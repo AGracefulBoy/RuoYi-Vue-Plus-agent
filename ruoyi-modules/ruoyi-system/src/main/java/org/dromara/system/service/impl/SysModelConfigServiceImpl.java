@@ -66,7 +66,7 @@ public class SysModelConfigServiceImpl implements ISysModelConfigService {
         lqw.like(StringUtils.isNotBlank(bo.getModelProvider()), SysModelConfig::getModelProvider, bo.getModelProvider());
         lqw.between(params.get("beginTime") != null && params.get("endTime") != null,
             SysModelConfig::getCreateTime, params.get("beginTime"), params.get("endTime"));
-        lqw.orderByDesc(SysModelConfig::getId);
+        lqw.orderByDesc(SysModelConfig::getModelId);
         return lqw;
     }
 
@@ -79,7 +79,7 @@ public class SysModelConfigServiceImpl implements ISysModelConfigService {
         validEntityBeforeSave(add);
         boolean flag = baseMapper.insert(add) > 0;
         if (flag) {
-            bo.setId(add.getId());
+            bo.setModelId(add.getModelId());
         }
         return flag;
     }
@@ -102,7 +102,7 @@ public class SysModelConfigServiceImpl implements ISysModelConfigService {
         if (StringUtils.isNotBlank(entity.getModelCode())) {
             boolean exists = baseMapper.exists(new LambdaQueryWrapper<SysModelConfig>()
                 .eq(SysModelConfig::getModelCode, entity.getModelCode())
-                .ne(ObjectUtil.isNotNull(entity.getId()), SysModelConfig::getId, entity.getId()));
+                .ne(ObjectUtil.isNotNull(entity.getModelId()), SysModelConfig::getModelId, entity.getModelId()));
             if (exists) {
                 throw new ServiceException("模型编码已存在");
             }

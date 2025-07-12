@@ -31,8 +31,8 @@ public class SysModelConfig extends TenantEntity {
     /**
      * 模型ID
      */
-    @TableId(value = "id")
-    private Long id;
+    @TableId(value = "model_id")
+    private Long modelId;
 
     /**
      * 模型编码

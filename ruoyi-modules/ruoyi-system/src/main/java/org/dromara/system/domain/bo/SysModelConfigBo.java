@@ -28,7 +28,7 @@ public class SysModelConfigBo extends BaseEntity {
      * 模型ID
      */
     @NotNull(message = "模型ID不能为空", groups = {EditGroup.class})
-    private Long id;
+    private Long modelId;
 
     /**
      * 模型编码
