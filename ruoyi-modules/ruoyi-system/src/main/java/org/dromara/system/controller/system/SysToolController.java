@@ -147,7 +147,7 @@ public class SysToolController extends BaseController {
      */
     @SaCheckPermission("system:tool:remove")
     @Log(title = "工具管理", businessType = BusinessType.DELETE)
-    @PostMapping("/{toolIds}")
+    @PostMapping("/remove")
     public R<Void> remove(@RequestBody List<Long> toolIds) {
         return toAjax(toolService.deleteWithValidByIds(toolIds, true));
     }

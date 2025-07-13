@@ -95,11 +95,11 @@ public class SysPythonPackageController extends BaseController {
     @PostMapping("/add")
     public R<Void> add(@Validated(AddGroup.class) @RequestBody List<SysPythonPackageBo> boList) {
         // 校验包名唯一性
-        for (SysPythonPackageBo bo : boList) {
-            if (!pythonPackageService.checkPackageNameUnique(bo)) {
-                return R.fail("新增Python包'" + bo.getPackageName() + "'失败，包名已存在");
-            }
-        }
+//        for (SysPythonPackageBo bo : boList) {
+//            if (!pythonPackageService.checkPackageNameUnique(bo)) {
+//                return R.fail("新增Python包'" + bo.getPackageName() + "'失败，包名已存在");
+//            }
+//        }
         return toAjax(pythonPackageService.insertBatchByBo(boList));
     }
 
@@ -110,9 +110,9 @@ public class SysPythonPackageController extends BaseController {
     @Log(title = "Python包管理", businessType = BusinessType.UPDATE)
     @PostMapping("/edit")
     public R<Void> edit(@Validated(EditGroup.class) @RequestBody SysPythonPackageBo bo) {
-        if (!pythonPackageService.checkPackageNameUnique(bo)) {
-            return R.fail("修改Python包'" + bo.getPackageName() + "'失败，包名已存在");
-        }
+//        if (!pythonPackageService.checkPackageNameUnique(bo)) {
+//            return R.fail("修改Python包'" + bo.getPackageName() + "'失败，包名已存在");
+//        }
         return toAjax(pythonPackageService.updateByBo(bo));
     }
 

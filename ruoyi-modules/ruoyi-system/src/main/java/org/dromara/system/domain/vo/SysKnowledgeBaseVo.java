@@ -141,4 +141,4 @@ public class SysKnowledgeBaseVo implements Serializable {
     @ExcelProperty(value = "备注")
     private String remark;
 
-} 
+}
