@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.dromara.system.mapper.SysKnowledgeBaseConfigMapper">
+
+    <resultMap type="SysKnowledgeBaseConfig" id="SysKnowledgeBaseConfigResult">
+        <result property="knowledgeBaseConfigId"    column="knowledge_base_config_id"    />
+        <result property="tenantId"    column="tenant_id"    />
+        <result property="topK"    column="top_k"    />
+        <result property="vectorWeight"    column="vector_weight"    />
+        <result property="delFlag"    column="del_flag"    />
+        <result property="metadata"    column="metadata"    />
+        <result property="model"    column="model"    />
+        <result property="blockSize"    column="block_size"    />
+        <result property="overlapSize"    column="overlap_size"    />
+        <result property="slicePrompt"    column="slice_prompt"    />
+        <result property="imagePrompt"    column="image_prompt"    />
+        <result property="createDept"    column="create_dept"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+
+    <sql id="selectSysKnowledgeBaseConfigVo">
+        select knowledge_base_config_id, tenant_id, top_k, vector_weight, del_flag, metadata, model, block_size, overlap_size, slice_prompt, image_prompt, create_dept, create_by, create_time, update_by, update_time, remark from sys_knowledge_base_config
+    </sql>
+
+</mapper> 
