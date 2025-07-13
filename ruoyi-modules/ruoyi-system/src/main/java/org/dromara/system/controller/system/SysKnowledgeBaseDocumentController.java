@@ -83,7 +83,7 @@ public class SysKnowledgeBaseDocumentController extends BaseController {
     @SaCheckPermission("system:knowledgeBaseDocument:add")
     @Log(title = "知识库文档管理", businessType = BusinessType.INSERT)
     @RepeatSubmit()
-    @PostMapping()
+    @PostMapping("/add")
     public R<Void> add(@Validated(AddGroup.class) @RequestBody SysKnowledgeBaseDocumentBo bo) {
         return toAjax(knowledgeBaseDocumentService.insertByBo(bo));
     }
@@ -94,7 +94,7 @@ public class SysKnowledgeBaseDocumentController extends BaseController {
     @SaCheckPermission("system:knowledgeBaseDocument:edit")
     @Log(title = "知识库文档管理", businessType = BusinessType.UPDATE)
     @RepeatSubmit()
-    @PutMapping()
+    @PostMapping("/edit")
     public R<Void> edit(@Validated(EditGroup.class) @RequestBody SysKnowledgeBaseDocumentBo bo) {
         return toAjax(knowledgeBaseDocumentService.updateByBo(bo));
     }
@@ -104,7 +104,7 @@ public class SysKnowledgeBaseDocumentController extends BaseController {
      */
     @SaCheckPermission("system:knowledgeBaseDocument:edit")
     @Log(title = "知识库文档管理", businessType = BusinessType.UPDATE)
-    @PutMapping("/updateStatus")
+    @PostMapping("/updateStatus")
     public R<Void> updateStatus(@RequestParam Long documentId, @RequestParam Integer status) {
         return toAjax(knowledgeBaseDocumentService.updateDocumentStatus(documentId, status));
     }
@@ -114,10 +114,10 @@ public class SysKnowledgeBaseDocumentController extends BaseController {
      */
     @SaCheckPermission("system:knowledgeBaseDocument:remove")
     @Log(title = "知识库文档管理", businessType = BusinessType.DELETE)
-    @DeleteMapping("/{documentIds}")
+    @PostMapping("/remove")
     public R<Void> remove(@NotEmpty(message = "主键不能为空")
-                          @PathVariable Long[] documentIds) {
-        return toAjax(knowledgeBaseDocumentService.deleteWithValidByIds(List.of(documentIds), true));
+                          @RequestBody List<Long> documentIds) {
+        return toAjax(knowledgeBaseDocumentService.deleteWithValidByIds(documentIds, true));
     }
 
     /**
@@ -125,7 +125,7 @@ public class SysKnowledgeBaseDocumentController extends BaseController {
      */
     @SaCheckPermission("system:knowledgeBaseDocument:remove")
     @Log(title = "知识库文档管理", businessType = BusinessType.DELETE)
-    @DeleteMapping("/deleteByKnowledgeBase/{knowledgeBaseId}")
+    @PostMapping("/deleteByKnowledgeBase/{knowledgeBaseId}")
     public R<Void> deleteByKnowledgeBase(@NotNull(message = "知识库ID不能为空")
                                          @PathVariable Long knowledgeBaseId) {
         return toAjax(knowledgeBaseDocumentService.deleteByKnowledgeBaseId(knowledgeBaseId));
@@ -139,4 +139,4 @@ public class SysKnowledgeBaseDocumentController extends BaseController {
         return R.ok(knowledgeBaseDocumentService.checkNameUnique(bo));
     }
 
-} 
+}
