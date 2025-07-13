@@ -106,4 +106,57 @@ public interface ISysPythonPackageService {
      */
     Boolean updateInstallStatus(Long packageId, String isInstalled);
 
+    /**
+     * 安装Python包
+     *
+     * @param packages 包名列表，多个包名用空格分隔
+     * @return 安装结果消息
+     */
+    String installPackages(String packages);
+
+    /**
+     * 卸载Python包
+     *
+     * @param packages 包名列表，多个包名用空格分隔
+     * @return 卸载结果消息
+     */
+    String uninstallPackages(String packages);
+
+    /**
+     * 根据包ID卸载Python包
+     *
+     * @param packageId 包ID
+     * @return 卸载结果消息
+     */
+    String uninstallPackageById(Long packageId);
+
+    /**
+     * 批量根据包ID卸载Python包
+     *
+     * @param packageIds 包ID列表
+     * @return 卸载结果消息
+     */
+    String uninstallPackagesByIds(List<Long> packageIds);
+
+    /**
+     * 测试连接
+     *
+     * @return 测试结果消息
+     */
+    String testConnection();
+
+    /**
+     * 获取已安装包列表
+     *
+     * @return 已安装包列表
+     */
+    String getInstalledPackages();
+
+    /**
+     * 同步包安装状态
+     *
+     * @return 同步结果消息
+     */
+    String syncPackageStatus();
+
 } 

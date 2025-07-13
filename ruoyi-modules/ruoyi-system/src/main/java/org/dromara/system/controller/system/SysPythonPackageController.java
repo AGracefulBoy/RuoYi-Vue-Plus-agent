@@ -140,4 +140,81 @@ public class SysPythonPackageController extends BaseController {
     public R<Void> remove(@RequestBody List<Long> packageIds) {
         return toAjax(pythonPackageService.deleteWithValidByIds(packageIds, true));
     }
+
+    /**
+     * 安装Python包
+     *
+     * @param packages 包名列表，多个包名用空格分隔
+     */
+    @SaCheckPermission("system:pythonPackage:install")
+    @Log(title = "Python包管理", businessType = BusinessType.UPDATE)
+    @PostMapping("/install")
+    public R<String> installPackages(@RequestParam String packages) {
+        return R.ok(pythonPackageService.installPackages(packages));
+    }
+
+    /**
+     * 卸载Python包
+     *
+     * @param packages 包名列表，多个包名用空格分隔
+     */
+    @SaCheckPermission("system:pythonPackage:uninstall")
+    @Log(title = "Python包管理", businessType = BusinessType.UPDATE)
+    @PostMapping("/uninstall")
+    public R<String> uninstallPackages(@RequestParam String packages) {
+        return R.ok(pythonPackageService.uninstallPackages(packages));
+    }
+
+    /**
+     * 根据包ID卸载Python包
+     *
+     * @param packageId 包ID
+     */
+    @SaCheckPermission("system:pythonPackage:uninstall")
+    @Log(title = "Python包管理", businessType = BusinessType.UPDATE)
+    @PostMapping("/uninstall/{packageId}")
+    public R<String> uninstallPackageById(@PathVariable Long packageId) {
+        return R.ok(pythonPackageService.uninstallPackageById(packageId));
+    }
+
+    /**
+     * 批量根据包ID卸载Python包
+     *
+     * @param packageIds 包ID列表
+     */
+    @SaCheckPermission("system:pythonPackage:uninstall")
+    @Log(title = "Python包管理", businessType = BusinessType.UPDATE)
+    @PostMapping("/uninstall/batch")
+    public R<String> uninstallPackagesByIds(@RequestBody List<Long> packageIds) {
+        return R.ok(pythonPackageService.uninstallPackagesByIds(packageIds));
+    }
+
+    /**
+     * 测试SSH连接
+     */
+    @SaCheckPermission("system:pythonPackage:test")
+    @Log(title = "Python包管理", businessType = BusinessType.OTHER)
+    @GetMapping("/testConnection")
+    public R<String> testConnection() {
+        return R.ok(pythonPackageService.testConnection());
+    }
+
+    /**
+     * 获取已安装包列表
+     */
+    @SaCheckPermission("system:pythonPackage:list")
+    @GetMapping("/installed")
+    public R<String> getInstalledPackages() {
+        return R.ok(pythonPackageService.getInstalledPackages());
+    }
+
+    /**
+     * 同步已安装包状态
+     */
+    @SaCheckPermission("system:pythonPackage:sync")
+    @Log(title = "Python包管理", businessType = BusinessType.UPDATE)
+    @PostMapping("/syncStatus")
+    public R<String> syncPackageStatus() {
+        return R.ok(pythonPackageService.syncPackageStatus());
+    }
 }

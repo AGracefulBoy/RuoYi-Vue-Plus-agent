@@ -276,3 +276,34 @@ warm-flow:
     - 255,205,23
     ## 已办理
     - 157,255,0
+
+# Python包管理配置
+python:
+  # 执行模式：local-本地执行, remote-远程执行
+  execution-mode: remote
+  # 本地模式配置
+  local:
+    # 虚拟环境路径
+    virtualenv-path: ./py-runtime
+    # 激活脚本路径
+    activate-script: ./myenv/bin/activate
+  # 远程模式配置
+  remote:
+    # 远程服务器地址
+    host: 192.168.1.100
+    # SSH端口
+    port: 22
+    # 用户名
+    username: root
+    # 密码（可选，建议使用密钥）
+    password:
+    # 私钥路径（可选）
+    private-key-path: ~/.ssh/id_rsa
+    # 私钥密码（可选）
+    private-key-passphrase:
+    # 连接超时时间（秒）
+    connection-timeout: 30
+    # 远程虚拟环境路径
+    virtualenv-path: /opt/py-runtime
+    # 远程激活脚本路径
+    activate-script: /opt/myenv/bin/activate
