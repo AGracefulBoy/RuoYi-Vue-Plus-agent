@@ -118,10 +118,10 @@ public class SysKnowledgeBaseController extends BaseController {
      */
     @SaCheckPermission("system:knowledgeBase:remove")
     @Log(title = "知识库管理", businessType = BusinessType.DELETE)
-    @DeleteMapping("/{knowledgeBaseIds}")
+    @PostMapping("/remove")
     public R<Void> remove(@NotEmpty(message = "主键不能为空")
-                          @PathVariable Long[] knowledgeBaseIds) {
-        return toAjax(knowledgeBaseService.deleteWithValidByIds(List.of(knowledgeBaseIds), true));
+                          @RequestBody List<Long> knowledgeBaseIds) {
+        return toAjax(knowledgeBaseService.deleteWithValidByIds(knowledgeBaseIds, true));
     }
 
     /**
@@ -132,4 +132,4 @@ public class SysKnowledgeBaseController extends BaseController {
         return R.ok(knowledgeBaseService.checkNameUnique(bo));
     }
 
-} 
+}
