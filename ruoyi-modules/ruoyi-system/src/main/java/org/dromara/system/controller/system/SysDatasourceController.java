@@ -74,13 +74,13 @@ public class SysDatasourceController extends BaseController {
     @SaCheckPermission("system:datasource:add")
     @Log(title = "数据源管理", businessType = BusinessType.INSERT)
     @RepeatSubmit
-    @PostMapping
+    @PostMapping("/add")
     public R<Void> add(@Validated(AddGroup.class) @RequestBody SysDatasourceBo bo) {
         // 校验数据源名称唯一性
         if (!datasourceService.checkDatasourceNameUnique(bo)) {
             return R.fail("新增数据源'" + bo.getDatasourceName() + "'失败，数据源名称已存在");
         }
-        
+
         // 校验数据源类型相关字段
         String validateResult = datasourceService.validateDatasourceFields(bo);
         if (validateResult != null) {
@@ -96,13 +96,13 @@ public class SysDatasourceController extends BaseController {
     @SaCheckPermission("system:datasource:edit")
     @Log(title = "数据源管理", businessType = BusinessType.UPDATE)
     @RepeatSubmit
-    @PutMapping
+    @PostMapping("edit")
     public R<Void> edit(@Validated(EditGroup.class) @RequestBody SysDatasourceBo bo) {
         // 校验数据源名称唯一性
         if (!datasourceService.checkDatasourceNameUnique(bo)) {
             return R.fail("修改数据源'" + bo.getDatasourceName() + "'失败，数据源名称已存在");
         }
-        
+
         // 校验数据源类型相关字段
         String validateResult = datasourceService.validateDatasourceFields(bo);
         if (validateResult != null) {
@@ -119,10 +119,10 @@ public class SysDatasourceController extends BaseController {
      */
     @SaCheckPermission("system:datasource:remove")
     @Log(title = "数据源管理", businessType = BusinessType.DELETE)
-    @DeleteMapping("/{datasourceIds}")
+    @PostMapping("/remove")
     public R<Void> remove(@NotEmpty(message = "数据源ID不能为空")
-                          @PathVariable Long[] datasourceIds) {
-        return toAjax(datasourceService.deleteWithValidByIds(List.of(datasourceIds), true));
+                          @RequestBody List<Long> datasourceIds) {
+        return toAjax(datasourceService.deleteWithValidByIds(datasourceIds, true));
     }
 
     /**
@@ -179,7 +179,7 @@ public class SysDatasourceController extends BaseController {
      */
     @SaCheckPermission("system:datasource:edit")
     @Log(title = "设置默认数据源", businessType = BusinessType.UPDATE)
-    @PutMapping("/setDefault/{datasourceId}")
+    @PostMapping("/setDefault/{datasourceId}")
     public R<Void> setDefaultDatasource(@NotNull(message = "数据源ID不能为空")
                                         @PathVariable Long datasourceId) {
         return toAjax(datasourceService.setDefaultDatasource(datasourceId));
@@ -249,4 +249,4 @@ public class SysDatasourceController extends BaseController {
         return R.ok(datasourceService.checkDatasourceNameUnique(datasource));
     }
 
-} 
+}
