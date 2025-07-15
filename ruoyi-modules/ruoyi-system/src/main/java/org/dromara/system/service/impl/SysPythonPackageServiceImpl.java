@@ -7,21 +7,22 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.dromara.common.core.constant.SystemConstants;
 import org.dromara.common.core.exception.ServiceException;
+import org.dromara.common.core.exception.base.BaseException;
 import org.dromara.common.core.utils.MapstructUtils;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
-import org.dromara.system.domain.SysDept;
-import org.dromara.system.domain.SysPythonPackage;
+import org.dromara.common.satoken.utils.LoginHelper;
 import org.dromara.system.config.PythonProperties;
+import org.dromara.system.domain.SysPythonPackage;
 import org.dromara.system.domain.bo.SysPythonPackageBo;
 import org.dromara.system.domain.vo.SysPythonPackageVo;
 import org.dromara.system.mapper.SysPythonPackageMapper;
 import org.dromara.system.service.ISysPythonPackageService;
 import org.dromara.system.util.SshUtil;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -80,8 +81,6 @@ public class SysPythonPackageServiceImpl implements ISysPythonPackageService {
         lqw.like(StringUtils.isNotBlank(bo.getPackageName()), SysPythonPackage::getPackageName, bo.getPackageName());
         lqw.eq(StringUtils.isNotBlank(bo.getPackageVersion()), SysPythonPackage::getPackageVersion, bo.getPackageVersion());
         lqw.like(StringUtils.isNotBlank(bo.getPackageDescription()), SysPythonPackage::getPackageDescription, bo.getPackageDescription());
-        lqw.eq(StringUtils.isNotBlank(bo.getIsInstalled()), SysPythonPackage::getIsInstalled, bo.getIsInstalled());
-        lqw.like(StringUtils.isNotBlank(bo.getRemark()), SysPythonPackage::getRemark, bo.getRemark());
         lqw.between(params.get("beginTime") != null && params.get("endTime") != null,
             SysPythonPackage::getCreateTime, params.get("beginTime"), params.get("endTime"));
         lqw.orderByDesc(SysPythonPackage::getCreateTime);
@@ -92,6 +91,7 @@ public class SysPythonPackageServiceImpl implements ISysPythonPackageService {
      * 新增Python包管理
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Boolean insertByBo(SysPythonPackageBo bo) {
         SysPythonPackage add = MapstructUtils.convert(bo, SysPythonPackage.class);
         validEntityBeforeSave(add);
@@ -128,6 +128,7 @@ public class SysPythonPackageServiceImpl implements ISysPythonPackageService {
      * 批量新增Python包管理
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Boolean insertBatchByBo(List<SysPythonPackageBo> boList) {
         List<SysPythonPackage> addList = MapstructUtils.convert(boList, SysPythonPackage.class);
         for (SysPythonPackage entity : addList) {
@@ -163,9 +164,9 @@ public class SysPythonPackageServiceImpl implements ISysPythonPackageService {
                 log.info("批量创建Python包成功并自动安装依赖：{}", cleanedPackages);
             } catch (Exception e) {
                 log.error("创建Python包后自动安装依赖失败：{}", e.getMessage(), e);
+                throw new ServiceException("Python安装依赖失败,请检查后重新安装");
             }
         }
-
         return result;
     }
 
@@ -204,7 +205,8 @@ public class SysPythonPackageServiceImpl implements ISysPythonPackageService {
     public boolean checkPackageNameUnique(SysPythonPackageBo bo) {
         boolean exist = baseMapper.exists(new LambdaQueryWrapper<SysPythonPackage>()
             .eq(SysPythonPackage::getPackageName, bo.getPackageName())
-            .ne(ObjectUtil.isNotNull(bo.getPackageId()), SysPythonPackage::getPackageId, bo.getPackageId()));
+            .eq(SysPythonPackage::getPackageVersion, bo.getPackageVersion())
+            .eq(SysPythonPackage::getUpdateBy, LoginHelper.getLoginUser().getUserId()));
         return !exist;
     }
 
@@ -261,6 +263,7 @@ public class SysPythonPackageServiceImpl implements ISysPythonPackageService {
      * 根据包ID卸载Python包
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public String uninstallPackageById(Long packageId) {
         // 查询包信息
         SysPythonPackageVo packageVo = queryById(packageId);
@@ -268,33 +271,11 @@ public class SysPythonPackageServiceImpl implements ISysPythonPackageService {
             throw new ServiceException("包不存在，ID: " + packageId);
         }
 
-        // 检查包是否已安装
-        if (!"1".equals(packageVo.getIsInstalled())) {
-            return "包 " + packageVo.getPackageName() + " 未安装，无需卸载";
+        if (baseMapper.deleteBatchIds(List.of(packageId)) > 0) {
+            return String.format("成功卸载包 %s (版本: %s)", packageVo.getPackageName(), packageVo.getPackageVersion());
         }
 
-        // 检查远程环境中的包版本
-        String installedVersion = getInstalledPackageVersion(packageVo.getPackageName());
-        if (installedVersion == null) {
-            log.warn("包 {} 在远程环境中未找到，可能已被手动卸载", packageVo.getPackageName());
-            // 更新数据库状态为未安装
-            updateInstallStatus(packageId, "0");
-            return "包 " + packageVo.getPackageName() + " 在远程环境中未找到，已更新数据库状态";
-        }
-
-        // 验证版本是否匹配
-        if (!installedVersion.equals(packageVo.getPackageVersion())) {
-            log.warn("包 {} 版本不匹配，数据库版本: {}, 实际安装版本: {}",
-                    packageVo.getPackageName(), packageVo.getPackageVersion(), installedVersion);
-        }
-
-        // 执行卸载
-        execPip("uninstall", "-y", packageVo.getPackageName());
-
-        // 更新数据库状态为未安装
-        updateInstallStatus(packageId, "0");
-
-        return String.format("成功卸载包 %s (版本: %s)", packageVo.getPackageName(), installedVersion);
+        throw new BaseException(String.format("卸载包 %s (版本: %s)失败", packageVo.getPackageName(), packageVo.getPackageVersion()));
     }
 
     /**
@@ -324,7 +305,7 @@ public class SysPythonPackageServiceImpl implements ISysPythonPackageService {
         }
 
         return String.format("批量卸载完成，成功: %d个，跳过: %d个，失败: %d个。详情: %s",
-                successCount, skipCount, errorCount, result.toString());
+            successCount, skipCount, errorCount, result.toString());
     }
 
     /**
@@ -412,17 +393,17 @@ public class SysPythonPackageServiceImpl implements ISysPythonPackageService {
 
                 if (isCurrentlyInstalled) {
                     syncDetails.append(String.format("包 %s 已安装（版本: %s），更新状态为已安装; ",
-                            packageVo.getPackageName(), installedVersion));
+                        packageVo.getPackageName(), installedVersion));
                 } else {
                     syncDetails.append(String.format("包 %s 未安装，更新状态为未安装; ",
-                            packageVo.getPackageName()));
+                        packageVo.getPackageName()));
                 }
             }
 
             // 如果版本不一致，记录警告
             if (isCurrentlyInstalled && !installedVersion.equals(packageVo.getPackageVersion())) {
                 syncDetails.append(String.format("警告：包 %s 版本不一致，数据库版本: %s，实际版本: %s; ",
-                        packageVo.getPackageName(), packageVo.getPackageVersion(), installedVersion));
+                    packageVo.getPackageName(), packageVo.getPackageVersion(), installedVersion));
             }
         }
 
@@ -541,9 +522,9 @@ public class SysPythonPackageServiceImpl implements ISysPythonPackageService {
     private String buildRemoteCommand(String... command) {
         // 先切换到虚拟环境目录，然后激活虚拟环境，最后执行pip命令
         return String.format("cd %s && source %s && pip %s",
-                pythonProperties.getRemote().getVirtualenvPath(),
-                pythonProperties.getRemote().getActivateScript(),
-                String.join(" ", command));
+            pythonProperties.getRemote().getVirtualenvPath(),
+            pythonProperties.getRemote().getActivateScript(),
+            String.join(" ", command));
     }
 
     /**
@@ -558,9 +539,9 @@ public class SysPythonPackageServiceImpl implements ISysPythonPackageService {
             if (pythonProperties.isRemoteMode()) {
                 // 远程模式：通过SSH执行
                 String command = String.format("cd %s && source %s && pip show %s | grep Version | cut -d ' ' -f 2",
-                        pythonProperties.getRemote().getVirtualenvPath(),
-                        pythonProperties.getRemote().getActivateScript(),
-                        packageName);
+                    pythonProperties.getRemote().getVirtualenvPath(),
+                    pythonProperties.getRemote().getActivateScript(),
+                    packageName);
                 output = SshUtil.executeRemoteCommand(pythonProperties.getRemote(), command);
             } else {
                 // 本地模式：通过本地进程执行
@@ -568,9 +549,9 @@ public class SysPythonPackageServiceImpl implements ISysPythonPackageService {
                 cmds.add("bash");
                 cmds.add("-c");
                 cmds.add(String.format("cd %s && source %s && pip show %s | grep Version | cut -d ' ' -f 2",
-                        pythonProperties.getLocal().getVirtualenvPath(),
-                        pythonProperties.getLocal().getActivateScript(),
-                        packageName));
+                    pythonProperties.getLocal().getVirtualenvPath(),
+                    pythonProperties.getLocal().getActivateScript(),
+                    packageName));
 
                 ProcessBuilder processBuilder = new ProcessBuilder(cmds);
                 Process process = processBuilder.start();
@@ -610,8 +591,8 @@ public class SysPythonPackageServiceImpl implements ISysPythonPackageService {
             if (pythonProperties.isRemoteMode()) {
                 // 远程模式：通过SSH执行
                 String command = String.format("cd %s && source %s && pip list --format=freeze",
-                        pythonProperties.getRemote().getVirtualenvPath(),
-                        pythonProperties.getRemote().getActivateScript());
+                    pythonProperties.getRemote().getVirtualenvPath(),
+                    pythonProperties.getRemote().getActivateScript());
                 output = SshUtil.executeRemoteCommand(pythonProperties.getRemote(), command);
             } else {
                 // 本地模式：通过本地进程执行
@@ -619,8 +600,8 @@ public class SysPythonPackageServiceImpl implements ISysPythonPackageService {
                 cmds.add("bash");
                 cmds.add("-c");
                 cmds.add(String.format("cd %s && source %s && pip list --format=freeze",
-                        pythonProperties.getLocal().getVirtualenvPath(),
-                        pythonProperties.getLocal().getActivateScript()));
+                    pythonProperties.getLocal().getVirtualenvPath(),
+                    pythonProperties.getLocal().getActivateScript()));
 
                 ProcessBuilder processBuilder = new ProcessBuilder(cmds);
                 Process process = processBuilder.start();

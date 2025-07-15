@@ -17,7 +17,7 @@ import org.dromara.system.domain.bo.SysAgentBo;
 import org.dromara.system.domain.vo.SysAgentVo;
 import org.dromara.system.mapper.SysAgentMapper;
 import org.dromara.system.service.ISysAgentService;
-import org.dromara.system.service.ISysOssService;
+
 import org.springframework.stereotype.Service;
 
 import java.util.Collection;
@@ -33,19 +33,13 @@ import java.util.List;
 public class SysAgentServiceImpl implements ISysAgentService {
 
     private final SysAgentMapper baseMapper;
-    private final ISysOssService ossService;
 
     /**
      * 查询智能体管理
      */
     @Override
     public SysAgentVo queryById(Long agentId) {
-        SysAgentVo agentVo = baseMapper.selectVoById(agentId);
-        if (agentVo != null && agentVo.getAvatar() != null) {
-            // 获取头像URL
-            agentVo.setAvatarUrl(ossService.getById(agentVo.getAvatar()).getUrl());
-        }
-        return agentVo;
+        return baseMapper.selectVoById(agentId);
     }
 
     /**

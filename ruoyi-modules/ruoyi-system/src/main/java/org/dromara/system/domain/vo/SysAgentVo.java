@@ -62,14 +62,9 @@ public class SysAgentVo implements Serializable {
     private String agentType;
 
     /**
-     * 智能体头像OSS文件ID
-     */
-    private Long avatar;
-
-    /**
      * 智能体头像URL
      */
-    private String avatarUrl;
+    private String avatar;
 
     /**
      * 智能体提示词

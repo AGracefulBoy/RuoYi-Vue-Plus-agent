@@ -200,7 +200,6 @@ public class SysDatasourceVo implements Serializable {
      * 创建者
      */
     @ExcelProperty(value = "创建者")
-    @Translation(type = TransConstant.USER_ID_TO_NAME, mapper = "createBy")
     private String createByName;
 
     /**
@@ -213,7 +212,6 @@ public class SysDatasourceVo implements Serializable {
      * 更新者
      */
     @ExcelProperty(value = "更新者")
-    @Translation(type = TransConstant.USER_ID_TO_NAME, mapper = "updateBy")
     private String updateByName;
 
     /**

@@ -95,11 +95,11 @@ public class SysPythonPackageController extends BaseController {
     @PostMapping("/add")
     public R<Void> add(@Validated(AddGroup.class) @RequestBody List<SysPythonPackageBo> boList) {
         // 校验包名唯一性
-//        for (SysPythonPackageBo bo : boList) {
-//            if (!pythonPackageService.checkPackageNameUnique(bo)) {
-//                return R.fail("新增Python包'" + bo.getPackageName() + "'失败，包名已存在");
-//            }
-//        }
+        for (SysPythonPackageBo bo : boList) {
+            if (!pythonPackageService.checkPackageNameUnique(bo)) {
+                return R.fail("新增Python包'" + bo.getPackageName() + "'失败，包名及版本已存在");
+            }
+        }
         return toAjax(pythonPackageService.insertBatchByBo(boList));
     }
 

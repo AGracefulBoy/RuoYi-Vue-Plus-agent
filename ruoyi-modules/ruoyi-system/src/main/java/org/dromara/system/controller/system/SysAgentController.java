@@ -73,7 +73,7 @@ public class SysAgentController extends BaseController {
     @SaCheckPermission("system:agent:add")
     @Log(title = "智能体管理", businessType = BusinessType.INSERT)
     @RepeatSubmit()
-    @PostMapping()
+    @PostMapping("/add")
     public R<Void> add(@Validated(AddGroup.class) @RequestBody SysAgentBo bo) {
         return toAjax(agentService.insertByBo(bo));
     }
@@ -84,7 +84,7 @@ public class SysAgentController extends BaseController {
     @SaCheckPermission("system:agent:edit")
     @Log(title = "智能体管理", businessType = BusinessType.UPDATE)
     @RepeatSubmit()
-    @PutMapping()
+    @PostMapping("/edit")
     public R<Void> edit(@Validated(EditGroup.class) @RequestBody SysAgentBo bo) {
         return toAjax(agentService.updateByBo(bo));
     }
@@ -94,7 +94,7 @@ public class SysAgentController extends BaseController {
      */
     @SaCheckPermission("system:agent:edit")
     @Log(title = "智能体管理", businessType = BusinessType.UPDATE)
-    @PutMapping("/changeStatus")
+    @PostMapping("/changeStatus")
     public R<Void> changeStatus(@RequestBody SysAgentBo bo) {
         return toAjax(agentService.updateAgentStatus(bo.getAgentId(), bo.getStatus()));
     }
@@ -106,10 +106,10 @@ public class SysAgentController extends BaseController {
      */
     @SaCheckPermission("system:agent:remove")
     @Log(title = "智能体管理", businessType = BusinessType.DELETE)
-    @DeleteMapping("/{agentIds}")
+    @PostMapping("/remove")
     public R<Void> remove(@NotNull(message = "智能体ID不能为空")
-                          @PathVariable Long[] agentIds) {
-        return toAjax(agentService.deleteWithValidByIds(List.of(agentIds), true));
+                          @RequestBody List<Long> agentIds) {
+        return toAjax(agentService.deleteWithValidByIds(agentIds, true));
     }
 
     /**
@@ -150,4 +150,4 @@ public class SysAgentController extends BaseController {
     public R<List<SysAgentVo>> getAvailableAgents() {
         return R.ok(agentService.queryByStatus("0"));
     }
-} 
+}

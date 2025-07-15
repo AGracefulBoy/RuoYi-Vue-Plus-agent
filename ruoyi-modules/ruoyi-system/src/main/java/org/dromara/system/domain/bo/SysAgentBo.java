@@ -50,9 +50,10 @@ public class SysAgentBo extends BaseEntity {
     private String agentType;
 
     /**
-     * 智能体头像OSS文件ID
+     * 智能体头像URL
      */
-    private Long avatar;
+    @Size(min = 0, max = 500, message = "智能体头像URL长度不能超过{max}个字符")
+    private String avatar;
 
     /**
      * 智能体提示词

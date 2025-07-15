@@ -16,6 +16,7 @@ import org.dromara.system.domain.vo.SysModelConfigVo;
 import org.dromara.system.mapper.SysModelConfigMapper;
 import org.dromara.system.service.ISysModelConfigService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
 import java.util.List;
@@ -74,6 +75,7 @@ public class SysModelConfigServiceImpl implements ISysModelConfigService {
      * 新增模型配置
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Boolean insertByBo(SysModelConfigBo bo) {
         SysModelConfig add = MapstructUtils.convert(bo, SysModelConfig.class);
         validEntityBeforeSave(add);
@@ -88,6 +90,7 @@ public class SysModelConfigServiceImpl implements ISysModelConfigService {
      * 修改模型配置
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Boolean updateByBo(SysModelConfigBo bo) {
         SysModelConfig update = MapstructUtils.convert(bo, SysModelConfig.class);
         validEntityBeforeSave(update);
@@ -113,6 +116,7 @@ public class SysModelConfigServiceImpl implements ISysModelConfigService {
      * 批量删除模型配置
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Boolean deleteWithValidByIds(Collection<Long> ids, Boolean isValid) {
         if (isValid) {
             // 做一些业务上的校验,判断是否需要校验

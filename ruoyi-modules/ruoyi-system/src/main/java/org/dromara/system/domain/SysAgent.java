@@ -48,9 +48,9 @@ public class SysAgent extends TenantEntity {
     private String agentType;
 
     /**
-     * 智能体头像OSS文件ID
+     * 智能体头像URL
      */
-    private Long avatar;
+    private String avatar;
 
     /**
      * 智能体提示词
