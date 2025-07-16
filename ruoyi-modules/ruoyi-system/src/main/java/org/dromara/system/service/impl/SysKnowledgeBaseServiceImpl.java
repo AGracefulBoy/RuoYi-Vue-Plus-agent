@@ -3,6 +3,7 @@ package org.dromara.system.service.impl;
 import cn.hutool.core.util.ObjectUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
@@ -49,7 +50,8 @@ public class SysKnowledgeBaseServiceImpl implements ISysKnowledgeBaseService {
     @Override
     public TableDataInfo<SysKnowledgeBaseVo> queryPageList(SysKnowledgeBaseBo bo, PageQuery pageQuery) {
         LambdaQueryWrapper<SysKnowledgeBase> lqw = buildQueryWrapper(bo);
-        Page<SysKnowledgeBaseVo> result = baseMapper.selectVoPage(pageQuery.build(), lqw);
+        Page<SysKnowledgeBase> page = pageQuery.build();
+        IPage<SysKnowledgeBaseVo> result = baseMapper.selectKnowledgeBaseListVoPage(page, lqw);
         return TableDataInfo.build(result);
     }
 
@@ -59,7 +61,7 @@ public class SysKnowledgeBaseServiceImpl implements ISysKnowledgeBaseService {
     @Override
     public List<SysKnowledgeBaseVo> queryList(SysKnowledgeBaseBo bo) {
         LambdaQueryWrapper<SysKnowledgeBase> lqw = buildQueryWrapper(bo);
-        return baseMapper.selectVoList(lqw);
+        return baseMapper.selectKnowledgeBaseListVo(lqw);
     }
 
     private LambdaQueryWrapper<SysKnowledgeBase> buildQueryWrapper(SysKnowledgeBaseBo bo) {
@@ -72,8 +74,7 @@ public class SysKnowledgeBaseServiceImpl implements ISysKnowledgeBaseService {
         lqw.eq(ObjectUtil.isNotNull(bo.getBlockSize()), SysKnowledgeBase::getBlockSize, bo.getBlockSize());
         lqw.eq(ObjectUtil.isNotNull(bo.getOverlapSize()), SysKnowledgeBase::getOverlapSize, bo.getOverlapSize());
         lqw.eq(StringUtils.isNotBlank(bo.getStatus()), SysKnowledgeBase::getStatus, bo.getStatus());
-        // 过滤已删除的数据
-        lqw.eq(SysKnowledgeBase::getDelFlag, SystemConstants.NORMAL);
+        // 注意：del_flag 的过滤已经在 Mapper 的 SQL 中处理，这里不再添加
         return lqw;
     }
 

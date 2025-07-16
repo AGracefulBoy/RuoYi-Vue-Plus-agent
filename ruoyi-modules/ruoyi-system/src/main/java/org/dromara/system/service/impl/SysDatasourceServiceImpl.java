@@ -3,6 +3,7 @@ package org.dromara.system.service.impl;
 import cn.hutool.core.util.ObjectUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
@@ -51,14 +52,15 @@ public class SysDatasourceServiceImpl implements ISysDatasourceService {
     @Override
     public TableDataInfo<SysDatasourceVo> queryPageList(SysDatasourceBo bo, PageQuery pageQuery) {
         LambdaQueryWrapper<SysDatasource> lqw = buildQueryWrapper(bo);
-        Page<SysDatasourceVo> result = baseMapper.selectVoPage(pageQuery.build(), lqw);
+        Page<SysDatasource> page = pageQuery.build();
+        IPage<SysDatasourceVo> result = baseMapper.selectDatasourceListVoPage(page, lqw);
         return TableDataInfo.build(result);
     }
 
     @Override
     public List<SysDatasourceVo> queryList(SysDatasourceBo bo) {
         LambdaQueryWrapper<SysDatasource> lqw = buildQueryWrapper(bo);
-        return baseMapper.selectVoList(lqw);
+        return baseMapper.selectDatasourceListVo(lqw);
     }
 
     private LambdaQueryWrapper<SysDatasource> buildQueryWrapper(SysDatasourceBo bo) {
@@ -69,8 +71,7 @@ public class SysDatasourceServiceImpl implements ISysDatasourceService {
         lqw.eq(StringUtils.isNotBlank(bo.getStatus()), SysDatasource::getStatus, bo.getStatus());
         lqw.eq(StringUtils.isNotBlank(bo.getIsDefault()), SysDatasource::getIsDefault, bo.getIsDefault());
         lqw.eq(StringUtils.isNotBlank(bo.getConnectionStatus()), SysDatasource::getConnectionStatus, bo.getConnectionStatus());
-        // 过滤已删除的数据
-        lqw.eq(SysDatasource::getDelFlag, SystemConstants.NORMAL);
+        // 注意：del_flag 的过滤已经在 Mapper 的 SQL 中处理，这里不再添加
         lqw.orderByDesc(SysDatasource::getCreateTime);
         return lqw;
     }

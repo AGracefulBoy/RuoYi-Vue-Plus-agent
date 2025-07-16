@@ -4,6 +4,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.ObjectUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
@@ -49,7 +50,8 @@ public class SysAgentServiceImpl implements ISysAgentService {
     @Override
     public TableDataInfo<SysAgentVo> queryPageList(SysAgentBo bo, PageQuery pageQuery) {
         LambdaQueryWrapper<SysAgent> lqw = buildQueryWrapper(bo);
-        Page<SysAgentVo> result = baseMapper.selectPageAgentList(pageQuery.build(), lqw);
+        Page<SysAgent> page = pageQuery.build();
+        IPage<SysAgentVo> result = baseMapper.selectAgentListVoPage(page, lqw);
         return TableDataInfo.build(result);
     }
 
@@ -59,7 +61,7 @@ public class SysAgentServiceImpl implements ISysAgentService {
     @Override
     public List<SysAgentVo> queryList(SysAgentBo bo) {
         LambdaQueryWrapper<SysAgent> lqw = buildQueryWrapper(bo);
-        return baseMapper.selectVoList(lqw);
+        return baseMapper.selectAgentListVo(lqw);
     }
 
     private LambdaQueryWrapper<SysAgent> buildQueryWrapper(SysAgentBo bo) {
@@ -71,8 +73,7 @@ public class SysAgentServiceImpl implements ISysAgentService {
         lqw.eq(StringUtils.isNotBlank(bo.getConversationMode()), SysAgent::getConversationMode, bo.getConversationMode());
         lqw.like(StringUtils.isNotBlank(bo.getModel()), SysAgent::getModel, bo.getModel());
         lqw.like(StringUtils.isNotBlank(bo.getEnhanceModel()), SysAgent::getEnhanceModel, bo.getEnhanceModel());
-        // 过滤已删除的数据
-        lqw.eq(SysAgent::getDelFlag, SystemConstants.NORMAL);
+        // 注意：del_flag 的过滤已经在 Mapper 的 SQL 中处理，这里不再添加
         lqw.orderByDesc(SysAgent::getCreateTime);
         return lqw;
     }
@@ -203,10 +204,9 @@ public class SysAgentServiceImpl implements ISysAgentService {
         LambdaQueryWrapper<SysAgent> wrapper = Wrappers.lambdaQuery();
         wrapper.eq(SysAgent::getAgentType, agentType);
         wrapper.eq(SysAgent::getStatus, "0"); // 只查询正常状态的智能体
-        // 过滤已删除的数据
-        wrapper.eq(SysAgent::getDelFlag, SystemConstants.NORMAL);
+        // 注意：del_flag 的过滤已经在 Mapper 的 SQL 中处理，这里不再添加
         wrapper.orderByDesc(SysAgent::getCreateTime);
-        return baseMapper.selectVoList(wrapper);
+        return baseMapper.selectAgentListVo(wrapper);
     }
 
     /**
@@ -216,9 +216,8 @@ public class SysAgentServiceImpl implements ISysAgentService {
     public List<SysAgentVo> queryByStatus(String status) {
         LambdaQueryWrapper<SysAgent> wrapper = Wrappers.lambdaQuery();
         wrapper.eq(SysAgent::getStatus, status);
-        // 过滤已删除的数据
-        wrapper.eq(SysAgent::getDelFlag, SystemConstants.NORMAL);
+        // 注意：del_flag 的过滤已经在 Mapper 的 SQL 中处理，这里不再添加
         wrapper.orderByDesc(SysAgent::getCreateTime);
-        return baseMapper.selectVoList(wrapper);
+        return baseMapper.selectAgentListVo(wrapper);
     }
 } 

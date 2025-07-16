@@ -197,7 +197,12 @@ public class SysDatasourceVo implements Serializable {
     private String remark;
 
     /**
-     * 创建者
+     * 创建者ID
+     */
+    private Long createBy;
+
+    /**
+     * 创建者名称
      */
     @ExcelProperty(value = "创建者")
     private String createByName;
@@ -209,7 +214,12 @@ public class SysDatasourceVo implements Serializable {
     private LocalDateTime createTime;
 
     /**
-     * 更新者
+     * 更新者ID
+     */
+    private Long updateBy;
+
+    /**
+     * 更新者名称
      */
     @ExcelProperty(value = "更新者")
     private String updateByName;
