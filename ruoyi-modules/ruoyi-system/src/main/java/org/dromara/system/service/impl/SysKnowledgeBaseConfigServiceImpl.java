@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.dromara.common.core.constant.SystemConstants;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.MapstructUtils;
 import org.dromara.common.core.utils.StringUtils;
@@ -82,6 +83,8 @@ public class SysKnowledgeBaseConfigServiceImpl implements ISysKnowledgeBaseConfi
         lqw.like(StringUtils.isNotBlank(bo.getSlicePrompt()), SysKnowledgeBaseConfig::getSlicePrompt, bo.getSlicePrompt());
         lqw.like(StringUtils.isNotBlank(bo.getImagePrompt()), SysKnowledgeBaseConfig::getImagePrompt, bo.getImagePrompt());
         lqw.like(StringUtils.isNotBlank(bo.getRemark()), SysKnowledgeBaseConfig::getRemark, bo.getRemark());
+        // 过滤已删除的数据
+        lqw.eq(SysKnowledgeBaseConfig::getDelFlag, SystemConstants.NORMAL);
         return lqw;
     }
 
@@ -150,6 +153,8 @@ public class SysKnowledgeBaseConfigServiceImpl implements ISysKnowledgeBaseConfi
     @Override
     public SysKnowledgeBaseConfigVo getDefaultConfig() {
         LambdaQueryWrapper<SysKnowledgeBaseConfig> lqw = Wrappers.lambdaQuery();
+        // 过滤已删除的数据
+        lqw.eq(SysKnowledgeBaseConfig::getDelFlag, SystemConstants.NORMAL);
         lqw.orderByDesc(SysKnowledgeBaseConfig::getCreateTime);
         lqw.last("LIMIT 1");
         SysKnowledgeBaseConfigVo config = baseMapper.selectVoOne(lqw);

@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.dromara.common.core.constant.SystemConstants;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.MapstructUtils;
 import org.dromara.common.core.utils.StringUtils;
@@ -88,6 +89,8 @@ public class SysKnowledgeBaseDocumentServiceImpl implements ISysKnowledgeBaseDoc
     public List<SysKnowledgeBaseDocumentVo> queryByKnowledgeBaseId(Long knowledgeBaseId) {
         LambdaQueryWrapper<SysKnowledgeBaseDocument> lqw = Wrappers.lambdaQuery();
         lqw.eq(SysKnowledgeBaseDocument::getKnowledgeBaseId, knowledgeBaseId);
+        // 过滤已删除的数据
+        lqw.eq(SysKnowledgeBaseDocument::getDelFlag, SystemConstants.NORMAL);
         lqw.orderByDesc(SysKnowledgeBaseDocument::getCreateTime);
         
         List<SysKnowledgeBaseDocumentVo> list = baseMapper.selectVoList(lqw);
@@ -105,6 +108,8 @@ public class SysKnowledgeBaseDocumentServiceImpl implements ISysKnowledgeBaseDoc
         lqw.eq(StringUtils.isNotBlank(bo.getType()), SysKnowledgeBaseDocument::getType, bo.getType());
         lqw.eq(ObjectUtil.isNotNull(bo.getStatus()), SysKnowledgeBaseDocument::getStatus, bo.getStatus());
         lqw.eq(ObjectUtil.isNotNull(bo.getUploadTime()), SysKnowledgeBaseDocument::getUploadTime, bo.getUploadTime());
+        // 过滤已删除的数据
+        lqw.eq(SysKnowledgeBaseDocument::getDelFlag, SystemConstants.NORMAL);
         lqw.orderByDesc(SysKnowledgeBaseDocument::getCreateTime);
         return lqw;
     }
@@ -223,6 +228,8 @@ public class SysKnowledgeBaseDocumentServiceImpl implements ISysKnowledgeBaseDoc
         lqw.eq(SysKnowledgeBaseDocument::getName, bo.getName());
         lqw.eq(SysKnowledgeBaseDocument::getKnowledgeBaseId, bo.getKnowledgeBaseId());
         lqw.ne(ObjectUtil.isNotNull(bo.getDocumentId()), SysKnowledgeBaseDocument::getDocumentId, bo.getDocumentId());
+        // 过滤已删除的数据
+        lqw.eq(SysKnowledgeBaseDocument::getDelFlag, SystemConstants.NORMAL);
         return !baseMapper.exists(lqw);
     }
 

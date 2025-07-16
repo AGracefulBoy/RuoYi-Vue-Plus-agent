@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
+import org.dromara.common.core.constant.SystemConstants;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.MapstructUtils;
 import org.dromara.common.core.utils.StringUtils;
@@ -67,6 +68,8 @@ public class SysModelConfigServiceImpl implements ISysModelConfigService {
         lqw.like(StringUtils.isNotBlank(bo.getModelProvider()), SysModelConfig::getModelProvider, bo.getModelProvider());
         lqw.between(params.get("beginTime") != null && params.get("endTime") != null,
             SysModelConfig::getCreateTime, params.get("beginTime"), params.get("endTime"));
+        // 过滤已删除的数据
+        lqw.eq(SysModelConfig::getDelFlag, SystemConstants.NORMAL);
         lqw.orderByDesc(SysModelConfig::getModelId);
         return lqw;
     }
@@ -130,7 +133,9 @@ public class SysModelConfigServiceImpl implements ISysModelConfigService {
     @Override
     public SysModelConfigVo queryByModelCode(String modelCode) {
         return baseMapper.selectVoOne(new LambdaQueryWrapper<SysModelConfig>()
-            .eq(SysModelConfig::getModelCode, modelCode));
+            .eq(SysModelConfig::getModelCode, modelCode)
+            // 过滤已删除的数据
+            .eq(SysModelConfig::getDelFlag, SystemConstants.NORMAL));
     }
 
     /**
@@ -139,7 +144,9 @@ public class SysModelConfigServiceImpl implements ISysModelConfigService {
     @Override
     public List<SysModelConfigVo> queryByModelProvider(String modelProvider) {
         return baseMapper.selectVoList(new LambdaQueryWrapper<SysModelConfig>()
-            .eq(SysModelConfig::getModelProvider, modelProvider));
+            .eq(SysModelConfig::getModelProvider, modelProvider)
+            // 过滤已删除的数据
+            .eq(SysModelConfig::getDelFlag, SystemConstants.NORMAL));
     }
 
     /**
@@ -148,7 +155,9 @@ public class SysModelConfigServiceImpl implements ISysModelConfigService {
     @Override
     public List<SysModelConfigVo> queryByModelType(String modelType) {
         return baseMapper.selectVoList(new LambdaQueryWrapper<SysModelConfig>()
-            .apply("JSON_CONTAINS(model_type, {0})", "\"" + modelType + "\""));
+            .apply("JSON_CONTAINS(model_type, {0})", "\"" + modelType + "\"")
+            // 过滤已删除的数据
+            .eq(SysModelConfig::getDelFlag, SystemConstants.NORMAL));
     }
 
     /**
@@ -157,7 +166,9 @@ public class SysModelConfigServiceImpl implements ISysModelConfigService {
     @Override
     public List<SysModelConfigVo> queryByModuleType(String moduleType) {
         return baseMapper.selectVoList(new LambdaQueryWrapper<SysModelConfig>()
-            .apply("JSON_CONTAINS(module_type, {0})", "\"" + moduleType + "\""));
+            .apply("JSON_CONTAINS(module_type, {0})", "\"" + moduleType + "\"")
+            // 过滤已删除的数据
+            .eq(SysModelConfig::getDelFlag, SystemConstants.NORMAL));
     }
 
 }

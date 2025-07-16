@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.dromara.common.core.constant.SystemConstants;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.exception.base.BaseException;
 import org.dromara.common.core.utils.MapstructUtils;
@@ -83,6 +84,8 @@ public class SysPythonPackageServiceImpl implements ISysPythonPackageService {
         lqw.like(StringUtils.isNotBlank(bo.getPackageDescription()), SysPythonPackage::getPackageDescription, bo.getPackageDescription());
         lqw.between(params.get("beginTime") != null && params.get("endTime") != null,
             SysPythonPackage::getCreateTime, params.get("beginTime"), params.get("endTime"));
+        // 过滤已删除的数据
+        lqw.eq(SysPythonPackage::getDelFlag, SystemConstants.NORMAL);
         lqw.orderByDesc(SysPythonPackage::getCreateTime);
         return lqw;
     }
@@ -206,7 +209,9 @@ public class SysPythonPackageServiceImpl implements ISysPythonPackageService {
         boolean exist = baseMapper.exists(new LambdaQueryWrapper<SysPythonPackage>()
             .eq(SysPythonPackage::getPackageName, bo.getPackageName())
             .eq(SysPythonPackage::getPackageVersion, bo.getPackageVersion())
-            .eq(SysPythonPackage::getUpdateBy, LoginHelper.getLoginUser().getUserId()));
+            .eq(SysPythonPackage::getUpdateBy, LoginHelper.getLoginUser().getUserId())
+            // 过滤已删除的数据
+            .eq(SysPythonPackage::getDelFlag, SystemConstants.NORMAL));
         return !exist;
     }
 
@@ -216,7 +221,9 @@ public class SysPythonPackageServiceImpl implements ISysPythonPackageService {
     @Override
     public SysPythonPackageVo queryByPackageName(String packageName) {
         return baseMapper.selectVoOne(new LambdaQueryWrapper<SysPythonPackage>()
-            .eq(SysPythonPackage::getPackageName, packageName));
+            .eq(SysPythonPackage::getPackageName, packageName)
+            // 过滤已删除的数据
+            .eq(SysPythonPackage::getDelFlag, SystemConstants.NORMAL));
     }
 
     /**
@@ -225,7 +232,9 @@ public class SysPythonPackageServiceImpl implements ISysPythonPackageService {
     @Override
     public List<SysPythonPackageVo> queryByInstallStatus(String isInstalled) {
         return baseMapper.selectVoList(new LambdaQueryWrapper<SysPythonPackage>()
-            .eq(SysPythonPackage::getIsInstalled, isInstalled));
+            .eq(SysPythonPackage::getIsInstalled, isInstalled)
+            // 过滤已删除的数据
+            .eq(SysPythonPackage::getDelFlag, SystemConstants.NORMAL));
     }
 
     /**

@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.dromara.common.core.constant.SystemConstants;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.MapstructUtils;
 import org.dromara.common.core.utils.StringUtils;
@@ -68,6 +69,8 @@ public class SysDatasourceServiceImpl implements ISysDatasourceService {
         lqw.eq(StringUtils.isNotBlank(bo.getStatus()), SysDatasource::getStatus, bo.getStatus());
         lqw.eq(StringUtils.isNotBlank(bo.getIsDefault()), SysDatasource::getIsDefault, bo.getIsDefault());
         lqw.eq(StringUtils.isNotBlank(bo.getConnectionStatus()), SysDatasource::getConnectionStatus, bo.getConnectionStatus());
+        // 过滤已删除的数据
+        lqw.eq(SysDatasource::getDelFlag, SystemConstants.NORMAL);
         lqw.orderByDesc(SysDatasource::getCreateTime);
         return lqw;
     }
@@ -307,6 +310,8 @@ public class SysDatasourceServiceImpl implements ISysDatasourceService {
         if (ObjectUtil.isNotNull(bo.getDatasourceId())) {
             lqw.ne(SysDatasource::getDatasourceId, bo.getDatasourceId());
         }
+        // 过滤已删除的数据
+        lqw.eq(SysDatasource::getDelFlag, SystemConstants.NORMAL);
         return baseMapper.selectCount(lqw) == 0;
     }
 

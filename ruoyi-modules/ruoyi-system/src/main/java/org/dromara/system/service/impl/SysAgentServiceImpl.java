@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
+import org.dromara.common.core.constant.SystemConstants;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.MapstructUtils;
 import org.dromara.common.core.utils.StringUtils;
@@ -70,6 +71,8 @@ public class SysAgentServiceImpl implements ISysAgentService {
         lqw.eq(StringUtils.isNotBlank(bo.getConversationMode()), SysAgent::getConversationMode, bo.getConversationMode());
         lqw.like(StringUtils.isNotBlank(bo.getModel()), SysAgent::getModel, bo.getModel());
         lqw.like(StringUtils.isNotBlank(bo.getEnhanceModel()), SysAgent::getEnhanceModel, bo.getEnhanceModel());
+        // 过滤已删除的数据
+        lqw.eq(SysAgent::getDelFlag, SystemConstants.NORMAL);
         lqw.orderByDesc(SysAgent::getCreateTime);
         return lqw;
     }
@@ -186,6 +189,8 @@ public class SysAgentServiceImpl implements ISysAgentService {
         if (bo.getAgentId() != null) {
             wrapper.ne(SysAgent::getAgentId, bo.getAgentId());
         }
+        // 过滤已删除的数据
+        wrapper.eq(SysAgent::getDelFlag, SystemConstants.NORMAL);
         long count = baseMapper.selectCount(wrapper);
         return count == 0;
     }
@@ -198,6 +203,8 @@ public class SysAgentServiceImpl implements ISysAgentService {
         LambdaQueryWrapper<SysAgent> wrapper = Wrappers.lambdaQuery();
         wrapper.eq(SysAgent::getAgentType, agentType);
         wrapper.eq(SysAgent::getStatus, "0"); // 只查询正常状态的智能体
+        // 过滤已删除的数据
+        wrapper.eq(SysAgent::getDelFlag, SystemConstants.NORMAL);
         wrapper.orderByDesc(SysAgent::getCreateTime);
         return baseMapper.selectVoList(wrapper);
     }
@@ -209,6 +216,8 @@ public class SysAgentServiceImpl implements ISysAgentService {
     public List<SysAgentVo> queryByStatus(String status) {
         LambdaQueryWrapper<SysAgent> wrapper = Wrappers.lambdaQuery();
         wrapper.eq(SysAgent::getStatus, status);
+        // 过滤已删除的数据
+        wrapper.eq(SysAgent::getDelFlag, SystemConstants.NORMAL);
         wrapper.orderByDesc(SysAgent::getCreateTime);
         return baseMapper.selectVoList(wrapper);
     }

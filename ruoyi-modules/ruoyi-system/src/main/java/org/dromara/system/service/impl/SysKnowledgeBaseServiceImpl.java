@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.dromara.common.core.constant.SystemConstants;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.MapstructUtils;
 import org.dromara.common.core.utils.StringUtils;
@@ -71,6 +72,8 @@ public class SysKnowledgeBaseServiceImpl implements ISysKnowledgeBaseService {
         lqw.eq(ObjectUtil.isNotNull(bo.getBlockSize()), SysKnowledgeBase::getBlockSize, bo.getBlockSize());
         lqw.eq(ObjectUtil.isNotNull(bo.getOverlapSize()), SysKnowledgeBase::getOverlapSize, bo.getOverlapSize());
         lqw.eq(StringUtils.isNotBlank(bo.getStatus()), SysKnowledgeBase::getStatus, bo.getStatus());
+        // 过滤已删除的数据
+        lqw.eq(SysKnowledgeBase::getDelFlag, SystemConstants.NORMAL);
         return lqw;
     }
 
@@ -150,6 +153,8 @@ public class SysKnowledgeBaseServiceImpl implements ISysKnowledgeBaseService {
     public SysKnowledgeBaseVo queryByName(String name) {
         LambdaQueryWrapper<SysKnowledgeBase> lqw = Wrappers.lambdaQuery();
         lqw.eq(SysKnowledgeBase::getName, name);
+        // 过滤已删除的数据
+        lqw.eq(SysKnowledgeBase::getDelFlag, SystemConstants.NORMAL);
         lqw.last("LIMIT 1");
         return baseMapper.selectVoOne(lqw);
     }
@@ -164,6 +169,8 @@ public class SysKnowledgeBaseServiceImpl implements ISysKnowledgeBaseService {
         if (ObjectUtil.isNotNull(bo.getKnowledgeBaseId())) {
             lqw.ne(SysKnowledgeBase::getKnowledgeBaseId, bo.getKnowledgeBaseId());
         }
+        // 过滤已删除的数据
+        lqw.eq(SysKnowledgeBase::getDelFlag, SystemConstants.NORMAL);
         return !baseMapper.exists(lqw);
     }
 

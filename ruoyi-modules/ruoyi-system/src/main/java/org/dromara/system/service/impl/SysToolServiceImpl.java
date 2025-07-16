@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.dromara.common.core.constant.SystemConstants;
 import org.dromara.common.core.utils.MapstructUtils;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
@@ -65,6 +66,7 @@ public class SysToolServiceImpl implements ISysToolService {
     private LambdaQueryWrapper<SysTool> buildQueryWrapper(SysToolBo bo) {
         Map<String, Object> params = bo.getParams();
         LambdaQueryWrapper<SysTool> lqw = Wrappers.lambdaQuery();
+        lqw.like(SysTool::getDelFlag, SystemConstants.NORMAL);
         lqw.like(StringUtils.isNotBlank(bo.getToolName()), SysTool::getToolName, bo.getToolName());
         lqw.like(StringUtils.isNotBlank(bo.getToolDesc()), SysTool::getToolDesc, bo.getToolDesc());
         lqw.eq(StringUtils.isNotBlank(bo.getFunctionName()), SysTool::getFunctionName, bo.getFunctionName());
@@ -171,4 +173,4 @@ public class SysToolServiceImpl implements ISysToolService {
         return baseMapper.update(null, luw) > 0;
     }
 
-} 
+}
