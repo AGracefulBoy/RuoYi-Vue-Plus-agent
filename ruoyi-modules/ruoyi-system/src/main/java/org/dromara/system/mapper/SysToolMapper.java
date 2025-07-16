@@ -25,9 +25,14 @@ public interface SysToolMapper extends BaseMapperPlus<SysTool, SysToolVo> {
      * @param wrapper 查询条件
      * @return 工具管理列表
      */
-    @Select("SELECT tool_id, tenant_id, tool_name, tool_desc, function_name, tool_type, " +
-            "is_stream, tool_status, del_flag, create_dept, create_by, create_time, " +
-            "update_by, update_time, remark FROM sys_tool ${ew.customSqlSegment}")
+    @Select("SELECT st.tool_id, st.tenant_id, st.tool_name, st.tool_desc, st.function_name, st.tool_type, " +
+            "st.is_stream, st.tool_status, st.del_flag, st.create_dept, st.create_by, " +
+            "u1.nick_name AS createByName, st.create_time, st.update_by, " +
+            "u2.nick_name AS updateByName, st.update_time, st.remark " +
+            "FROM sys_tool st " +
+            "LEFT JOIN sys_user u1 ON st.create_by = u1.user_id " +
+            "LEFT JOIN sys_user u2 ON st.update_by = u2.user_id " +
+            "WHERE st.del_flag = '0' ${ew.customSqlSegment}")
     List<SysToolListVo> selectToolListVo(@Param(Constants.WRAPPER) Wrapper<SysTool> wrapper);
 
     /**
@@ -37,9 +42,14 @@ public interface SysToolMapper extends BaseMapperPlus<SysTool, SysToolVo> {
      * @param wrapper 查询条件
      * @return 工具管理列表
      */
-    @Select("SELECT tool_id, tenant_id, tool_name, tool_desc, function_name, tool_type, " +
-            "is_stream, tool_status, del_flag, create_dept, create_by, create_time, " +
-            "update_by, update_time, remark FROM sys_tool ${ew.customSqlSegment}")
+    @Select("SELECT st.tool_id, st.tenant_id, st.tool_name, st.tool_desc, st.function_name, st.tool_type, " +
+            "st.is_stream, st.tool_status, st.del_flag, st.create_dept, st.create_by, " +
+            "u1.nick_name AS createByName, st.create_time, st.update_by, " +
+            "u2.nick_name AS updateByName, st.update_time, st.remark " +
+            "FROM sys_tool st " +
+            "LEFT JOIN sys_user u1 ON st.create_by = u1.user_id " +
+            "LEFT JOIN sys_user u2 ON st.update_by = u2.user_id " +
+            "WHERE st.del_flag = '0' ${ew.customSqlSegment}")
     IPage<SysToolListVo> selectToolListVoPage(IPage<SysTool> page, @Param(Constants.WRAPPER) Wrapper<SysTool> wrapper);
 
 } 

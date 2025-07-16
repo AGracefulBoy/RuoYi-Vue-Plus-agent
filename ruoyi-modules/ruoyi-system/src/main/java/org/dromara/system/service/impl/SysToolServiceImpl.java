@@ -66,7 +66,7 @@ public class SysToolServiceImpl implements ISysToolService {
     private LambdaQueryWrapper<SysTool> buildQueryWrapper(SysToolBo bo) {
         Map<String, Object> params = bo.getParams();
         LambdaQueryWrapper<SysTool> lqw = Wrappers.lambdaQuery();
-        lqw.like(SysTool::getDelFlag, SystemConstants.NORMAL);
+        // 注意：del_flag 的过滤已经在 Mapper 的 SQL 中处理，这里不再添加
         lqw.like(StringUtils.isNotBlank(bo.getToolName()), SysTool::getToolName, bo.getToolName());
         lqw.like(StringUtils.isNotBlank(bo.getToolDesc()), SysTool::getToolDesc, bo.getToolDesc());
         lqw.eq(StringUtils.isNotBlank(bo.getFunctionName()), SysTool::getFunctionName, bo.getFunctionName());
@@ -171,6 +171,46 @@ public class SysToolServiceImpl implements ISysToolService {
         luw.set(SysTool::getToolStatus, toolStatus);
         luw.eq(SysTool::getToolId, toolId);
         return baseMapper.update(null, luw) > 0;
+    }
+
+    /**
+     * 复制工具管理
+     */
+    @Override
+    public Boolean copyTool(Long toolId) {
+        // 查询原工具信息
+        SysToolVo originalTool = baseMapper.selectVoById(toolId);
+        if (ObjectUtil.isNull(originalTool)) {
+            return false;
+        }
+
+        // 手动创建新的业务对象并复制属性
+        SysToolBo copyToolBo = new SysToolBo();
+        
+        // 复制基本属性
+        copyToolBo.setToolName(originalTool.getToolName());
+        copyToolBo.setToolDesc(originalTool.getToolDesc());
+        copyToolBo.setFunctionName(originalTool.getFunctionName());
+        copyToolBo.setToolType(originalTool.getToolType());
+        copyToolBo.setIsStream(originalTool.getIsStream());
+        copyToolBo.setScriptCode(originalTool.getScriptCode());
+        copyToolBo.setToolStatus(originalTool.getToolStatus());
+        copyToolBo.setRemark(originalTool.getRemark());
+
+        // 生成新的工具名称：原工具名 + 副本 + 时间戳
+        String timestamp = String.valueOf(System.currentTimeMillis());
+        String newToolName = originalTool.getToolName() + "副本" + timestamp;
+        copyToolBo.setToolName(newToolName);
+
+        // 清空ID，让系统自动生成新的ID
+        copyToolBo.setToolId(null);
+
+        // 设置创建时间和更新时间为空，让系统自动填充
+        copyToolBo.setCreateTime(null);
+        copyToolBo.setUpdateTime(null);
+
+        // 插入新的工具记录
+        return insertByBo(copyToolBo);
     }
 
 }

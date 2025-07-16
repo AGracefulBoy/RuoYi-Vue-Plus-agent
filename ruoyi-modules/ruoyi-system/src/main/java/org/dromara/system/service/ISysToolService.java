@@ -107,4 +107,12 @@ public interface ISysToolService {
      */
     Boolean updateToolStatus(Long toolId, String toolStatus);
 
+    /**
+     * 复制工具管理
+     *
+     * @param toolId 原工具ID
+     * @return 结果
+     */
+    Boolean copyTool(Long toolId);
+
 } 

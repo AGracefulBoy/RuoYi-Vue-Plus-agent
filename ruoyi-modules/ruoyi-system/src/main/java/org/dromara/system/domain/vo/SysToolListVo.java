@@ -94,6 +94,12 @@ public class SysToolListVo implements Serializable {
     private Long createBy;
 
     /**
+     * 创建者名称
+     */
+    @ExcelProperty(value = "创建者名称")
+    private String createByName;
+
+    /**
      * 创建时间
      */
     @ExcelProperty(value = "创建时间")
@@ -104,6 +110,12 @@ public class SysToolListVo implements Serializable {
      */
     @ExcelProperty(value = "更新者")
     private Long updateBy;
+
+    /**
+     * 更新者名称
+     */
+    @ExcelProperty(value = "更新者名称")
+    private String updateByName;
 
     /**
      * 更新时间

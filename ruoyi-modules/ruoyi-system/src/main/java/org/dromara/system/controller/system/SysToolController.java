@@ -152,4 +152,19 @@ public class SysToolController extends BaseController {
         return toAjax(toolService.deleteWithValidByIds(toolIds, true));
     }
 
+    /**
+     * 复制工具管理
+     *
+     * @param toolId 工具ID
+     */
+    @SaCheckPermission("system:tool:add")
+    @Log(title = "工具管理", businessType = BusinessType.INSERT)
+    @PostMapping("/copy/{toolId}")
+    public R<Void> copy(@PathVariable Long toolId) {
+        if (toolService.copyTool(toolId)) {
+            return R.ok("复制工具成功");
+        }
+        return R.fail("复制工具失败，原工具不存在");
+    }
+
 }
