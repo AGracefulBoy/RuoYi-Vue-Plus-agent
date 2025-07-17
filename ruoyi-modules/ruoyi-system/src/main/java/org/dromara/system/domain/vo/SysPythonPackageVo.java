@@ -2,6 +2,8 @@ package org.dromara.system.domain.vo;
 
 import io.github.linpeilie.annotations.AutoMapper;
 import lombok.Data;
+import org.dromara.common.translation.annotation.Translation;
+import org.dromara.common.translation.constant.TransConstant;
 import org.dromara.system.domain.SysPythonPackage;
 
 import java.io.Serial;
@@ -84,5 +86,11 @@ public class SysPythonPackageVo implements Serializable {
      * 备注
      */
     private String remark;
+
+    @Translation(type = TransConstant.USER_ID_TO_NICKNAME,mapper = "createBy")
+    private String createByName;
+
+    @Translation(type = TransConstant.USER_ID_TO_NICKNAME,mapper = "updateBy")
+    private String updateByName;
 
 }
