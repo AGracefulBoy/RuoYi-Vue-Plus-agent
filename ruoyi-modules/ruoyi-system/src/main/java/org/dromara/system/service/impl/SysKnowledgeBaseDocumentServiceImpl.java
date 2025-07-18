@@ -1,5 +1,6 @@
 package org.dromara.system.service.impl;
 
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.ObjectUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -13,6 +14,7 @@ import org.dromara.common.core.utils.MapstructUtils;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
+import org.dromara.system.constant.SysKnowledgeBaseDocumentConstants;
 import org.dromara.system.domain.SysKnowledgeBaseDocument;
 import org.dromara.system.domain.bo.SysKnowledgeBaseDocumentBo;
 import org.dromara.system.domain.vo.SysKnowledgeBaseDocumentVo;
@@ -21,9 +23,12 @@ import org.dromara.system.mapper.SysKnowledgeBaseMapper;
 import org.dromara.system.service.ISysKnowledgeBaseDocumentService;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 知识库文档管理Service业务层处理
@@ -132,6 +137,10 @@ public class SysKnowledgeBaseDocumentServiceImpl implements ISysKnowledgeBaseDoc
     @Override
     public Boolean insertByBo(SysKnowledgeBaseDocumentBo bo) {
         SysKnowledgeBaseDocument add = MapstructUtils.convert(bo, SysKnowledgeBaseDocument.class);
+        
+        // 从知识库管理表获取配置并设置默认值
+        fillDefaultConfigFromKnowledgeBase(add);
+        
         validEntityBeforeSave(add);
         
         // 设置上传时间
@@ -141,7 +150,7 @@ public class SysKnowledgeBaseDocumentServiceImpl implements ISysKnowledgeBaseDoc
         
         // 设置默认状态为处理中
         if (ObjectUtil.isNull(add.getStatus())) {
-            add.setStatus(0);
+            add.setStatus(SysKnowledgeBaseDocumentConstants.DEFAULT_STATUS);
         }
         
         boolean flag = baseMapper.insert(add) > 0;
@@ -149,6 +158,42 @@ public class SysKnowledgeBaseDocumentServiceImpl implements ISysKnowledgeBaseDoc
             bo.setDocumentId(add.getDocumentId());
         }
         return flag;
+    }
+
+    /**
+     * 批量新增知识库文档管理
+     */
+    @Override
+    public Boolean insertByBoList(List<SysKnowledgeBaseDocumentBo> boList) {
+        if (CollUtil.isEmpty(boList)) {
+            return true;
+        }
+        
+        List<SysKnowledgeBaseDocument> entityList = new ArrayList<>();
+        Date currentTime = new Date();
+        
+        for (SysKnowledgeBaseDocumentBo bo : boList) {
+            SysKnowledgeBaseDocument add = MapstructUtils.convert(bo, SysKnowledgeBaseDocument.class);
+            
+            // 从知识库管理表获取配置并设置默认值
+            fillDefaultConfigFromKnowledgeBase(add);
+            
+            validEntityBeforeSave(add);
+            
+            // 设置上传时间
+            if (ObjectUtil.isNull(add.getUploadTime())) {
+                add.setUploadTime(currentTime);
+            }
+            
+            // 设置默认状态为处理中
+            if (ObjectUtil.isNull(add.getStatus())) {
+                add.setStatus(SysKnowledgeBaseDocumentConstants.DEFAULT_STATUS);
+            }
+            
+            entityList.add(add);
+        }
+        
+        return baseMapper.insertBatch(entityList);
     }
 
     /**
@@ -173,17 +218,9 @@ public class SysKnowledgeBaseDocumentServiceImpl implements ISysKnowledgeBaseDoc
             }
         }
         
-        // 校验文档名称唯一性
-        if (StringUtils.isNotBlank(entity.getName())) {
-            LambdaQueryWrapper<SysKnowledgeBaseDocument> lqw = Wrappers.lambdaQuery();
-            lqw.eq(SysKnowledgeBaseDocument::getName, entity.getName());
-            lqw.eq(SysKnowledgeBaseDocument::getKnowledgeBaseId, entity.getKnowledgeBaseId());
-            lqw.ne(ObjectUtil.isNotNull(entity.getDocumentId()), SysKnowledgeBaseDocument::getDocumentId, entity.getDocumentId());
-            
-            boolean exists = baseMapper.exists(lqw);
-            if (exists) {
-                throw new ServiceException("文档名称已存在");
-            }
+        // 校验状态是否有效
+        if (StringUtils.isNotBlank(entity.getStatus()) && !SysKnowledgeBaseDocumentConstants.isValidStatus(entity.getStatus())) {
+            throw new ServiceException("无效的文档状态: " + entity.getStatus());
         }
     }
 
@@ -212,25 +249,92 @@ public class SysKnowledgeBaseDocumentServiceImpl implements ISysKnowledgeBaseDoc
      * 更新文档处理状态
      */
     @Override
-    public Boolean updateDocumentStatus(Long documentId, Integer status) {
+    public Boolean updateDocumentStatus(Long documentId, String status) {
+        // 校验状态是否有效
+        if (!SysKnowledgeBaseDocumentConstants.isValidStatus(status)) {
+            throw new ServiceException("无效的文档状态: " + status);
+        }
+        
         LambdaUpdateWrapper<SysKnowledgeBaseDocument> luw = Wrappers.lambdaUpdate();
         luw.eq(SysKnowledgeBaseDocument::getDocumentId, documentId);
         luw.set(SysKnowledgeBaseDocument::getStatus, status);
         return baseMapper.update(null, luw) > 0;
     }
 
+    
     /**
-     * 校验文档名称是否唯一
+     * 从知识库管理表获取配置并填充到文档中
      */
-    @Override
-    public boolean checkNameUnique(SysKnowledgeBaseDocumentBo bo) {
-        LambdaQueryWrapper<SysKnowledgeBaseDocument> lqw = Wrappers.lambdaQuery();
-        lqw.eq(SysKnowledgeBaseDocument::getName, bo.getName());
-        lqw.eq(SysKnowledgeBaseDocument::getKnowledgeBaseId, bo.getKnowledgeBaseId());
-        lqw.ne(ObjectUtil.isNotNull(bo.getDocumentId()), SysKnowledgeBaseDocument::getDocumentId, bo.getDocumentId());
-        // 过滤已删除的数据
-        lqw.eq(SysKnowledgeBaseDocument::getDelFlag, SystemConstants.NORMAL);
-        return !baseMapper.exists(lqw);
+    private void fillDefaultConfigFromKnowledgeBase(SysKnowledgeBaseDocument document) {
+        if (ObjectUtil.isNull(document.getKnowledgeBaseId())) {
+            return;
+        }
+        
+        // 查询知识库配置
+        var knowledgeBaseVo = knowledgeBaseMapper.selectVoById(document.getKnowledgeBaseId());
+        if (ObjectUtil.isNull(knowledgeBaseVo)) {
+            return;
+        }
+        
+        // 如果文档没有配置 metadata，则从知识库获取
+        if (ObjectUtil.isNull(document.getMetadata()) && StringUtils.isNotBlank(knowledgeBaseVo.getMetadata())) {
+            document.setMetadata(convertMetadataToMap(knowledgeBaseVo.getMetadata()));
+        }
+        
+        // 如果文档没有配置 model，则从知识库获取
+        if (StringUtils.isBlank(document.getModel()) && StringUtils.isNotBlank(knowledgeBaseVo.getModel())) {
+            document.setModel(knowledgeBaseVo.getModel());
+        }
+        
+        // 如果文档没有配置 blockSize，则从知识库获取
+        if (ObjectUtil.isNull(document.getBlockSize()) && ObjectUtil.isNotNull(knowledgeBaseVo.getBlockSize())) {
+            document.setBlockSize(knowledgeBaseVo.getBlockSize());
+        }
+        
+        // 如果文档没有配置 overlapSize，则从知识库获取
+        if (ObjectUtil.isNull(document.getOverlapSize()) && ObjectUtil.isNotNull(knowledgeBaseVo.getOverlapSize())) {
+            document.setOverlapSize(knowledgeBaseVo.getOverlapSize());
+        }
+        
+        // 如果文档没有配置 slicePrompt，则从知识库获取
+        if (StringUtils.isBlank(document.getSlicePrompt()) && StringUtils.isNotBlank(knowledgeBaseVo.getSlicePrompt())) {
+            document.setSlicePrompt(knowledgeBaseVo.getSlicePrompt());
+        }
+        
+        // 如果文档没有配置 imagePrompt，则从知识库获取
+        if (StringUtils.isBlank(document.getImagePrompt()) && StringUtils.isNotBlank(knowledgeBaseVo.getImagePrompt())) {
+            document.setImagePrompt(knowledgeBaseVo.getImagePrompt());
+        }
+    }
+    
+    /**
+     * 将逗号分割的字符串转换为Map对象
+     */
+    private Map<String, Object> convertMetadataToMap(String metadata) {
+        Map<String, Object> metadataMap = new HashMap<>();
+        if (StringUtils.isBlank(metadata)) {
+            return metadataMap;
+        }
+        
+        // 按逗号分割
+        String[] items = metadata.split(",");
+        for (String item : items) {
+            String trimmedItem = item.trim();
+            if (StringUtils.isNotBlank(trimmedItem)) {
+                // 如果包含等号，则分割为键值对
+                if (trimmedItem.contains("=")) {
+                    String[] keyValue = trimmedItem.split("=", 2);
+                    if (keyValue.length == 2) {
+                        metadataMap.put(keyValue[0].trim(), keyValue[1].trim());
+                    }
+                } else {
+                    // 否则将项目作为键，值设为空字符串
+                    metadataMap.put(trimmedItem, "");
+                }
+            }
+        }
+        
+        return metadataMap;
     }
 
 } 

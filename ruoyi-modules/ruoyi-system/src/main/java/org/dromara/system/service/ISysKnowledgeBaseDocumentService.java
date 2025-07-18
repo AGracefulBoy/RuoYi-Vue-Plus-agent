@@ -57,6 +57,14 @@ public interface ISysKnowledgeBaseDocumentService {
     Boolean insertByBo(SysKnowledgeBaseDocumentBo bo);
 
     /**
+     * 批量新增知识库文档管理
+     *
+     * @param boList 知识库文档管理列表
+     * @return 结果
+     */
+    Boolean insertByBoList(List<SysKnowledgeBaseDocumentBo> boList);
+
+    /**
      * 修改知识库文档管理
      *
      * @param bo 知识库文档管理
@@ -88,14 +96,7 @@ public interface ISysKnowledgeBaseDocumentService {
      * @param status     处理状态
      * @return 结果
      */
-    Boolean updateDocumentStatus(Long documentId, Integer status);
+    Boolean updateDocumentStatus(Long documentId, String status);
 
-    /**
-     * 校验文档名称是否唯一
-     *
-     * @param bo 知识库文档管理
-     * @return 结果
-     */
-    boolean checkNameUnique(SysKnowledgeBaseDocumentBo bo);
 
 } 

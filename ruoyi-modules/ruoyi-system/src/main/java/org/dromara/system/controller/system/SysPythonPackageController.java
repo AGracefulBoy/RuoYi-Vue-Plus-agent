@@ -12,6 +12,7 @@ import org.dromara.common.log.enums.BusinessType;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.common.web.core.BaseController;
+import org.dromara.system.domain.bo.PythonDebugRequestBo;
 import org.dromara.system.domain.bo.SysPythonPackageBo;
 import org.dromara.system.domain.vo.SysPythonPackageVo;
 import org.dromara.system.service.ISysPythonPackageService;
@@ -216,5 +217,19 @@ public class SysPythonPackageController extends BaseController {
     @PostMapping("/syncStatus")
     public R<String> syncPackageStatus() {
         return R.ok(pythonPackageService.syncPackageStatus());
+    }
+
+    /**
+     * Python代码调试接口（支持流式和非流式）
+     *
+     * @param request  调试请求对象
+     * @param response HTTP响应
+     */
+    @SaCheckPermission("system:pythonPackage:debug")
+    @Log(title = "Python代码调试", businessType = BusinessType.OTHER)
+    @PostMapping("/debug")
+    public void debugPythonCode(@RequestBody PythonDebugRequestBo request,
+                                HttpServletResponse response) {
+        pythonPackageService.debugPythonCode(request, response);
     }
 }

@@ -1,7 +1,9 @@
 package org.dromara.system.service;
 
+import jakarta.servlet.http.HttpServletResponse;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
+import org.dromara.system.domain.bo.PythonDebugRequestBo;
 import org.dromara.system.domain.bo.SysPythonPackageBo;
 import org.dromara.system.domain.vo.SysPythonPackageVo;
 
@@ -158,5 +160,13 @@ public interface ISysPythonPackageService {
      * @return 同步结果消息
      */
     String syncPackageStatus();
+
+    /**
+     * Python代码调试（支持流式和非流式）
+     *
+     * @param request  调试请求对象
+     * @param response HTTP响应
+     */
+    void debugPythonCode(PythonDebugRequestBo request, HttpServletResponse response);
 
 }

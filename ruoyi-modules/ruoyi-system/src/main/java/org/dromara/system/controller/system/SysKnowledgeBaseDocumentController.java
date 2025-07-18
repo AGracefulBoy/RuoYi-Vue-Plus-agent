@@ -78,14 +78,14 @@ public class SysKnowledgeBaseDocumentController extends BaseController {
     }
 
     /**
-     * 新增知识库文档管理
+     * 批量新增知识库文档管理
      */
     @SaCheckPermission("system:knowledgeBaseDocument:add")
     @Log(title = "知识库文档管理", businessType = BusinessType.INSERT)
     @RepeatSubmit()
     @PostMapping("/add")
-    public R<Void> add(@Validated(AddGroup.class) @RequestBody SysKnowledgeBaseDocumentBo bo) {
-        return toAjax(knowledgeBaseDocumentService.insertByBo(bo));
+    public R<Void> add(@Validated(AddGroup.class) @RequestBody List<SysKnowledgeBaseDocumentBo> boList) {
+        return toAjax(knowledgeBaseDocumentService.insertByBoList(boList));
     }
 
     /**
@@ -105,7 +105,7 @@ public class SysKnowledgeBaseDocumentController extends BaseController {
     @SaCheckPermission("system:knowledgeBaseDocument:edit")
     @Log(title = "知识库文档管理", businessType = BusinessType.UPDATE)
     @PostMapping("/updateStatus")
-    public R<Void> updateStatus(@RequestParam Long documentId, @RequestParam Integer status) {
+    public R<Void> updateStatus(@RequestParam Long documentId, @RequestParam String status) {
         return toAjax(knowledgeBaseDocumentService.updateDocumentStatus(documentId, status));
     }
 
@@ -131,12 +131,5 @@ public class SysKnowledgeBaseDocumentController extends BaseController {
         return toAjax(knowledgeBaseDocumentService.deleteByKnowledgeBaseId(knowledgeBaseId));
     }
 
-    /**
-     * 校验文档名称是否唯一
-     */
-    @PostMapping("/checkDocumentName")
-    public R<Boolean> checkDocumentName(@RequestBody SysKnowledgeBaseDocumentBo bo) {
-        return R.ok(knowledgeBaseDocumentService.checkNameUnique(bo));
-    }
 
 }

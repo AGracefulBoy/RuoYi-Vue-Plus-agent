@@ -1,13 +1,16 @@
 package org.dromara.system.service.impl;
 
-import cn.hutool.core.util.ObjectUtil;
+
+import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.common.core.constant.SystemConstants;
+import org.dromara.common.core.domain.R;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.exception.base.BaseException;
 import org.dromara.common.core.utils.MapstructUtils;
@@ -17,11 +20,14 @@ import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.common.satoken.utils.LoginHelper;
 import org.dromara.system.config.PythonProperties;
 import org.dromara.system.domain.SysPythonPackage;
+import org.dromara.system.domain.bo.PythonDebugRequestBo;
 import org.dromara.system.domain.bo.SysPythonPackageBo;
 import org.dromara.system.domain.vo.SysPythonPackageVo;
 import org.dromara.system.mapper.SysPythonPackageMapper;
 import org.dromara.system.service.ISysPythonPackageService;
+import org.dromara.system.util.HttpUtils;
 import org.dromara.system.util.SshUtil;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -633,5 +639,118 @@ public class SysPythonPackageServiceImpl implements ISysPythonPackageService {
             return "";
         }
     }
+
+    /**
+     * Python代码调试（支持流式和非流式）
+     */
+    @Override
+    public void debugPythonCode(PythonDebugRequestBo request, HttpServletResponse response) {
+        try {
+            // 验证请求参数
+            if (request.getCode() == null || request.getCode().trim().isEmpty()) {
+                throw new ServiceException("Python代码不能为空");
+            }
+
+            // 构建请求数据，匹配Flask API格式
+            Map<String, String> data = new HashMap<>();
+            String code = request.getCode().trim();
+            
+            // 如果有文件路径，替换代码中的占位符
+            if (request.getFiles() != null && !request.getFiles().isEmpty()) {
+                code = code.replace("{files}", request.getFiles());
+            }
+            
+            // 使用单独的funcName字段，默认为"main"
+            String functionName = request.getFuncName() != null && !request.getFuncName().trim().isEmpty() 
+                ? request.getFuncName().trim() : "main";
+            
+            // 处理参数，转换为JSON格式
+            String paramsJson = buildParamsJson(request.getParams());
+            
+            data.put("code", code);
+            data.put("func_name", functionName);
+            data.put("params", paramsJson);
+
+            String requestJson = JSONUtil.toJsonStr(data);
+            log.info("发送Python调试请求 - 函数名: {}, 参数: {}, 流式: {}", functionName, paramsJson, request.getStream());
+            log.info("完整请求数据: {}", requestJson);
+
+            // 根据stream参数决定是否使用流式响应
+            if (Boolean.TRUE.equals(request.getStream())) {
+                // 流式响应
+                handleStreamResponse(requestJson, response);
+            } else {
+                // 非流式响应
+                handleNonStreamResponse(requestJson, response);
+            }
+        } catch (Exception e) {
+            log.error("Python代码调试失败: {}", e.getMessage(), e);
+            try {
+                response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                response.setCharacterEncoding("UTF-8");
+                response.getWriter().write(JSONUtil.toJsonStr(R.fail("Python代码调试失败: " + e.getMessage())));
+                response.getWriter().flush();
+            } catch (IOException ioException) {
+                log.error("写入错误响应失败: {}", ioException.getMessage());
+            }
+        }
+    }
+
+    /**
+     * 处理非流式响应
+     */
+    private void handleNonStreamResponse(String requestJson, HttpServletResponse response) throws IOException {
+        String url = "http://115.190.43.113:5000/exec";
+        String result = HttpUtils.sendPost(url, requestJson);
+        
+        log.info("Python代码调试完成，结果: {}", result);
+        
+        // 设置响应头
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setCharacterEncoding("UTF-8");
+        
+        // 构建标准响应格式
+        R<String> responseResult = R.ok(result);
+        response.getWriter().write(JSONUtil.toJsonStr(responseResult));
+        response.getWriter().flush();
+    }
+
+    /**
+     * 处理流式响应
+     */
+    private void handleStreamResponse(String requestJson, HttpServletResponse response) throws IOException {
+        // 设置流式响应头
+        response.setContentType(MediaType.TEXT_PLAIN_VALUE);
+        response.setCharacterEncoding("UTF-8");
+        response.setHeader("Cache-Control", "no-cache");
+        response.setHeader("Connection", "keep-alive");
+        
+        // 流式调用
+        String url = "http://115.190.43.113:5003/exec";
+        boolean success = HttpUtils.sendPostStream(url, requestJson, response.getOutputStream());
+        
+        if (success) {
+            log.info("Python代码调试流式请求完成");
+        } else {
+            log.error("Python代码调试流式请求失败");
+        }
+    }
+
+    /**
+     * 构建参数JSON字符串
+     */
+    private String buildParamsJson(Map<String, Object> params) {
+        if (params == null || params.isEmpty()) {
+            return "{}";
+        }
+        
+        try {
+            return JSONUtil.toJsonStr(params);
+        } catch (Exception e) {
+            log.debug("构建参数JSON失败，返回空JSON: {}", e.getMessage());
+            return "{}";
+        }
+    }
+
 }
 

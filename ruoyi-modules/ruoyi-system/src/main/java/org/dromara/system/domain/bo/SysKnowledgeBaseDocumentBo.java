@@ -66,9 +66,9 @@ public class SysKnowledgeBaseDocumentBo extends BaseEntity {
     private Long size;
 
     /**
-     * 处理状态（0 处理中 1 处理成功 2 失败）
+     * 处理状态（to_be_executed 待执行, document_parsing 解析中, document_embedding 文档向量化, document_finished 已完成, document_fail 失败）
      */
-    private Integer status;
+    private String status;
 
     /**
      * 文档元数据
