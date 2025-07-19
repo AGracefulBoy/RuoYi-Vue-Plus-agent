@@ -2,10 +2,12 @@ package org.dromara.common.llm.model.protocol.req;
 
 //import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
 
+import com.alibaba.cloud.ai.dashscope.api.DashScopeResponseFormat;
 import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.ai.deepseek.DeepSeekChatOptions;
+import org.springframework.ai.deepseek.api.ResponseFormat;
 import org.springframework.ai.openai.OpenAiChatOptions;
 
 import java.util.List;
@@ -17,6 +19,7 @@ public class IChatRequest {
      * 对话模型
      */
     private String code;
+
 
     private Boolean stream;
     /**
@@ -70,6 +73,113 @@ public class IChatRequest {
     private Double topP;
 
 
+    /**
+     * 在遇到这些词时，API 将停止生成更多的 token。
+     */
+
+    private String completionsPath;
+
+
+    private ResponseFormatRequest responseFormat;
+
+
+    public static ResponseFormat toDeepSeekResponseFormat(ResponseFormatRequest responseFormatRequest) {
+        if (responseFormatRequest == null) {
+            return null;
+        }
+
+        ResponseFormat.Builder builder = ResponseFormat.builder();
+
+        if (responseFormatRequest.getType() != null) {
+            switch (responseFormatRequest.getType()) {
+                case TEXT:
+                    builder.type(ResponseFormat.Type.TEXT);
+                    break;
+                case JSON_OBJECT:
+                case JSON_SCHEMA:
+                    builder.type(ResponseFormat.Type.JSON_OBJECT);
+                    break;
+                default:
+                    builder.type(ResponseFormat.Type.TEXT);
+                    break;
+            }
+        }
+
+        return builder.build();
+    }
+
+    public static org.springframework.ai.openai.api.ResponseFormat toOpenAiResponseFormat(ResponseFormatRequest responseFormatRequest) {
+        if (responseFormatRequest == null) {
+            return null;
+        }
+
+        org.springframework.ai.openai.api.ResponseFormat.Builder builder = org.springframework.ai.openai.api.ResponseFormat.builder();
+
+        if (responseFormatRequest.getType() != null) {
+            switch (responseFormatRequest.getType()) {
+                case TEXT:
+                    builder.type(org.springframework.ai.openai.api.ResponseFormat.Type.TEXT);
+                    break;
+                case JSON_OBJECT:
+                    builder.type(org.springframework.ai.openai.api.ResponseFormat.Type.JSON_OBJECT);
+                    break;
+                case JSON_SCHEMA:
+                    builder.type(org.springframework.ai.openai.api.ResponseFormat.Type.JSON_SCHEMA);
+
+                    if (responseFormatRequest.getJsonSchema() != null) {
+                        org.springframework.ai.openai.api.ResponseFormat.JsonSchema.Builder jsonSchemaBuilder =
+                            org.springframework.ai.openai.api.ResponseFormat.JsonSchema.builder();
+
+                        if (responseFormatRequest.getJsonSchema().getName() != null) {
+                            jsonSchemaBuilder.name(responseFormatRequest.getJsonSchema().getName());
+                        }
+
+                        if (responseFormatRequest.getJsonSchema().getSchema() != null) {
+                            jsonSchemaBuilder.schema(responseFormatRequest.getJsonSchema().getSchema());
+                        }
+
+                        if (responseFormatRequest.getJsonSchema().getStrict() != null) {
+                            jsonSchemaBuilder.strict(responseFormatRequest.getJsonSchema().getStrict());
+                        }
+
+                        builder.jsonSchema(jsonSchemaBuilder.build());
+                    }
+                    break;
+                default:
+                    builder.type(org.springframework.ai.openai.api.ResponseFormat.Type.TEXT);
+                    break;
+            }
+        }
+
+        return builder.build();
+    }
+
+    public static DashScopeResponseFormat toDashScopeResponseFormat(ResponseFormatRequest responseFormatRequest) {
+        if (responseFormatRequest == null) {
+            return null;
+        }
+
+        DashScopeResponseFormat.Builder builder = DashScopeResponseFormat.builder();
+
+        if (responseFormatRequest.getType() != null) {
+            switch (responseFormatRequest.getType()) {
+                case TEXT:
+                    builder.type(DashScopeResponseFormat.Type.TEXT);
+                    break;
+                case JSON_OBJECT:
+                case JSON_SCHEMA:
+                    builder.type(DashScopeResponseFormat.Type.JSON_OBJECT);
+                    break;
+                default:
+                    builder.type(DashScopeResponseFormat.Type.TEXT);
+                    break;
+            }
+        }
+
+        return builder.build();
+    }
+
+
     public DeepSeekChatOptions deepSeekChatOptions() {
         return DeepSeekChatOptions.builder()
             .model(this.model)
@@ -79,6 +189,7 @@ public class IChatRequest {
             .frequencyPenalty(this.frequencyPenalty)
             .presencePenalty(this.presencePenalty)
             .topP(this.topP)
+            .responseFormat(toDeepSeekResponseFormat(this.responseFormat))
             .build();
     }
 
@@ -91,6 +202,7 @@ public class IChatRequest {
             .frequencyPenalty(this.frequencyPenalty)
             .presencePenalty(this.presencePenalty)
             .topP(this.topP)
+            .responseFormat(toOpenAiResponseFormat(this.responseFormat))
             .build();
     }
 
@@ -101,14 +213,9 @@ public class IChatRequest {
             .withMaxToken(this.maxTokens)
             .withTemperature(this.temperature)
             .withTopP(this.topP)
+            .withResponseFormat(toDashScopeResponseFormat(this.responseFormat))
             .build();
     }
 
-
-    /**
-     * 在遇到这些词时，API 将停止生成更多的 token。
-     */
-
-    private String completionsPath;
 
 }
