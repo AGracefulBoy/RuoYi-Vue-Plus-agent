@@ -17,7 +17,9 @@ import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.common.web.core.BaseController;
 import org.dromara.system.domain.bo.SysKnowledgeBaseDocumentBo;
 import org.dromara.system.domain.vo.SysKnowledgeBaseDocumentVo;
+import org.dromara.system.service.IDocumentSplitService;
 import org.dromara.system.service.ISysKnowledgeBaseDocumentService;
+import org.dromara.system.service.split.DocumentChunk;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -35,6 +37,7 @@ import java.util.List;
 public class SysKnowledgeBaseDocumentController extends BaseController {
 
     private final ISysKnowledgeBaseDocumentService knowledgeBaseDocumentService;
+    private final IDocumentSplitService documentSplitService;
 
     /**
      * 查询知识库文档管理列表
@@ -131,5 +134,46 @@ public class SysKnowledgeBaseDocumentController extends BaseController {
         return toAjax(knowledgeBaseDocumentService.deleteByKnowledgeBaseId(knowledgeBaseId));
     }
 
+    /**
+     * Split document into chunks for processing.
+     *
+     * @param documentUrl   document URL to split
+     * @param documentType  document type (xlsx, docx, pdf)
+     * @param chunkSize     maximum chunk size in characters
+     * @param overlapSize   overlap size between chunks
+     * @return list of document chunks
+     */
+    @SaCheckPermission("system:knowledgeBaseDocument:split")
+    @Log(title = "文档切分", businessType = BusinessType.OTHER)
+    @PostMapping("/split")
+    public R<List<DocumentChunk>> splitDocument(@RequestParam String documentUrl,
+                                               @RequestParam String documentType,
+                                               @RequestParam(defaultValue = "1000") Integer chunkSize,
+                                               @RequestParam(defaultValue = "100") Integer overlapSize) {
+        List<DocumentChunk> chunks = documentSplitService.splitDocument(documentUrl, documentType, chunkSize, overlapSize);
+        return R.ok(chunks);
+    }
 
+    /**
+     * Get supported document types for splitting.
+     *
+     * @return list of supported document types
+     */
+    @SaCheckPermission("system:knowledgeBaseDocument:query")
+    @GetMapping("/supportedTypes")
+    public R<List<String>> getSupportedDocumentTypes() {
+        return R.ok(documentSplitService.getSupportedDocumentTypes());
+    }
+
+    /**
+     * Check if document type is supported for splitting.
+     *
+     * @param documentType document type to check
+     * @return true if supported, false otherwise
+     */
+    @SaCheckPermission("system:knowledgeBaseDocument:query")
+    @GetMapping("/isSupported")
+    public R<Boolean> isDocumentTypeSupported(@RequestParam String documentType) {
+        return R.ok(documentSplitService.isDocumentTypeSupported(documentType));
+    }
 }

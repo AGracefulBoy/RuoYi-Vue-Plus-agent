@@ -18,6 +18,7 @@ import org.dromara.system.domain.SysKnowledgeBase;
 import org.dromara.system.domain.bo.SysKnowledgeBaseBo;
 import org.dromara.system.domain.vo.SysKnowledgeBaseVo;
 import org.dromara.system.mapper.SysKnowledgeBaseMapper;
+import org.dromara.system.service.IElasticsearchIndexService;
 import org.dromara.system.service.ISysKnowledgeBaseService;
 import org.springframework.stereotype.Service;
 
@@ -35,6 +36,7 @@ import java.util.List;
 public class SysKnowledgeBaseServiceImpl implements ISysKnowledgeBaseService {
 
     private final SysKnowledgeBaseMapper baseMapper;
+    private final IElasticsearchIndexService elasticsearchIndexService;
 
     /**
      * 查询知识库管理
@@ -88,6 +90,16 @@ public class SysKnowledgeBaseServiceImpl implements ISysKnowledgeBaseService {
         boolean flag = baseMapper.insert(add) > 0;
         if (flag) {
             bo.setKnowledgeBaseId(add.getKnowledgeBaseId());
+
+            // Create Elasticsearch index for the knowledge base
+            try {
+                Boolean indexCreated = elasticsearchIndexService.createKnowledgeBaseIndex(add.getKnowledgeBaseId().toString());
+                if (!indexCreated) {
+                    log.warn("Failed to create Elasticsearch index for knowledge base: {}", add.getKnowledgeBaseId().toString());
+                }
+            } catch (Exception exception) {
+                log.error("Error creating Elasticsearch index for knowledge base: {}", add.getKnowledgeBaseId().toString(), exception);
+            }
         }
         return flag;
     }
@@ -144,7 +156,32 @@ public class SysKnowledgeBaseServiceImpl implements ISysKnowledgeBaseService {
         if (isValid) {
             // 做一些业务上的校验,判断是否需要校验
         }
-        return baseMapper.deleteBatchIds(ids) > 0;
+
+        // Collect knowledge base names before deletion for ES index cleanup
+        List<String> knowledgeBaseNames = ids.stream()
+            .map(this::queryById)
+            .filter(ObjectUtil::isNotNull)
+            .map(SysKnowledgeBaseVo::getName)
+            .filter(StringUtils::isNotBlank)
+            .toList();
+
+        boolean flag = baseMapper.deleteBatchIds(ids) > 0;
+
+        if (flag) {
+            // Delete corresponding Elasticsearch indices
+            knowledgeBaseNames.forEach(name -> {
+                try {
+                    Boolean indexDeleted = elasticsearchIndexService.deleteKnowledgeBaseIndex(name);
+                    if (!indexDeleted) {
+                        log.warn("Failed to delete Elasticsearch index for knowledge base: {}", name);
+                    }
+                } catch (Exception exception) {
+                    log.error("Error deleting Elasticsearch index for knowledge base: {}", name, exception);
+                }
+            });
+        }
+
+        return flag;
     }
 
     /**
@@ -186,4 +223,4 @@ public class SysKnowledgeBaseServiceImpl implements ISysKnowledgeBaseService {
         return baseMapper.update(null, updateWrapper);
     }
 
-} 
+}
