@@ -145,7 +145,7 @@ public class SysKnowledgeBaseDocumentController extends BaseController {
      * @return paginated list of ES documents without embedding fields
      */
     @SaCheckPermission("system:knowledgeBaseDocument:query")
-    @GetMapping("/es/{documentId}")
+    @GetMapping("/chunk/{documentId}")
     public TableDataInfo<SysKnowledgeBaseEsDocumentVo> queryEsDocuments(@NotNull(message = "文档ID不能为空")
                                                                         @PathVariable Long documentId,
                                                                         PageQuery pageQuery) {
@@ -160,7 +160,7 @@ public class SysKnowledgeBaseDocumentController extends BaseController {
      */
     @SaCheckPermission("system:knowledgeBaseDocument:remove")
     @Log(title = "知识库ES文档管理", businessType = BusinessType.DELETE)
-    @PostMapping("/es/delete/{documentId}")
+    @PostMapping("/chunk/delete/{documentId}")
     public R<Void> deleteEsDocuments(@NotNull(message = "文档ID不能为空")
                                      @PathVariable Long documentId) {
         return toAjax(elasticsearchDocumentService.deleteDocumentsByDocumentId(documentId));
@@ -175,7 +175,7 @@ public class SysKnowledgeBaseDocumentController extends BaseController {
      */
     @SaCheckPermission("system:knowledgeBaseDocument:remove")
     @Log(title = "知识库ES文档块管理", businessType = BusinessType.DELETE)
-    @PostMapping("/es/deleteChunk/{documentId}/{chunkId}")
+    @PostMapping("/chunk/deleteChunk/{documentId}/{chunkId}")
     public R<Void> deleteEsChunk(@NotNull(message = "文档ID不能为空")
                                  @PathVariable Long documentId,
                                  @NotNull(message = "文档块ID不能为空")
@@ -191,7 +191,7 @@ public class SysKnowledgeBaseDocumentController extends BaseController {
      */
     @SaCheckPermission("system:knowledgeBaseDocument:remove")
     @Log(title = "知识库ES文档块管理", businessType = BusinessType.DELETE)
-    @PostMapping("/es/deleteByChunkId/{chunkId}")
+    @PostMapping("/chunk/deleteByChunkId/{chunkId}")
     public R<Void> deleteEsChunkByChunkId(@NotNull(message = "文档块ID不能为空")
                                          @PathVariable String chunkId) {
         return toAjax(elasticsearchDocumentService.deleteChunkByChunkId(chunkId));
