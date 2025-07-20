@@ -182,4 +182,18 @@ public class SysKnowledgeBaseDocumentController extends BaseController {
                                  @PathVariable Long chunkId) {
         return toAjax(elasticsearchDocumentService.deleteChunkById(documentId, chunkId));
     }
+
+    /**
+     * 根据ES文档块ID直接删除数据（更简化的接口）
+     *
+     * @param chunkId the ES chunk ID to delete
+     * @return operation result
+     */
+    @SaCheckPermission("system:knowledgeBaseDocument:remove")
+    @Log(title = "知识库ES文档块管理", businessType = BusinessType.DELETE)
+    @PostMapping("/es/deleteByChunkId/{chunkId}")
+    public R<Void> deleteEsChunkByChunkId(@NotNull(message = "文档块ID不能为空")
+                                         @PathVariable String chunkId) {
+        return toAjax(elasticsearchDocumentService.deleteChunkByChunkId(chunkId));
+    }
 }

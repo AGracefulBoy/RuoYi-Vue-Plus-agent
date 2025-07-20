@@ -39,4 +39,13 @@ public interface IElasticsearchDocumentService {
      * @return true if deletion succeeded, false otherwise
      */
     Boolean deleteChunkById(Long documentId, Long chunkId);
+
+    /**
+     * Deletes a specific chunk document by chunk ID only.
+     * This method will automatically find the document ID and index.
+     *
+     * @param chunkId the chunk ID to delete
+     * @return true if deletion succeeded, false otherwise
+     */
+    Boolean deleteChunkByChunkId(String chunkId);
 }

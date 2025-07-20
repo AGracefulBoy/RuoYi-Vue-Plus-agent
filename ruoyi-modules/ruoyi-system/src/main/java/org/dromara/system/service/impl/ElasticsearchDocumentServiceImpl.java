@@ -14,7 +14,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.system.domain.SysKnowledgeBaseDocument;
+import org.dromara.system.domain.SysKnowledgeBaseDocumentChunk;
 import org.dromara.system.domain.vo.SysKnowledgeBaseEsDocumentVo;
+import org.dromara.system.mapper.SysKnowledgeBaseDocumentChunkMapper;
 import org.dromara.system.mapper.SysKnowledgeBaseDocumentMapper;
 import org.dromara.system.service.IElasticsearchDocumentService;
 import org.dromara.system.service.IElasticsearchIndexService;
@@ -39,6 +41,7 @@ public class ElasticsearchDocumentServiceImpl implements IElasticsearchDocumentS
     private final ElasticsearchClient elasticsearchClient;
     private final IElasticsearchIndexService elasticsearchIndexService;
     private final SysKnowledgeBaseDocumentMapper knowledgeBaseDocumentMapper;
+    private final SysKnowledgeBaseDocumentChunkMapper knowledgeBaseDocumentChunkMapper;
 
     /**
      * {@inheritDoc}
@@ -215,6 +218,57 @@ public class ElasticsearchDocumentServiceImpl implements IElasticsearchDocumentS
         } catch (Exception exception) {
             log.error("Failed to get index name for documentId: {}", documentId, exception);
             return null;
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Boolean deleteChunkByChunkId(String chunkId) {
+        try {
+            log.info("Deleting ES chunk by chunkId: {}", chunkId);
+
+            // First, find the chunk record to get document ID and knowledge base ID
+            SysKnowledgeBaseDocumentChunk chunk = knowledgeBaseDocumentChunkMapper.selectById(Long.valueOf(chunkId));
+            if (chunk == null) {
+                log.warn("Chunk not found in database: chunkId={}", chunkId);
+                return false;
+            }
+
+            Long documentId = chunk.getDocumentId();
+            Long knowledgeBaseId = chunk.getKnowledgeBaseId();
+
+            if (documentId == null || knowledgeBaseId == null) {
+                log.warn("Invalid chunk data: chunkId={}, documentId={}, knowledgeBaseId={}",
+                    chunkId, documentId, knowledgeBaseId);
+                return false;
+            }
+
+            // Generate index name using knowledge base ID
+            String indexName = elasticsearchIndexService.generateIndexName(knowledgeBaseId.toString());
+
+            // Delete the specific chunk document from ES
+            DeleteRequest deleteRequest = DeleteRequest.of(builder -> builder
+                .index(indexName)
+                .id(chunkId)
+                .refresh(Refresh.True) // Refresh index after deletion
+            );
+
+            var deleteResponse = elasticsearchClient.delete(deleteRequest);
+            boolean success = deleteResponse.result().jsonValue().equals("deleted");
+
+            if (success) {
+                log.info("Successfully deleted ES chunk: chunkId={}", chunkId);
+            } else {
+                log.warn("ES chunk not found or already deleted: chunkId={}", chunkId);
+            }
+
+            return success;
+
+        } catch (Exception exception) {
+            log.error("Failed to delete ES chunk: chunkId={}", chunkId, exception);
+            return false;
         }
     }
 

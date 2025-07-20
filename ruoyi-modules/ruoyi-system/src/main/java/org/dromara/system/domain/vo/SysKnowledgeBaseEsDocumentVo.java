@@ -22,9 +22,9 @@ public class SysKnowledgeBaseEsDocumentVo implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /**
-     * Elasticsearch document ID (chunk ID)
+     * Elasticsearch document ID (chunk ID) - can be used for deletion
      */
-    @ExcelProperty(value = "ES文档ID")
+    @ExcelProperty(value = "ES文档块ID")
     private String id;
 
     /**
