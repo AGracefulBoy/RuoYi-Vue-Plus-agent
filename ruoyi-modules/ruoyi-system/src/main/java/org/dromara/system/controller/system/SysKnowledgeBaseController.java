@@ -96,7 +96,7 @@ public class SysKnowledgeBaseController extends BaseController {
     @SaCheckPermission("system:knowledgeBase:edit")
     @Log(title = "知识库管理", businessType = BusinessType.UPDATE)
     @RepeatSubmit()
-    @PutMapping()
+    @PutMapping("/edit")
     public R<Void> edit(@Validated(EditGroup.class) @RequestBody SysKnowledgeBaseBo bo) {
         return toAjax(knowledgeBaseService.updateByBo(bo));
     }

@@ -17,7 +17,9 @@ import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.common.web.core.BaseController;
 import org.dromara.system.domain.bo.SysKnowledgeBaseDocumentBo;
 import org.dromara.system.domain.vo.SysKnowledgeBaseDocumentVo;
+import org.dromara.system.domain.vo.SysKnowledgeBaseEsDocumentVo;
 import org.dromara.system.service.IDocumentSplitService;
+import org.dromara.system.service.IElasticsearchDocumentService;
 import org.dromara.system.service.ISysKnowledgeBaseDocumentService;
 import org.dromara.system.service.split.DocumentChunk;
 import org.springframework.validation.annotation.Validated;
@@ -38,6 +40,7 @@ public class SysKnowledgeBaseDocumentController extends BaseController {
 
     private final ISysKnowledgeBaseDocumentService knowledgeBaseDocumentService;
     private final IDocumentSplitService documentSplitService;
+    private final IElasticsearchDocumentService elasticsearchDocumentService;
 
     /**
      * 查询知识库文档管理列表
@@ -133,47 +136,50 @@ public class SysKnowledgeBaseDocumentController extends BaseController {
                                          @PathVariable Long knowledgeBaseId) {
         return toAjax(knowledgeBaseDocumentService.deleteByKnowledgeBaseId(knowledgeBaseId));
     }
-
     /**
-     * Split document into chunks for processing.
+     * 根据documentId 查询向量数据
      *
-     * @param documentUrl   document URL to split
-     * @param documentType  document type (xlsx, docx, pdf)
-     * @param chunkSize     maximum chunk size in characters
-     * @param overlapSize   overlap size between chunks
-     * @return list of document chunks
+     *
+     * @param documentId the document ID to search for
+     * @param pageQuery  pagination parameters
+     * @return paginated list of ES documents without embedding fields
      */
-    @SaCheckPermission("system:knowledgeBaseDocument:split")
-    @Log(title = "文档切分", businessType = BusinessType.OTHER)
-    @PostMapping("/split")
-    public R<List<DocumentChunk>> splitDocument(@RequestParam String documentUrl,
-                                               @RequestParam String documentType,
-                                               @RequestParam(defaultValue = "1000") Integer chunkSize,
-                                               @RequestParam(defaultValue = "100") Integer overlapSize) {
-        List<DocumentChunk> chunks = documentSplitService.splitDocument(documentUrl, documentType, chunkSize, overlapSize);
-        return R.ok(chunks);
+    @SaCheckPermission("system:knowledgeBaseDocument:query")
+    @GetMapping("/es/{documentId}")
+    public TableDataInfo<SysKnowledgeBaseEsDocumentVo> queryEsDocuments(@NotNull(message = "文档ID不能为空")
+                                                                        @PathVariable Long documentId,
+                                                                        PageQuery pageQuery) {
+        return elasticsearchDocumentService.queryDocumentsByDocumentId(documentId, pageQuery);
     }
 
     /**
-     * Get supported document types for splitting.
+     * 根据document ID删除文档向量
      *
-     * @return list of supported document types
+     * @param documentId the document ID whose ES documents to delete
+     * @return operation result
      */
-    @SaCheckPermission("system:knowledgeBaseDocument:query")
-    @GetMapping("/supportedTypes")
-    public R<List<String>> getSupportedDocumentTypes() {
-        return R.ok(documentSplitService.getSupportedDocumentTypes());
+    @SaCheckPermission("system:knowledgeBaseDocument:remove")
+    @Log(title = "知识库ES文档管理", businessType = BusinessType.DELETE)
+    @PostMapping("/es/delete/{documentId}")
+    public R<Void> deleteEsDocuments(@NotNull(message = "文档ID不能为空")
+                                     @PathVariable Long documentId) {
+        return toAjax(elasticsearchDocumentService.deleteDocumentsByDocumentId(documentId));
     }
 
     /**
-     * Check if document type is supported for splitting.
+     * 根据chunkId 删除数据
      *
-     * @param documentType document type to check
-     * @return true if supported, false otherwise
+     * @param documentId the document ID (used for index determination)
+     * @param chunkId    the chunk ID to delete
+     * @return operation result
      */
-    @SaCheckPermission("system:knowledgeBaseDocument:query")
-    @GetMapping("/isSupported")
-    public R<Boolean> isDocumentTypeSupported(@RequestParam String documentType) {
-        return R.ok(documentSplitService.isDocumentTypeSupported(documentType));
+    @SaCheckPermission("system:knowledgeBaseDocument:remove")
+    @Log(title = "知识库ES文档块管理", businessType = BusinessType.DELETE)
+    @PostMapping("/es/deleteChunk/{documentId}/{chunkId}")
+    public R<Void> deleteEsChunk(@NotNull(message = "文档ID不能为空")
+                                 @PathVariable Long documentId,
+                                 @NotNull(message = "文档块ID不能为空")
+                                 @PathVariable Long chunkId) {
+        return toAjax(elasticsearchDocumentService.deleteChunkById(documentId, chunkId));
     }
 }
