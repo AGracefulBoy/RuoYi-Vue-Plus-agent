@@ -3,6 +3,7 @@ package org.dromara.system.service;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.system.domain.bo.SysDatasourceBo;
+import org.dromara.system.domain.vo.SysDatasourceListVo;
 import org.dromara.system.domain.vo.SysDatasourceVo;
 
 import java.util.Collection;
@@ -31,6 +32,15 @@ public interface ISysDatasourceService {
      * @return 数据源列表
      */
     TableDataInfo<SysDatasourceVo> queryPageList(SysDatasourceBo bo, PageQuery pageQuery);
+
+    /**
+     * 查询数据源管理列表（分页）- 精简版
+     *
+     * @param bo        查询条件
+     * @param pageQuery 分页参数
+     * @return 数据源列表（只包含核心字段）
+     */
+    TableDataInfo<SysDatasourceListVo> queryPageListForList(SysDatasourceBo bo, PageQuery pageQuery);
 
     /**
      * 查询数据源管理列表

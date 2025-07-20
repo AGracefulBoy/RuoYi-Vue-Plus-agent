@@ -9,6 +9,7 @@ import org.apache.ibatis.annotations.Select;
 import org.dromara.common.core.constant.SystemConstants;
 import org.dromara.common.mybatis.core.mapper.BaseMapperPlus;
 import org.dromara.system.domain.SysDatasource;
+import org.dromara.system.domain.vo.SysDatasourceListVo;
 import org.dromara.system.domain.vo.SysDatasourceVo;
 
 import java.util.List;
@@ -60,6 +61,20 @@ public interface SysDatasourceMapper extends BaseMapperPlus<SysDatasource, SysDa
             "LEFT JOIN sys_user u2 ON sd.update_by = u2.user_id " +
             "WHERE sd.del_flag = '0' ${ew.customSqlSegment}")
     IPage<SysDatasourceVo> selectDatasourceListVoPage(IPage<SysDatasource> page, @Param(Constants.WRAPPER) Wrapper<SysDatasource> wrapper);
+
+    /**
+     * 分页查询数据源管理列表（精简版）
+     *
+     * @param page    分页对象
+     * @param wrapper 查询条件
+     * @return 数据源管理列表（只包含核心字段）
+     */
+    @Select("SELECT sd.datasource_id, sd.datasource_name, sd.datasource_type, " +
+            "u1.nick_name AS createByName, sd.create_time, sd.update_time, sd.status " +
+            "FROM sys_datasource sd " +
+            "LEFT JOIN sys_user u1 ON sd.create_by = u1.user_id " +
+            "WHERE sd.del_flag = '0' ${ew.customSqlSegment}")
+    IPage<SysDatasourceListVo> selectDatasourceListVoPageForList(IPage<SysDatasource> page, @Param(Constants.WRAPPER) Wrapper<SysDatasource> wrapper);
 
     /**
      * 根据数据源名称查询数据源

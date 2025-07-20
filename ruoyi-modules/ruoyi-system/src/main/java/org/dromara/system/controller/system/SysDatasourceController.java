@@ -16,6 +16,7 @@ import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.common.web.core.BaseController;
 import org.dromara.system.domain.bo.SysDatasourceBo;
+import org.dromara.system.domain.vo.SysDatasourceListVo;
 import org.dromara.system.domain.vo.SysDatasourceVo;
 import org.dromara.system.service.ISysDatasourceService;
 import org.springframework.validation.annotation.Validated;
@@ -41,8 +42,8 @@ public class SysDatasourceController extends BaseController {
      */
     @SaCheckPermission("system:datasource:list")
     @GetMapping("/list")
-    public TableDataInfo<SysDatasourceVo> list(SysDatasourceBo bo, PageQuery pageQuery) {
-        return datasourceService.queryPageList(bo, pageQuery);
+    public TableDataInfo<SysDatasourceListVo> list(SysDatasourceBo bo, PageQuery pageQuery) {
+        return datasourceService.queryPageListForList(bo, pageQuery);
     }
 
     /**

@@ -17,6 +17,7 @@ import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.system.domain.SysDatasource;
 import org.dromara.system.domain.bo.SysDatasourceBo;
+import org.dromara.system.domain.vo.SysDatasourceListVo;
 import org.dromara.system.domain.vo.SysDatasourceVo;
 import org.dromara.system.mapper.SysDatasourceMapper;
 import org.dromara.system.service.ISysDatasourceService;
@@ -61,6 +62,14 @@ public class SysDatasourceServiceImpl implements ISysDatasourceService {
     public List<SysDatasourceVo> queryList(SysDatasourceBo bo) {
         LambdaQueryWrapper<SysDatasource> lqw = buildQueryWrapper(bo);
         return baseMapper.selectDatasourceListVo(lqw);
+    }
+
+    @Override
+    public TableDataInfo<SysDatasourceListVo> queryPageListForList(SysDatasourceBo bo, PageQuery pageQuery) {
+        LambdaQueryWrapper<SysDatasource> lqw = buildQueryWrapper(bo);
+        Page<SysDatasource> page = pageQuery.build();
+        IPage<SysDatasourceListVo> result = baseMapper.selectDatasourceListVoPageForList(page, lqw);
+        return TableDataInfo.build(result);
     }
 
     private LambdaQueryWrapper<SysDatasource> buildQueryWrapper(SysDatasourceBo bo) {
