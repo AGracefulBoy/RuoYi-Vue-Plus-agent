@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.dromara.system.mapper.SysTableMetadataMapper">
+
+    <resultMap type="org.dromara.system.domain.SysTableMetadata" id="SysTableMetadataResult">
+        <result property="tableMetaId" column="table_meta_id" />
+        <result property="tenantId" column="tenant_id" />
+        <result property="datasourceId" column="datasource_id" />
+        <result property="databaseName" column="database_name" />
+        <result property="tableName" column="table_name" />
+        <result property="tableComment" column="table_comment" />
+        <result property="tableType" column="table_type" />
+        <result property="engine" column="engine" />
+        <result property="charset" column="charset" />
+        <result property="collation" column="collation" />
+        <result property="tableRows" column="table_rows" />
+        <result property="dataLength" column="data_length" />
+        <result property="indexLength" column="index_length" />
+        <result property="createTimeDb" column="create_time_db" />
+        <result property="updateTimeDb" column="update_time_db" />
+        <result property="syncStatus" column="sync_status" />
+        <result property="lastSyncTime" column="last_sync_time" />
+        <result property="syncErrorMessage" column="sync_error_message" />
+        <result property="fieldCount" column="field_count" />
+        <result property="indexCount" column="index_count" />
+        <result property="isPartitioned" column="is_partitioned" />
+        <result property="partitionInfo" column="partition_info" />
+        <result property="tableStructure" column="table_structure" />
+        <result property="businessDescription" column="business_description" />
+        <result property="status" column="status" />
+        <result property="delFlag" column="del_flag" />
+        <result property="createDept" column="create_dept" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+    </resultMap>
+
+    <resultMap type="org.dromara.system.domain.vo.SysTableMetadataVo" id="SysTableMetadataVoResult">
+        <result property="tableMetaId" column="table_meta_id" />
+        <result property="tenantId" column="tenant_id" />
+        <result property="datasourceId" column="datasource_id" />
+        <result property="datasourceName" column="datasource_name" />
+        <result property="databaseName" column="database_name" />
+        <result property="tableName" column="table_name" />
+        <result property="tableComment" column="table_comment" />
+        <result property="tableType" column="table_type" />
+        <result property="engine" column="engine" />
+        <result property="charset" column="charset" />
+        <result property="collation" column="collation" />
+        <result property="tableRows" column="table_rows" />
+        <result property="dataLength" column="data_length" />
+        <result property="indexLength" column="index_length" />
+        <result property="createTimeDb" column="create_time_db" />
+        <result property="updateTimeDb" column="update_time_db" />
+        <result property="syncStatus" column="sync_status" />
+        <result property="lastSyncTime" column="last_sync_time" />
+        <result property="syncErrorMessage" column="sync_error_message" />
+        <result property="fieldCount" column="field_count" />
+        <result property="indexCount" column="index_count" />
+        <result property="isPartitioned" column="is_partitioned" />
+        <result property="partitionInfo" column="partition_info" />
+        <result property="tableStructure" column="table_structure" />
+        <result property="businessDescription" column="business_description" />
+        <result property="status" column="status" />
+        <result property="remark" column="remark" />
+        <result property="createBy" column="create_by" />
+        <result property="createByName" column="createByName" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateByName" column="updateByName" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+
+    <sql id="selectSysTableMetadataVo">
+        select stm.table_meta_id, stm.tenant_id, stm.datasource_id, sd.datasource_name,
+               stm.database_name, stm.table_name, stm.table_comment, stm.table_type,
+               stm.engine, stm.charset, stm.collation, stm.table_rows,
+               stm.data_length, stm.index_length, stm.create_time_db, stm.update_time_db,
+               stm.sync_status, stm.last_sync_time, stm.sync_error_message, stm.field_count,
+               stm.index_count, stm.is_partitioned, stm.partition_info, stm.table_structure,
+               stm.business_description, stm.status, stm.remark, stm.create_by,
+               u1.nick_name as createByName, stm.create_time, stm.update_by,
+               u2.nick_name as updateByName, stm.update_time
+        from sys_table_metadata stm
+        left join sys_datasource sd on stm.datasource_id = sd.datasource_id
+        left join sys_user u1 on stm.create_by = u1.user_id
+        left join sys_user u2 on stm.update_by = u2.user_id
+    </sql>
+
+    <!-- 由于使用了注解方式，大部分SQL已在Mapper接口中定义，此处仅保留基本的映射配置 -->
+    
+</mapper>

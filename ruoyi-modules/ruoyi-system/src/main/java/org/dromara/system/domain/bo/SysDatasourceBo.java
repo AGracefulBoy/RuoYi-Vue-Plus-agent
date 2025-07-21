@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
-@AutoMapper(target = SysDatasource.class, reverseConvertGenerate = false)
+@AutoMapper(target = SysDatasource.class)
 public class SysDatasourceBo extends BaseEntity {
 
     /**
