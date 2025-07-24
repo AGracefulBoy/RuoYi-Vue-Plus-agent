@@ -54,7 +54,7 @@ public class PageQuery implements Serializable {
     /**
      * 每页显示记录数 默认值 默认查全部
      */
-    public static final int DEFAULT_PAGE_SIZE = Integer.MAX_VALUE;
+    public static final int DEFAULT_PAGE_SIZE = 10;
 
     /**
      * 构建分页对象

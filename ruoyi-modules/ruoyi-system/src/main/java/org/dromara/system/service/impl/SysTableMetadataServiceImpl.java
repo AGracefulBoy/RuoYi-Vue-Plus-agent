@@ -246,6 +246,20 @@ public class SysTableMetadataServiceImpl implements ISysTableMetadataService {
     }
 
     @Override
+    public TableDataInfo<SysTableMetadataVo> queryPageByDatasourceId(Long datasourceId, PageQuery pageQuery) {
+        LambdaQueryWrapper<SysTableMetadata> lqw = Wrappers.lambdaQuery();
+        lqw.eq(SysTableMetadata::getDatasourceId, datasourceId);
+        lqw.orderByDesc(SysTableMetadata::getCreateTime);
+        
+        Page<SysTableMetadataVo> result = baseMapper.selectVoPage(pageQuery.build(), lqw);
+        List<SysTableMetadataVo> records = result.getRecords();
+        if (records != null && !records.isEmpty()) {
+            fillRelatedData(records);
+        }
+        return TableDataInfo.build(result);
+    }
+
+    @Override
     public List<SysTableMetadataVo> queryByDatasourceIdAndDatabase(Long datasourceId, String databaseName) {
         List<SysTableMetadataVo> list = baseMapper.selectByDatasourceIdAndDatabase(datasourceId, databaseName);
         if (list != null && !list.isEmpty()) {

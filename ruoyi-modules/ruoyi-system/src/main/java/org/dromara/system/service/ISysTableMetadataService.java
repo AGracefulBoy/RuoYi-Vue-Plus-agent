@@ -73,6 +73,15 @@ public interface ISysTableMetadataService {
     List<SysTableMetadataVo> queryByDatasourceId(Long datasourceId);
 
     /**
+     * 根据数据源ID查询表元数据列表（分页）
+     *
+     * @param datasourceId 数据源ID
+     * @param pageQuery    分页参数
+     * @return 表元数据列表（分页）
+     */
+    TableDataInfo<SysTableMetadataVo> queryPageByDatasourceId(Long datasourceId, PageQuery pageQuery);
+
+    /**
      * 根据数据源ID和数据库名称查询表元数据列表
      *
      * @param datasourceId 数据源ID

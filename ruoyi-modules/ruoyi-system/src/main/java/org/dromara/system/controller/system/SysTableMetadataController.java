@@ -108,8 +108,9 @@ public class SysTableMetadataController extends BaseController {
      */
     @SaCheckPermission("system:table:metadata:list")
     @GetMapping("/datasource/{datasourceId}")
-    public R<List<SysTableMetadataVo>> listByDatasourceId(@NotNull(message = "数据源ID不能为空") @PathVariable Long datasourceId) {
-        return R.ok(tableMetadataService.queryByDatasourceId(datasourceId));
+    public TableDataInfo<SysTableMetadataVo> listByDatasourceId(@NotNull(message = "数据源ID不能为空") @PathVariable Long datasourceId,
+                                                                PageQuery pageQuery) {
+        return tableMetadataService.queryPageByDatasourceId(datasourceId, pageQuery);
     }
 
     /**
