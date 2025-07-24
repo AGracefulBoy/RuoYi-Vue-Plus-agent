@@ -9,6 +9,7 @@ import org.apache.ibatis.annotations.Select;
 import org.dromara.common.mybatis.core.mapper.BaseMapperPlus;
 import org.dromara.system.domain.SysAgent;
 import org.dromara.system.domain.vo.SysAgentVo;
+import org.dromara.system.domain.vo.SysAgentListVo;
 
 import java.util.List;
 
@@ -62,4 +63,35 @@ public interface SysAgentMapper extends BaseMapperPlus<SysAgent, SysAgentVo> {
             "LEFT JOIN sys_user u2 ON sa.update_by = u2.user_id " +
             "WHERE sa.del_flag = '0' ${ew.customSqlSegment}")
     IPage<SysAgentVo> selectAgentListVoPage(IPage<SysAgent> page, @Param(Constants.WRAPPER) Wrapper<SysAgent> wrapper);
+
+    /**
+     * 查询智能体管理列表（仅返回关键字段）
+     *
+     * @param wrapper 查询条件
+     * @return 智能体管理列表
+     */
+    @Select("SELECT sa.agent_id, sa.agent_name, sa.agent_desc, sa.agent_type, " +
+            "sa.avatar, sa.status, sa.create_by, u1.nick_name AS createByName, " +
+            "sa.update_by, u2.nick_name AS updateByName, sa.create_time, sa.update_time " +
+            "FROM sys_agent sa " +
+            "LEFT JOIN sys_user u1 ON sa.create_by = u1.user_id " +
+            "LEFT JOIN sys_user u2 ON sa.update_by = u2.user_id " +
+            "WHERE sa.del_flag = '0' ${ew.customSqlSegment}")
+    List<SysAgentListVo> selectAgentSimpleListVo(@Param(Constants.WRAPPER) Wrapper<SysAgent> wrapper);
+
+    /**
+     * 分页查询智能体管理列表（仅返回关键字段）
+     *
+     * @param page    分页对象
+     * @param wrapper 查询条件
+     * @return 智能体管理列表
+     */
+    @Select("SELECT sa.agent_id, sa.agent_name, sa.agent_desc, sa.agent_type, " +
+            "sa.avatar, sa.status, sa.create_by, u1.nick_name AS createByName, " +
+            "sa.update_by, u2.nick_name AS updateByName, sa.create_time, sa.update_time " +
+            "FROM sys_agent sa " +
+            "LEFT JOIN sys_user u1 ON sa.create_by = u1.user_id " +
+            "LEFT JOIN sys_user u2 ON sa.update_by = u2.user_id " +
+            "WHERE sa.del_flag = '0' ${ew.customSqlSegment}")
+    IPage<SysAgentListVo> selectAgentSimpleListVoPage(IPage<SysAgent> page, @Param(Constants.WRAPPER) Wrapper<SysAgent> wrapper);
 } 

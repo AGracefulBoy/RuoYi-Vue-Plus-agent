@@ -16,6 +16,7 @@ import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.common.web.core.BaseController;
 import org.dromara.system.domain.bo.SysAgentBo;
 import org.dromara.system.domain.vo.SysAgentVo;
+import org.dromara.system.domain.vo.SysAgentListVo;
 import org.dromara.system.service.ISysAgentService;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -40,8 +41,8 @@ public class SysAgentController extends BaseController {
      */
     @SaCheckPermission("system:agent:list")
     @GetMapping("/list")
-    public TableDataInfo<SysAgentVo> list(SysAgentBo bo, PageQuery pageQuery) {
-        return agentService.queryPageList(bo, pageQuery);
+    public TableDataInfo<SysAgentListVo> list(SysAgentBo bo, PageQuery pageQuery) {
+        return agentService.querySimplePageList(bo, pageQuery);
     }
 
     /**
@@ -56,7 +57,7 @@ public class SysAgentController extends BaseController {
     }
 
     /**
-     * 获取智能体管理详细信息
+     * 获取智能体详细信息
      *
      * @param agentId 智能体ID
      */

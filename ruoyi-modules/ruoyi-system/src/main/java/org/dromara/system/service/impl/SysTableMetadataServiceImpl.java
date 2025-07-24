@@ -18,16 +18,25 @@ import org.dromara.system.domain.SysTableMetadata;
 import org.dromara.system.domain.SysDatasource;
 import org.dromara.system.domain.SysUser;
 import org.dromara.system.domain.bo.SysTableMetadataBo;
+import org.dromara.system.domain.bo.SysDatasourceBo;
 import org.dromara.system.domain.vo.SysTableMetadataVo;
 import org.dromara.system.mapper.SysTableMetadataMapper;
 import org.dromara.system.mapper.SysDatasourceMapper;
 import org.dromara.system.mapper.SysUserMapper;
 import org.dromara.system.service.ISysTableMetadataService;
+import org.dromara.system.util.DatasourceValidatorUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -62,12 +71,12 @@ public class SysTableMetadataServiceImpl implements ISysTableMetadataService {
         LambdaQueryWrapper<SysTableMetadata> lqw = buildQueryWrapper(bo);
         Page<SysTableMetadata> page = pageQuery.build();
         IPage<SysTableMetadataVo> result = baseMapper.selectVoPage(page, lqw);
-        
+
         // 填充关联数据
         if (result.getRecords() != null && !result.getRecords().isEmpty()) {
             fillRelatedData(result.getRecords());
         }
-        
+
         return TableDataInfo.build(result);
     }
 
@@ -75,12 +84,12 @@ public class SysTableMetadataServiceImpl implements ISysTableMetadataService {
     public List<SysTableMetadataVo> queryList(SysTableMetadataBo bo) {
         LambdaQueryWrapper<SysTableMetadata> lqw = buildQueryWrapper(bo);
         List<SysTableMetadataVo> list = baseMapper.selectVoList(lqw);
-        
+
         // 填充关联数据
         if (list != null && !list.isEmpty()) {
             fillRelatedData(list);
         }
-        
+
         return list;
     }
 
@@ -140,18 +149,18 @@ public class SysTableMetadataServiceImpl implements ISysTableMetadataService {
         // 填充数据
         final Map<Long, String> finalDatasourceNameMap = datasourceNameMap;
         final Map<Long, String> finalUserNameMap = userNameMap;
-        
+
         list.forEach(vo -> {
             // 填充数据源名称
             if (vo.getDatasourceId() != null) {
                 vo.setDatasourceName(finalDatasourceNameMap.get(vo.getDatasourceId()));
             }
-            
+
             // 填充创建者名称
             if (vo.getCreateBy() != null) {
                 vo.setCreateByName(finalUserNameMap.get(vo.getCreateBy()));
             }
-            
+
             // 填充更新者名称
             if (vo.getUpdateBy() != null) {
                 vo.setUpdateByName(finalUserNameMap.get(vo.getUpdateBy()));
@@ -172,7 +181,7 @@ public class SysTableMetadataServiceImpl implements ISysTableMetadataService {
         lqw.like(StringUtils.isNotBlank(bo.getBusinessDescription()), SysTableMetadata::getBusinessDescription, bo.getBusinessDescription());
         lqw.eq(StringUtils.isNotBlank(bo.getStatus()), SysTableMetadata::getStatus, bo.getStatus());
         lqw.between(ObjectUtil.isAllNotEmpty(bo.getParams().get("beginCreateTime"), bo.getParams().get("endCreateTime")),
-                SysTableMetadata::getCreateTime, bo.getParams().get("beginCreateTime"), bo.getParams().get("endCreateTime"));
+            SysTableMetadata::getCreateTime, bo.getParams().get("beginCreateTime"), bo.getParams().get("endCreateTime"));
         lqw.orderByDesc(SysTableMetadata::getLastSyncTime);
         lqw.orderByDesc(SysTableMetadata::getCreateTime);
         return lqw;
@@ -182,14 +191,14 @@ public class SysTableMetadataServiceImpl implements ISysTableMetadataService {
     @Transactional(rollbackFor = Exception.class)
     public Boolean insertByBo(SysTableMetadataBo bo) {
         SysTableMetadata add = MapstructUtils.convert(bo, SysTableMetadata.class);
-        
+
         // 检查是否已存在相同的表
         SysTableMetadataVo existingTable = baseMapper.selectByDatasourceIdAndDatabaseAndTable(
             bo.getDatasourceId(), bo.getDatabaseName(), bo.getTableName());
         if (ObjectUtil.isNotNull(existingTable)) {
             throw new ServiceException("表元数据已存在：" + bo.getDatabaseName() + "." + bo.getTableName());
         }
-        
+
         // 设置默认值
         if (StringUtils.isBlank(add.getSyncStatus())) {
             add.setSyncStatus("0");
@@ -203,7 +212,7 @@ public class SysTableMetadataServiceImpl implements ISysTableMetadataService {
         if (StringUtils.isBlank(add.getTableType())) {
             add.setTableType("TABLE");
         }
-        
+
         boolean flag = baseMapper.insert(add) > 0;
         if (flag) {
             bo.setTableMetaId(add.getTableMetaId());
@@ -224,7 +233,7 @@ public class SysTableMetadataServiceImpl implements ISysTableMetadataService {
         if (ObjectUtil.isEmpty(ids)) {
             return false;
         }
-        
+
         // 可以在这里添加删除前的验证逻辑，比如检查是否有关联的字段元数据
         for (Long id : ids) {
             SysTableMetadataVo tableMetadata = baseMapper.selectVoById(id);
@@ -232,7 +241,7 @@ public class SysTableMetadataServiceImpl implements ISysTableMetadataService {
                 throw new ServiceException("表元数据存在关联字段，不允许删除：" + tableMetadata.getTableName());
             }
         }
-        
+
         return baseMapper.deleteBatchIds(ids) > 0;
     }
 
@@ -250,7 +259,7 @@ public class SysTableMetadataServiceImpl implements ISysTableMetadataService {
         LambdaQueryWrapper<SysTableMetadata> lqw = Wrappers.lambdaQuery();
         lqw.eq(SysTableMetadata::getDatasourceId, datasourceId);
         lqw.orderByDesc(SysTableMetadata::getCreateTime);
-        
+
         Page<SysTableMetadataVo> result = baseMapper.selectVoPage(pageQuery.build(), lqw);
         List<SysTableMetadataVo> records = result.getRecords();
         if (records != null && !records.isEmpty()) {
@@ -309,38 +318,38 @@ public class SysTableMetadataServiceImpl implements ISysTableMetadataService {
     @Transactional(rollbackFor = Exception.class)
     public Boolean syncTableStructure(Long datasourceId) {
         log.info("开始同步数据源表结构信息，数据源ID：{}", datasourceId);
-        
+
         try {
             // TODO: 这里应该实现具体的同步逻辑
             // 1. 获取数据源连接信息
             // 2. 连接数据库获取表结构信息
             // 3. 更新或插入表元数据信息
             // 4. 更新同步状态和时间
-            
+
             // 暂时只更新同步时间作为示例
             LambdaUpdateWrapper<SysTableMetadata> updateWrapper = new LambdaUpdateWrapper<>();
             updateWrapper.eq(SysTableMetadata::getDatasourceId, datasourceId)
-                         .eq(SysTableMetadata::getSyncStatus, "0")
-                         .set(SysTableMetadata::getLastSyncTime, LocalDateTime.now())
-                         .set(SysTableMetadata::getSyncStatus, "1");
-            
+                .eq(SysTableMetadata::getSyncStatus, "0")
+                .set(SysTableMetadata::getLastSyncTime, LocalDateTime.now())
+                .set(SysTableMetadata::getSyncStatus, "1");
+
             baseMapper.update(null, updateWrapper);
-            
+
             log.info("同步数据源表结构信息完成，数据源ID：{}", datasourceId);
             return true;
         } catch (Exception e) {
             log.error("同步数据源表结构信息失败，数据源ID：{}，错误信息：{}", datasourceId, e.getMessage(), e);
-            
+
             // 更新同步状态为失败
             LambdaUpdateWrapper<SysTableMetadata> updateWrapper = new LambdaUpdateWrapper<>();
             updateWrapper.eq(SysTableMetadata::getDatasourceId, datasourceId)
-                         .eq(SysTableMetadata::getSyncStatus, "0")
-                         .set(SysTableMetadata::getLastSyncTime, LocalDateTime.now())
-                         .set(SysTableMetadata::getSyncStatus, "2")
-                         .set(SysTableMetadata::getSyncErrorMessage, e.getMessage());
-            
+                .eq(SysTableMetadata::getSyncStatus, "0")
+                .set(SysTableMetadata::getLastSyncTime, LocalDateTime.now())
+                .set(SysTableMetadata::getSyncStatus, "2")
+                .set(SysTableMetadata::getSyncErrorMessage, e.getMessage());
+
             baseMapper.update(null, updateWrapper);
-            
+
             throw new ServiceException("同步表结构信息失败：" + e.getMessage());
         }
     }
@@ -349,41 +358,41 @@ public class SysTableMetadataServiceImpl implements ISysTableMetadataService {
     @Transactional(rollbackFor = Exception.class)
     public Boolean syncSingleTable(Long tableMetaId) {
         log.info("开始同步单个表结构信息，表元数据ID：{}", tableMetaId);
-        
+
         try {
             SysTableMetadataVo tableMetadata = baseMapper.selectVoById(tableMetaId);
             if (ObjectUtil.isNull(tableMetadata)) {
                 throw new ServiceException("表元数据不存在");
             }
-            
+
             // TODO: 这里应该实现具体的单表同步逻辑
             // 1. 获取表的最新结构信息
             // 2. 更新表元数据信息
             // 3. 更新同步状态和时间
-            
+
             // 暂时只更新同步时间作为示例
             LambdaUpdateWrapper<SysTableMetadata> updateWrapper = new LambdaUpdateWrapper<>();
             updateWrapper.eq(SysTableMetadata::getTableMetaId, tableMetaId)
-                         .set(SysTableMetadata::getLastSyncTime, LocalDateTime.now())
-                         .set(SysTableMetadata::getSyncStatus, "1")
-                         .set(SysTableMetadata::getSyncErrorMessage, null);
-            
+                .set(SysTableMetadata::getLastSyncTime, LocalDateTime.now())
+                .set(SysTableMetadata::getSyncStatus, "1")
+                .set(SysTableMetadata::getSyncErrorMessage, null);
+
             baseMapper.update(null, updateWrapper);
-            
+
             log.info("同步单个表结构信息完成，表元数据ID：{}", tableMetaId);
             return true;
         } catch (Exception e) {
             log.error("同步单个表结构信息失败，表元数据ID：{}，错误信息：{}", tableMetaId, e.getMessage(), e);
-            
+
             // 更新同步状态为失败
             LambdaUpdateWrapper<SysTableMetadata> updateWrapper = new LambdaUpdateWrapper<>();
             updateWrapper.eq(SysTableMetadata::getTableMetaId, tableMetaId)
-                         .set(SysTableMetadata::getLastSyncTime, LocalDateTime.now())
-                         .set(SysTableMetadata::getSyncStatus, "2")
-                         .set(SysTableMetadata::getSyncErrorMessage, e.getMessage());
-            
+                .set(SysTableMetadata::getLastSyncTime, LocalDateTime.now())
+                .set(SysTableMetadata::getSyncStatus, "2")
+                .set(SysTableMetadata::getSyncErrorMessage, e.getMessage());
+
             baseMapper.update(null, updateWrapper);
-            
+
             throw new ServiceException("同步表结构信息失败：" + e.getMessage());
         }
     }
@@ -393,16 +402,97 @@ public class SysTableMetadataServiceImpl implements ISysTableMetadataService {
     public Boolean updateSyncStatus(Long tableMetaId, String syncStatus, String syncErrorMessage) {
         LambdaUpdateWrapper<SysTableMetadata> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(SysTableMetadata::getTableMetaId, tableMetaId)
-                     .set(SysTableMetadata::getLastSyncTime, LocalDateTime.now())
-                     .set(SysTableMetadata::getSyncStatus, syncStatus);
-        
+            .set(SysTableMetadata::getLastSyncTime, LocalDateTime.now())
+            .set(SysTableMetadata::getSyncStatus, syncStatus);
+
         if (StringUtils.isNotBlank(syncErrorMessage)) {
             updateWrapper.set(SysTableMetadata::getSyncErrorMessage, syncErrorMessage);
         } else {
             updateWrapper.set(SysTableMetadata::getSyncErrorMessage, null);
         }
-        
+
         return baseMapper.update(null, updateWrapper) > 0;
+    }
+
+    @Override
+    public List<Object> queryTableData(Long tableMetaId) {
+        log.info("查询表数据，表元数据ID：{}", tableMetaId);
+
+        List<Object> result = new ArrayList<>();
+
+        try {
+            // 获取表元数据信息
+            SysTableMetadataVo tableMetadata = queryById(tableMetaId);
+            if (ObjectUtil.isNull(tableMetadata)) {
+                throw new ServiceException("表元数据不存在");
+            }
+
+            // 获取数据源信息
+            SysDatasource datasource = datasourceMapper.selectById(tableMetadata.getDatasourceId());
+            if (ObjectUtil.isNull(datasource)) {
+                throw new ServiceException("数据源不存在");
+            }
+
+            // 构建连接URL
+            SysDatasourceBo datasourceBo = MapstructUtils.convert(datasource, SysDatasourceBo.class);
+            String connectionUrl = DatasourceValidatorUtils.buildConnectionUrl(datasourceBo);
+
+            // 添加连接参数
+            if (StringUtils.isNotBlank(datasource.getConnectionParams())) {
+                connectionUrl += (connectionUrl.contains("?") ? "&" : "?") + datasource.getConnectionParams();
+            }
+
+
+            if (StringUtils.isNotBlank(datasource.getDriverClassName())) {
+                Class.forName(datasource.getDriverClassName());
+            } else {
+                Class.forName("com.mysql.cj.jdbc.Driver");
+            }
+
+            // 建立连接并查询数据
+            try (Connection connection = DriverManager.getConnection(
+                connectionUrl,
+                datasource.getUsername(),
+                datasource.getPassword())) {
+
+                // 构建查询SQL，限制100条
+                String sql = String.format("SELECT * FROM `%s`.`%s` LIMIT 100",
+                    tableMetadata.getDatabaseName(), tableMetadata.getTableName());
+
+                try (PreparedStatement statement = connection.prepareStatement(sql);
+                     ResultSet resultSet = statement.executeQuery()) {
+
+                    // 获取元数据信息
+                    ResultSetMetaData metaData = resultSet.getMetaData();
+                    int columnCount = metaData.getColumnCount();
+
+                    // 添加列信息作为第一条记录
+                    Map<String, Object> columnInfo = new LinkedHashMap<>();
+                    for (int i = 1; i <= columnCount; i++) {
+                        columnInfo.put("column_" + i, metaData.getColumnName(i) + " (" + metaData.getColumnTypeName(i) + ")");
+                    }
+                    result.add(columnInfo);
+
+                    // 遍历结果集
+                    while (resultSet.next()) {
+                        Map<String, Object> row = new LinkedHashMap<>();
+                        for (int i = 1; i <= columnCount; i++) {
+                            String columnName = metaData.getColumnName(i);
+                            Object value = resultSet.getObject(i);
+                            row.put(columnName, value);
+                        }
+                        result.add(row);
+                    }
+                }
+            }
+
+            log.info("查询表数据成功，返回记录数：{}", result.size() - 1);
+            return result;
+
+        } catch (Exception e) {
+            log.error("查询表数据失败：{}", e.getMessage(), e);
+            throw new ServiceException("查询表数据失败：" + e.getMessage());
+        }
     }
 
 }

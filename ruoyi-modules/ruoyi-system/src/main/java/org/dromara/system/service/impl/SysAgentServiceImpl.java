@@ -16,14 +16,19 @@ import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.system.domain.SysAgent;
 import org.dromara.system.domain.bo.SysAgentBo;
-import org.dromara.system.domain.vo.SysAgentVo;
+import org.dromara.system.domain.vo.*;
 import org.dromara.system.mapper.SysAgentMapper;
+import org.dromara.system.mapper.SysToolMapper;
+import org.dromara.system.mapper.SysKnowledgeBaseMapper;
+import org.dromara.system.mapper.SysDatasourceMapper;
 import org.dromara.system.service.ISysAgentService;
 
 import org.springframework.stereotype.Service;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.stream.Collectors;
 
 /**
  * 智能体管理Service业务层处理
@@ -35,13 +40,77 @@ import java.util.List;
 public class SysAgentServiceImpl implements ISysAgentService {
 
     private final SysAgentMapper baseMapper;
+    private final SysToolMapper toolMapper;
+    private final SysKnowledgeBaseMapper knowledgeBaseMapper;
+    private final SysDatasourceMapper datasourceMapper;
 
     /**
      * 查询智能体管理
      */
     @Override
     public SysAgentVo queryById(Long agentId) {
-        return baseMapper.selectVoById(agentId);
+        SysAgentVo agentVo = baseMapper.selectVoById(agentId);
+        if (agentVo == null) {
+            return null;
+        }
+        
+        // 转换工具列表
+        if (CollUtil.isNotEmpty(agentVo.getToolList())) {
+            List<SysToolSimpleVo> toolDetailList = new ArrayList<>();
+            for (Long toolId : agentVo.getToolList()) {
+                SysToolVo toolVo = toolMapper.selectVoById(toolId);
+                if (toolVo != null) {
+                    SysToolSimpleVo simpleVo = new SysToolSimpleVo();
+                    simpleVo.setToolId(toolVo.getToolId());
+                    simpleVo.setToolName(toolVo.getToolName());
+                    simpleVo.setToolDesc(toolVo.getToolDesc());
+                    simpleVo.setFunctionName(toolVo.getFunctionName());
+                    simpleVo.setToolType(toolVo.getToolType());
+                    simpleVo.setToolStatus(toolVo.getToolStatus());
+                    toolDetailList.add(simpleVo);
+                }
+            }
+            agentVo.setToolDetailList(toolDetailList);
+        }
+        
+        // 转换知识库列表
+        if (CollUtil.isNotEmpty(agentVo.getKnowledgeBaseList())) {
+            List<SysKnowledgeBaseSimpleVo> knowledgeBaseDetailList = new ArrayList<>();
+            for (Long knowledgeBaseId : agentVo.getKnowledgeBaseList()) {
+                SysKnowledgeBaseVo knowledgeBaseVo = knowledgeBaseMapper.selectVoById(knowledgeBaseId);
+                if (knowledgeBaseVo != null) {
+                    SysKnowledgeBaseSimpleVo simpleVo = new SysKnowledgeBaseSimpleVo();
+                    simpleVo.setKnowledgeBaseId(knowledgeBaseVo.getKnowledgeBaseId());
+                    simpleVo.setName(knowledgeBaseVo.getName());
+                    simpleVo.setDescription(knowledgeBaseVo.getDescription());
+                    simpleVo.setModel(knowledgeBaseVo.getModel());
+                    simpleVo.setStatus(knowledgeBaseVo.getStatus());
+                    knowledgeBaseDetailList.add(simpleVo);
+                }
+            }
+            agentVo.setKnowledgeBaseDetailList(knowledgeBaseDetailList);
+        }
+        
+        // 转换数据库列表
+        if (CollUtil.isNotEmpty(agentVo.getDatabaseList())) {
+            List<SysDatasourceSimpleVo> databaseDetailList = new ArrayList<>();
+            for (Long datasourceId : agentVo.getDatabaseList()) {
+                SysDatasourceVo datasourceVo = datasourceMapper.selectVoById(datasourceId);
+                if (datasourceVo != null) {
+                    SysDatasourceSimpleVo simpleVo = new SysDatasourceSimpleVo();
+                    simpleVo.setDatasourceId(datasourceVo.getDatasourceId());
+                    simpleVo.setDatasourceName(datasourceVo.getDatasourceName());
+                    simpleVo.setDatasourceType(datasourceVo.getDatasourceType());
+                    simpleVo.setDatabaseType(datasourceVo.getDatabaseType());
+                    simpleVo.setDatabaseName(datasourceVo.getDatabaseName());
+                    simpleVo.setStatus(datasourceVo.getStatus());
+                    databaseDetailList.add(simpleVo);
+                }
+            }
+            agentVo.setDatabaseDetailList(databaseDetailList);
+        }
+        
+        return agentVo;
     }
 
     /**
@@ -52,6 +121,17 @@ public class SysAgentServiceImpl implements ISysAgentService {
         LambdaQueryWrapper<SysAgent> lqw = buildQueryWrapper(bo);
         Page<SysAgent> page = pageQuery.build();
         IPage<SysAgentVo> result = baseMapper.selectAgentListVoPage(page, lqw);
+        return TableDataInfo.build(result);
+    }
+
+    /**
+     * 查询智能体管理列表（仅返回关键字段）
+     */
+    @Override
+    public TableDataInfo<SysAgentListVo> querySimplePageList(SysAgentBo bo, PageQuery pageQuery) {
+        LambdaQueryWrapper<SysAgent> lqw = buildQueryWrapper(bo);
+        Page<SysAgent> page = pageQuery.build();
+        IPage<SysAgentListVo> result = baseMapper.selectAgentSimpleListVoPage(page, lqw);
         return TableDataInfo.build(result);
     }
 

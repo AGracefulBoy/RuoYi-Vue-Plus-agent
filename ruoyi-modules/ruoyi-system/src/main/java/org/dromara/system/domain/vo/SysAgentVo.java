@@ -122,6 +122,24 @@ public class SysAgentVo implements Serializable {
     private List<Long> databaseList;
 
     /**
+     * 工具详细信息列表（用于前端展示）
+     */
+    @TableField(exist = false)
+    private List<SysToolSimpleVo> toolDetailList;
+
+    /**
+     * 知识库详细信息列表（用于前端展示）
+     */
+    @TableField(exist = false)
+    private List<SysKnowledgeBaseSimpleVo> knowledgeBaseDetailList;
+
+    /**
+     * 数据库详细信息列表（用于前端展示）
+     */
+    @TableField(exist = false)
+    private List<SysDatasourceSimpleVo> databaseDetailList;
+
+    /**
      * 创建部门
      */
     private Long createDept;

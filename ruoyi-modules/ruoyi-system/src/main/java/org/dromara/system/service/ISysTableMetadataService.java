@@ -159,4 +159,12 @@ public interface ISysTableMetadataService {
      */
     Boolean updateSyncStatus(Long tableMetaId, String syncStatus, String syncErrorMessage);
 
+    /**
+     * 查询表数据（前100条）
+     *
+     * @param tableMetaId 表元数据ID
+     * @return 表数据列表
+     */
+    List<Object> queryTableData(Long tableMetaId);
+
 }

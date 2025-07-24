@@ -227,4 +227,15 @@ public class SysTableMetadataController extends BaseController {
         return toAjax(tableMetadataService.updateSyncStatus(tableMetaId, syncStatus, syncErrorMessage));
     }
 
+    /**
+     * 查询表数据（前100条）
+     *
+     * @param tableMetaId 表元数据ID
+     */
+    @SaCheckPermission("system:table:metadata:query")
+    @GetMapping("/table/{tableMetaId}/data")
+    public R<List<Object>> queryTableData(@NotNull(message = "表元数据ID不能为空") @PathVariable Long tableMetaId) {
+        return R.ok(tableMetadataService.queryTableData(tableMetaId));
+    }
+
 }

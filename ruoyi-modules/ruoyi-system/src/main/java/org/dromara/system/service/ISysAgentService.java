@@ -4,6 +4,7 @@ import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.system.domain.bo.SysAgentBo;
 import org.dromara.system.domain.vo.SysAgentVo;
+import org.dromara.system.domain.vo.SysAgentListVo;
 
 import java.util.Collection;
 import java.util.List;
@@ -31,6 +32,15 @@ public interface ISysAgentService {
      * @return 智能体管理集合
      */
     TableDataInfo<SysAgentVo> queryPageList(SysAgentBo bo, PageQuery pageQuery);
+
+    /**
+     * 查询智能体管理列表（仅返回关键字段）
+     *
+     * @param bo        智能体管理业务对象
+     * @param pageQuery 分页查询参数
+     * @return 智能体管理集合
+     */
+    TableDataInfo<SysAgentListVo> querySimplePageList(SysAgentBo bo, PageQuery pageQuery);
 
     /**
      * 查询智能体管理列表
