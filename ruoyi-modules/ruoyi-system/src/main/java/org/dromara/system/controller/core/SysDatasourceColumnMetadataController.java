@@ -1,4 +1,4 @@
-package org.dromara.system.controller.system;
+package org.dromara.system.controller.core;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import jakarta.servlet.http.HttpServletResponse;
@@ -32,7 +32,7 @@ import java.util.List;
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/system/column/metadata")
-public class SysColumnMetadataController extends BaseController {
+public class SysDatasourceColumnMetadataController extends BaseController {
 
     private final ISysColumnMetadataService columnMetadataService;
 

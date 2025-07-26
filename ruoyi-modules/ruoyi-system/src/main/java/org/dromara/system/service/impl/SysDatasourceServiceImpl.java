@@ -16,26 +16,26 @@ import org.dromara.common.encrypt.utils.EncryptUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.system.domain.SysDatasource;
+import org.dromara.system.domain.bo.SysColumnMetadataBo;
 import org.dromara.system.domain.bo.SysDatasourceBo;
+import org.dromara.system.domain.bo.SysTableMetadataBo;
 import org.dromara.system.domain.vo.SysDatasourceListVo;
 import org.dromara.system.domain.vo.SysDatasourceVo;
 import org.dromara.system.mapper.SysDatasourceMapper;
+import org.dromara.system.service.ISysColumnMetadataService;
 import org.dromara.system.service.ISysDatasourceService;
 import org.dromara.system.service.ISysTableMetadataService;
-import org.dromara.system.service.ISysColumnMetadataService;
-import org.dromara.system.domain.bo.SysTableMetadataBo;
-import org.dromara.system.domain.bo.SysColumnMetadataBo;
 import org.dromara.system.util.DatasourceValidatorUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.scheduling.annotation.Async;
 
 import java.io.File;
 import java.sql.*;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.ArrayList;
+import java.util.concurrent.*;
 
 /**
  * 数据源管理Service业务层处理
@@ -50,6 +50,21 @@ public class SysDatasourceServiceImpl implements ISysDatasourceService {
     private final SysDatasourceMapper baseMapper;
     private final ISysTableMetadataService tableMetadataService;
     private final ISysColumnMetadataService columnMetadataService;
+
+    // 创建专用的元数据获取线程池
+    private final Executor metadataFetchExecutor = new ThreadPoolExecutor(
+        2,                          // 核心线程数
+        5,                          // 最大线程数
+        60L,                        // 空闲线程存活时间
+        TimeUnit.SECONDS,           // 时间单位
+        new LinkedBlockingQueue<>(100),  // 工作队列
+        r -> {
+            Thread thread = new Thread(r, "metadata-fetch-" + System.currentTimeMillis());
+            thread.setDaemon(true);  // 设置为守护线程
+            return thread;
+        },
+        new ThreadPoolExecutor.CallerRunsPolicy()  // 拒绝策略：调用者执行
+    );
 
     @Override
     public SysDatasourceVo queryById(Long datasourceId) {
@@ -410,38 +425,45 @@ public class SysDatasourceServiceImpl implements ISysDatasourceService {
 
     /**
      * 异步获取MySQL数据库元数据，包括表和列信息。
+     * 使用 CompletableFuture 实现真正的异步执行
      *
      * @param datasource 数据源配置
      */
-    @Async
     public void asyncFetchMysqlMetadata(SysDatasource datasource) {
-        log.info("开始为MySQL数据源异步获取元数据: {}", datasource.getDatasourceName());
+        CompletableFuture.runAsync(() -> {
+                log.info("开始为MySQL数据源异步获取元数据: {}", datasource.getDatasourceName());
 
-        try {
-            // 解密连接密码
-            String decryptedPassword = datasource.getPassword();
-            if (StringUtils.isNotBlank(decryptedPassword)) {
                 try {
-                    // 尝试解密密码，如果解密失败则使用原密码
-                    decryptedPassword = EncryptUtils.decryptByAes(decryptedPassword, "");
-                } catch (Exception e) {
-                    log.warn("密码解密失败，使用原始密码: {}", e.getMessage());
-                    // 保持原始密码
+                    // 解密连接密码
+                    String decryptedPassword = datasource.getPassword();
+                    if (StringUtils.isNotBlank(decryptedPassword)) {
+                        try {
+                            // 尝试解密密码，如果解密失败则使用原密码
+                            decryptedPassword = EncryptUtils.decryptByAes(decryptedPassword, "");
+                        } catch (Exception e) {
+                            log.warn("密码解密失败，使用原始密码: {}", e.getMessage());
+                            // 保持原始密码
+                        }
+                    }
+
+                    // 构建连接配置
+                    SysDatasourceBo connectionConfig = MapstructUtils.convert(datasource, SysDatasourceBo.class);
+                    connectionConfig.setPassword(decryptedPassword);
+
+                    // 从MySQL数据库获取元数据
+                    fetchMysqlDatabaseMetadata(connectionConfig);
+
+                    log.info("成功完成数据源的异步元数据获取: {}", datasource.getDatasourceName());
+                } catch (Exception exception) {
+                    log.error("获取数据源元数据失败: {}, 错误: {}",
+                        datasource.getDatasourceName(), exception.getMessage(), exception);
                 }
-            }
-
-            // 构建连接配置
-            SysDatasourceBo connectionConfig = MapstructUtils.convert(datasource, SysDatasourceBo.class);
-            connectionConfig.setPassword(decryptedPassword);
-
-            // 从MySQL数据库获取元数据
-            fetchMysqlDatabaseMetadata(connectionConfig);
-
-            log.info("成功完成数据源的异步元数据获取: {}", datasource.getDatasourceName());
-        } catch (Exception exception) {
-            log.error("获取数据源元数据失败: {}, 错误: {}",
-                datasource.getDatasourceName(), exception.getMessage(), exception);
-        }
+            }, metadataFetchExecutor)
+            .exceptionally(throwable -> {
+                log.error("异步获取元数据任务执行失败: {}, 错误: {}",
+                    datasource.getDatasourceName(), throwable.getMessage(), throwable);
+                return null;
+            });
     }
 
     /**
@@ -528,20 +550,20 @@ public class SysDatasourceServiceImpl implements ISysDatasourceService {
     /**
      * 从MySQL数据库获取表元数据。
      *
-     * @param connection 数据库连接
+     * @param connection   数据库连接
      * @param datasourceId 数据源ID
      * @param databaseName 数据库名称
      * @return 表元数据列表
      */
     private List<SysTableMetadataBo> fetchTableMetadata(Connection connection,
-            Long datasourceId, String databaseName) {
+                                                        Long datasourceId, String databaseName) {
         List<SysTableMetadataBo> tableMetadataList = new ArrayList<>();
 
         try {
             DatabaseMetaData databaseMetaData = connection.getMetaData();
 
             try (ResultSet tablesResultSet = databaseMetaData.getTables(
-                    databaseName, null, null, new String[]{"TABLE", "VIEW"})) {
+                databaseName, null, null, new String[]{"TABLE", "VIEW"})) {
 
                 while (tablesResultSet.next()) {
                     SysTableMetadataBo tableMetadata = new SysTableMetadataBo();
@@ -571,7 +593,7 @@ public class SysDatasourceServiceImpl implements ISysDatasourceService {
     /**
      * Fetch additional table information from information_schema.
      *
-     * @param connection the database connection
+     * @param connection    the database connection
      * @param tableMetadata the table metadata to enrich
      */
     private void fetchAdditionalTableInfo(Connection connection, SysTableMetadataBo tableMetadata) {
@@ -621,15 +643,15 @@ public class SysDatasourceServiceImpl implements ISysDatasourceService {
     /**
      * 从MySQL数据库为指定表获取列元数据。
      *
-     * @param connection 数据库连接
-     * @param tableMetaId 表元数据ID
+     * @param connection   数据库连接
+     * @param tableMetaId  表元数据ID
      * @param datasourceId 数据源ID
      * @param databaseName 数据库名称
-     * @param tableName 表名称
+     * @param tableName    表名称
      * @return 列元数据列表
      */
     private List<SysColumnMetadataBo> fetchColumnMetadataWithConnection(Connection connection,
-            Long tableMetaId, Long datasourceId, String databaseName, String tableName) {
+                                                                        Long tableMetaId, Long datasourceId, String databaseName, String tableName) {
         List<SysColumnMetadataBo> columnMetadataList = new ArrayList<>();
 
         try {
@@ -690,14 +712,14 @@ public class SysDatasourceServiceImpl implements ISysDatasourceService {
      * 从MySQL数据库为指定表获取列元数据（保留原方法以兼容其他调用）。
      *
      * @param databaseMetaData 数据库元数据对象
-     * @param tableMetaId 表元数据ID
-     * @param datasourceId 数据源ID
-     * @param databaseName 数据库名称
-     * @param tableName 表名称
+     * @param tableMetaId      表元数据ID
+     * @param datasourceId     数据源ID
+     * @param databaseName     数据库名称
+     * @param tableName        表名称
      * @return 列元数据列表
      */
     private List<SysColumnMetadataBo> fetchColumnMetadata(DatabaseMetaData databaseMetaData,
-            Long tableMetaId, Long datasourceId, String databaseName, String tableName) {
+                                                          Long tableMetaId, Long datasourceId, String databaseName, String tableName) {
         List<SysColumnMetadataBo> columnMetadataList = new ArrayList<>();
 
         try (ResultSet columnsResultSet = databaseMetaData.getColumns(databaseName, null, tableName, null)) {
@@ -753,14 +775,14 @@ public class SysDatasourceServiceImpl implements ISysDatasourceService {
     /**
      * Check if a column is a primary key using connection.
      *
-     * @param connection the database connection
+     * @param connection   the database connection
      * @param databaseName the database name
-     * @param tableName the table name
-     * @param columnName the column name
+     * @param tableName    the table name
+     * @param columnName   the column name
      * @return true if the column is a primary key
      */
     private boolean isPrimaryKeyWithConnection(Connection connection, String databaseName,
-            String tableName, String columnName) {
+                                               String tableName, String columnName) {
         try {
             DatabaseMetaData databaseMetaData = connection.getMetaData();
             try (ResultSet primaryKeysResultSet = databaseMetaData.getPrimaryKeys(databaseName, null, tableName)) {
@@ -781,13 +803,13 @@ public class SysDatasourceServiceImpl implements ISysDatasourceService {
      * Check if a column is a primary key.
      *
      * @param databaseMetaData the database metadata object
-     * @param databaseName the database name
-     * @param tableName the table name
-     * @param columnName the column name
+     * @param databaseName     the database name
+     * @param tableName        the table name
+     * @param columnName       the column name
      * @return true if the column is a primary key
      */
     private boolean isPrimaryKey(DatabaseMetaData databaseMetaData, String databaseName,
-            String tableName, String columnName) {
+                                 String tableName, String columnName) {
         try (ResultSet primaryKeysResultSet = databaseMetaData.getPrimaryKeys(databaseName, null, tableName)) {
             while (primaryKeysResultSet.next()) {
                 if (columnName.equals(primaryKeysResultSet.getString("COLUMN_NAME"))) {
@@ -823,8 +845,8 @@ public class SysDatasourceServiceImpl implements ISysDatasourceService {
         if (dataType == null) return false;
         String lowerType = dataType.toLowerCase();
         return lowerType.contains("int") || lowerType.contains("decimal") ||
-               lowerType.contains("numeric") || lowerType.contains("float") ||
-               lowerType.contains("double");
+            lowerType.contains("numeric") || lowerType.contains("float") ||
+            lowerType.contains("double");
     }
 
 }

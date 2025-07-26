@@ -6,9 +6,7 @@ import io.github.linpeilie.annotations.AutoMapper;
 import lombok.Data;
 import org.dromara.common.excel.annotation.ExcelDictFormat;
 import org.dromara.common.excel.convert.ExcelDictConvert;
-import org.dromara.common.translation.annotation.Translation;
-import org.dromara.common.translation.constant.TransConstant;
-import org.dromara.system.domain.SysTableMetadata;
+import org.dromara.system.domain.SysDatasourceTableMetadata;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -21,7 +19,7 @@ import java.time.LocalDateTime;
  */
 @Data
 @ExcelIgnoreUnannotated
-@AutoMapper(target = SysTableMetadata.class)
+@AutoMapper(target = SysDatasourceTableMetadata.class)
 public class SysTableMetadataVo implements Serializable {
 
     @Serial
@@ -68,6 +66,12 @@ public class SysTableMetadataVo implements Serializable {
      */
     @ExcelProperty(value = "表注释")
     private String tableComment;
+
+    /**
+     * 表描述
+     */
+    @ExcelProperty(value = "表描述")
+    private String tableDesc;
 
     /**
      * 表类型（TABLE基表、VIEW视图、SYSTEM系统表等）

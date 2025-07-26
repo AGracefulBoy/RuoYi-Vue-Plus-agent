@@ -4,10 +4,9 @@ import io.github.linpeilie.annotations.AutoMapper;
 import jakarta.validation.constraints.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import org.dromara.common.core.validate.AddGroup;
 import org.dromara.common.core.validate.EditGroup;
 import org.dromara.common.mybatis.core.domain.BaseEntity;
-import org.dromara.system.domain.SysColumnMetadata;
+import org.dromara.system.domain.SysDatasourceColumnMetadata;
 
 import java.time.LocalDateTime;
 
@@ -18,7 +17,7 @@ import java.time.LocalDateTime;
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
-@AutoMapper(target = SysColumnMetadata.class, reverseConvertGenerate = false)
+@AutoMapper(target = SysDatasourceColumnMetadata.class, reverseConvertGenerate = false)
 public class SysColumnMetadataBo extends BaseEntity {
 
     /**
@@ -65,6 +64,12 @@ public class SysColumnMetadataBo extends BaseEntity {
      */
     @Size(max = 500, message = "字段注释长度不能超过{max}个字符")
     private String columnComment;
+
+    /**
+     * 字段描述
+     */
+    @Size(max = 1000, message = "字段描述长度不能超过{max}个字符")
+    private String columnDesc;
 
     /**
      * 字段在表中的位置（从1开始）

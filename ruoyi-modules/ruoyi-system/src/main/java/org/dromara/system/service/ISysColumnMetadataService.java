@@ -57,6 +57,15 @@ public interface ISysColumnMetadataService {
     Boolean updateByBo(SysColumnMetadataBo bo);
 
     /**
+     * 更新字段描述（仅允许智能体修改此字段）
+     *
+     * @param columnMetaId 字段元数据ID
+     * @param columnDesc   字段描述
+     * @return 更新结果
+     */
+    Boolean updateColumnDesc(Long columnMetaId, String columnDesc);
+
+    /**
      * 校验并批量删除字段元数据管理信息
      *
      * @param ids 字段元数据ID集合

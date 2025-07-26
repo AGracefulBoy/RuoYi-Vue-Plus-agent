@@ -1,14 +1,9 @@
 package org.dromara.system.mapper;
 
-import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.toolkit.Constants;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Select;
 import org.dromara.common.core.constant.SystemConstants;
 import org.dromara.common.mybatis.core.mapper.BaseMapperPlus;
-import org.dromara.system.domain.SysTableMetadata;
+import org.dromara.system.domain.SysDatasourceTableMetadata;
 import org.dromara.system.domain.vo.SysTableMetadataVo;
 
 import java.util.List;
@@ -18,7 +13,7 @@ import java.util.List;
  *
  * @author ruoyi
  */
-public interface SysTableMetadataMapper extends BaseMapperPlus<SysTableMetadata, SysTableMetadataVo> {
+public interface SysTableMetadataMapper extends BaseMapperPlus<SysDatasourceTableMetadata, SysTableMetadataVo> {
 
     /**
      * 根据数据源ID查询表元数据列表
@@ -28,12 +23,12 @@ public interface SysTableMetadataMapper extends BaseMapperPlus<SysTableMetadata,
      */
     default List<SysTableMetadataVo> selectByDatasourceId(Long datasourceId) {
         return selectVoList(
-            new LambdaQueryWrapper<SysTableMetadata>()
-                .eq(SysTableMetadata::getDatasourceId, datasourceId)
-                .eq(SysTableMetadata::getStatus, "0")
-                .eq(SysTableMetadata::getDelFlag, SystemConstants.NORMAL)
-                .orderByAsc(SysTableMetadata::getDatabaseName)
-                .orderByAsc(SysTableMetadata::getTableName)
+            new LambdaQueryWrapper<SysDatasourceTableMetadata>()
+                .eq(SysDatasourceTableMetadata::getDatasourceId, datasourceId)
+                .eq(SysDatasourceTableMetadata::getStatus, "0")
+                .eq(SysDatasourceTableMetadata::getDelFlag, SystemConstants.NORMAL)
+                .orderByAsc(SysDatasourceTableMetadata::getDatabaseName)
+                .orderByAsc(SysDatasourceTableMetadata::getTableName)
         );
     }
 
@@ -46,12 +41,12 @@ public interface SysTableMetadataMapper extends BaseMapperPlus<SysTableMetadata,
      */
     default List<SysTableMetadataVo> selectByDatasourceIdAndDatabase(Long datasourceId, String databaseName) {
         return selectVoList(
-            new LambdaQueryWrapper<SysTableMetadata>()
-                .eq(SysTableMetadata::getDatasourceId, datasourceId)
-                .eq(SysTableMetadata::getDatabaseName, databaseName)
-                .eq(SysTableMetadata::getStatus, "0")
-                .eq(SysTableMetadata::getDelFlag, SystemConstants.NORMAL)
-                .orderByAsc(SysTableMetadata::getTableName)
+            new LambdaQueryWrapper<SysDatasourceTableMetadata>()
+                .eq(SysDatasourceTableMetadata::getDatasourceId, datasourceId)
+                .eq(SysDatasourceTableMetadata::getDatabaseName, databaseName)
+                .eq(SysDatasourceTableMetadata::getStatus, "0")
+                .eq(SysDatasourceTableMetadata::getDelFlag, SystemConstants.NORMAL)
+                .orderByAsc(SysDatasourceTableMetadata::getTableName)
         );
     }
 
@@ -65,11 +60,11 @@ public interface SysTableMetadataMapper extends BaseMapperPlus<SysTableMetadata,
      */
     default SysTableMetadataVo selectByDatasourceIdAndDatabaseAndTable(Long datasourceId, String databaseName, String tableName) {
         return selectVoOne(
-            new LambdaQueryWrapper<SysTableMetadata>()
-                .eq(SysTableMetadata::getDatasourceId, datasourceId)
-                .eq(SysTableMetadata::getDatabaseName, databaseName)
-                .eq(SysTableMetadata::getTableName, tableName)
-                .eq(SysTableMetadata::getDelFlag, SystemConstants.NORMAL)
+            new LambdaQueryWrapper<SysDatasourceTableMetadata>()
+                .eq(SysDatasourceTableMetadata::getDatasourceId, datasourceId)
+                .eq(SysDatasourceTableMetadata::getDatabaseName, databaseName)
+                .eq(SysDatasourceTableMetadata::getTableName, tableName)
+                .eq(SysDatasourceTableMetadata::getDelFlag, SystemConstants.NORMAL)
         );
     }
 
@@ -81,11 +76,11 @@ public interface SysTableMetadataMapper extends BaseMapperPlus<SysTableMetadata,
      */
     default List<SysTableMetadataVo> selectBySyncStatus(String syncStatus) {
         return selectVoList(
-            new LambdaQueryWrapper<SysTableMetadata>()
-                .eq(SysTableMetadata::getSyncStatus, syncStatus)
-                .eq(SysTableMetadata::getStatus, "0")
-                .eq(SysTableMetadata::getDelFlag, SystemConstants.NORMAL)
-                .orderByAsc(SysTableMetadata::getLastSyncTime)
+            new LambdaQueryWrapper<SysDatasourceTableMetadata>()
+                .eq(SysDatasourceTableMetadata::getSyncStatus, syncStatus)
+                .eq(SysDatasourceTableMetadata::getStatus, "0")
+                .eq(SysDatasourceTableMetadata::getDelFlag, SystemConstants.NORMAL)
+                .orderByAsc(SysDatasourceTableMetadata::getLastSyncTime)
         );
     }
 
@@ -97,10 +92,10 @@ public interface SysTableMetadataMapper extends BaseMapperPlus<SysTableMetadata,
      */
     default long countByDatasourceId(Long datasourceId) {
         return selectCount(
-            new LambdaQueryWrapper<SysTableMetadata>()
-                .eq(SysTableMetadata::getDatasourceId, datasourceId)
-                .eq(SysTableMetadata::getStatus, "0")
-                .eq(SysTableMetadata::getDelFlag, SystemConstants.NORMAL)
+            new LambdaQueryWrapper<SysDatasourceTableMetadata>()
+                .eq(SysDatasourceTableMetadata::getDatasourceId, datasourceId)
+                .eq(SysDatasourceTableMetadata::getStatus, "0")
+                .eq(SysDatasourceTableMetadata::getDelFlag, SystemConstants.NORMAL)
         );
     }
 
@@ -113,11 +108,11 @@ public interface SysTableMetadataMapper extends BaseMapperPlus<SysTableMetadata,
      */
     default long countByDatasourceIdAndDatabase(Long datasourceId, String databaseName) {
         return selectCount(
-            new LambdaQueryWrapper<SysTableMetadata>()
-                .eq(SysTableMetadata::getDatasourceId, datasourceId)
-                .eq(SysTableMetadata::getDatabaseName, databaseName)
-                .eq(SysTableMetadata::getStatus, "0")
-                .eq(SysTableMetadata::getDelFlag, SystemConstants.NORMAL)
+            new LambdaQueryWrapper<SysDatasourceTableMetadata>()
+                .eq(SysDatasourceTableMetadata::getDatasourceId, datasourceId)
+                .eq(SysDatasourceTableMetadata::getDatabaseName, databaseName)
+                .eq(SysDatasourceTableMetadata::getStatus, "0")
+                .eq(SysDatasourceTableMetadata::getDelFlag, SystemConstants.NORMAL)
         );
     }
 
@@ -129,11 +124,11 @@ public interface SysTableMetadataMapper extends BaseMapperPlus<SysTableMetadata,
      */
     default List<SysTableMetadataVo> selectPendingSyncTables(Long datasourceId) {
         return selectVoList(
-            new LambdaQueryWrapper<SysTableMetadata>()
-                .eq(SysTableMetadata::getDatasourceId, datasourceId)
-                .eq(SysTableMetadata::getSyncStatus, "0")
-                .eq(SysTableMetadata::getStatus, "0")
-                .orderByAsc(SysTableMetadata::getCreateTime)
+            new LambdaQueryWrapper<SysDatasourceTableMetadata>()
+                .eq(SysDatasourceTableMetadata::getDatasourceId, datasourceId)
+                .eq(SysDatasourceTableMetadata::getSyncStatus, "0")
+                .eq(SysDatasourceTableMetadata::getStatus, "0")
+                .orderByAsc(SysDatasourceTableMetadata::getCreateTime)
         );
     }
 

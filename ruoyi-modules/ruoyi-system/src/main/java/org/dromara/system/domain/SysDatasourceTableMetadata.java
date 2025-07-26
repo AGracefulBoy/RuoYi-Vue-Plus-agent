@@ -17,8 +17,8 @@ import java.time.LocalDateTime;
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
-@TableName("sys_table_metadata")
-public class SysTableMetadata extends TenantEntity {
+@TableName("sys_datasource_table_metadata")
+public class SysDatasourceTableMetadata extends TenantEntity {
 
     @Serial
     private static final long serialVersionUID = 1L;
@@ -48,6 +48,11 @@ public class SysTableMetadata extends TenantEntity {
      * 表注释
      */
     private String tableComment;
+
+    /**
+     * 表注释
+     */
+    private String tableDesc;
 
     /**
      * 表类型（TABLE基表、VIEW视图、SYSTEM系统表等）

@@ -1,4 +1,4 @@
-package org.dromara.system.controller.system;
+package org.dromara.system.controller.core;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import jakarta.servlet.http.HttpServletResponse;
@@ -7,7 +7,6 @@ import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.core.validate.AddGroup;
-import org.dromara.common.core.validate.EditGroup;
 import org.dromara.common.excel.utils.ExcelUtil;
 import org.dromara.common.idempotent.annotation.RepeatSubmit;
 import org.dromara.common.log.annotation.Log;
@@ -15,6 +14,7 @@ import org.dromara.common.log.enums.BusinessType;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.common.web.core.BaseController;
+import org.dromara.system.domain.bo.SysTableDescUpdateBo;
 import org.dromara.system.domain.bo.SysTableMetadataBo;
 import org.dromara.system.domain.vo.SysTableMetadataVo;
 import org.dromara.system.service.ISysTableMetadataService;
@@ -32,7 +32,7 @@ import java.util.List;
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/system/table/metadata")
-public class SysTableMetadataController extends BaseController {
+public class SysDatasourceTableMetadataController extends BaseController {
 
     private final ISysTableMetadataService tableMetadataService;
 
@@ -79,14 +79,21 @@ public class SysTableMetadataController extends BaseController {
     }
 
     /**
-     * 修改表元数据管理
+     * 修改表元数据管理（仅允许修改表描述字段和字段描述）
      */
     @SaCheckPermission("system:table:metadata:edit")
     @Log(title = "表元数据管理", businessType = BusinessType.UPDATE)
     @RepeatSubmit()
     @PostMapping("/edit")
-    public R<Void> edit(@Validated(EditGroup.class) @RequestBody SysTableMetadataBo bo) {
-        return toAjax(tableMetadataService.updateByBo(bo));
+    public R<Void> edit(@Validated @RequestBody SysTableDescUpdateBo bo) {
+        // 验证表是否存在
+        SysTableMetadataVo existingTable = tableMetadataService.queryById(bo.getTableMetaId());
+        if (existingTable == null) {
+            return R.fail("表元数据不存在");
+        }
+
+        // 调用服务层的专门方法来更新表描述和字段描述
+        return toAjax(tableMetadataService.updateTableAndColumnDesc(bo));
     }
 
     /**
@@ -109,8 +116,9 @@ public class SysTableMetadataController extends BaseController {
     @SaCheckPermission("system:table:metadata:list")
     @GetMapping("/datasource/{datasourceId}")
     public TableDataInfo<SysTableMetadataVo> listByDatasourceId(@NotNull(message = "数据源ID不能为空") @PathVariable Long datasourceId,
+                                                                @RequestParam("keyword") String keyword,
                                                                 PageQuery pageQuery) {
-        return tableMetadataService.queryPageByDatasourceId(datasourceId, pageQuery);
+        return tableMetadataService.queryPageByDatasourceId(datasourceId, keyword,pageQuery);
     }
 
     /**
@@ -136,8 +144,8 @@ public class SysTableMetadataController extends BaseController {
     @SaCheckPermission("system:table:metadata:query")
     @GetMapping("/datasource/{datasourceId}/database/{databaseName}/table/{tableName}")
     public R<SysTableMetadataVo> getTableInfo(@NotNull(message = "数据源ID不能为空") @PathVariable Long datasourceId,
-                                               @PathVariable String databaseName,
-                                               @PathVariable String tableName) {
+                                              @PathVariable String databaseName,
+                                              @PathVariable String tableName) {
         return R.ok(tableMetadataService.queryByDatasourceIdAndDatabaseAndTable(datasourceId, databaseName, tableName));
     }
 

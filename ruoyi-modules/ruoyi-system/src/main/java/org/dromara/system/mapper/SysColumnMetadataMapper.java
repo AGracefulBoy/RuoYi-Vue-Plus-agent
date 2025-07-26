@@ -1,14 +1,9 @@
 package org.dromara.system.mapper;
 
-import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.toolkit.Constants;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Select;
 import org.dromara.common.core.constant.SystemConstants;
 import org.dromara.common.mybatis.core.mapper.BaseMapperPlus;
-import org.dromara.system.domain.SysColumnMetadata;
+import org.dromara.system.domain.SysDatasourceColumnMetadata;
 import org.dromara.system.domain.vo.SysColumnMetadataVo;
 
 import java.util.List;
@@ -18,7 +13,7 @@ import java.util.List;
  *
  * @author ruoyi
  */
-public interface SysColumnMetadataMapper extends BaseMapperPlus<SysColumnMetadata, SysColumnMetadataVo> {
+public interface SysColumnMetadataMapper extends BaseMapperPlus<SysDatasourceColumnMetadata, SysColumnMetadataVo> {
 
     /**
      * 根据表元数据ID查询字段元数据列表
@@ -28,10 +23,10 @@ public interface SysColumnMetadataMapper extends BaseMapperPlus<SysColumnMetadat
      */
     default List<SysColumnMetadataVo> selectByTableMetaId(Long tableMetaId) {
         return selectVoList(
-            new LambdaQueryWrapper<SysColumnMetadata>()
-                .eq(SysColumnMetadata::getTableMetaId, tableMetaId)
-                .eq(SysColumnMetadata::getStatus, "0")
-                .orderByAsc(SysColumnMetadata::getOrdinalPosition)
+            new LambdaQueryWrapper<SysDatasourceColumnMetadata>()
+                .eq(SysDatasourceColumnMetadata::getTableMetaId, tableMetaId)
+                .eq(SysDatasourceColumnMetadata::getStatus, "0")
+                .orderByAsc(SysDatasourceColumnMetadata::getOrdinalPosition)
         );
     }
 
@@ -43,12 +38,12 @@ public interface SysColumnMetadataMapper extends BaseMapperPlus<SysColumnMetadat
      */
     default List<SysColumnMetadataVo> selectByDatasourceId(Long datasourceId) {
         return selectVoList(
-            new LambdaQueryWrapper<SysColumnMetadata>()
-                .eq(SysColumnMetadata::getDatasourceId, datasourceId)
-                .eq(SysColumnMetadata::getStatus, "0")
-                .orderByAsc(SysColumnMetadata::getDatabaseName)
-                .orderByAsc(SysColumnMetadata::getTableName)
-                .orderByAsc(SysColumnMetadata::getOrdinalPosition)
+            new LambdaQueryWrapper<SysDatasourceColumnMetadata>()
+                .eq(SysDatasourceColumnMetadata::getDatasourceId, datasourceId)
+                .eq(SysDatasourceColumnMetadata::getStatus, "0")
+                .orderByAsc(SysDatasourceColumnMetadata::getDatabaseName)
+                .orderByAsc(SysDatasourceColumnMetadata::getTableName)
+                .orderByAsc(SysDatasourceColumnMetadata::getOrdinalPosition)
         );
     }
 
@@ -62,12 +57,12 @@ public interface SysColumnMetadataMapper extends BaseMapperPlus<SysColumnMetadat
      */
     default List<SysColumnMetadataVo> selectByDatasourceAndTable(Long datasourceId, String databaseName, String tableName) {
         return selectVoList(
-            new LambdaQueryWrapper<SysColumnMetadata>()
-                .eq(SysColumnMetadata::getDatasourceId, datasourceId)
-                .eq(SysColumnMetadata::getDatabaseName, databaseName)
-                .eq(SysColumnMetadata::getTableName, tableName)
-                .eq(SysColumnMetadata::getStatus, "0")
-                .orderByAsc(SysColumnMetadata::getOrdinalPosition)
+            new LambdaQueryWrapper<SysDatasourceColumnMetadata>()
+                .eq(SysDatasourceColumnMetadata::getDatasourceId, datasourceId)
+                .eq(SysDatasourceColumnMetadata::getDatabaseName, databaseName)
+                .eq(SysDatasourceColumnMetadata::getTableName, tableName)
+                .eq(SysDatasourceColumnMetadata::getStatus, "0")
+                .orderByAsc(SysDatasourceColumnMetadata::getOrdinalPosition)
         );
     }
 
@@ -82,12 +77,12 @@ public interface SysColumnMetadataMapper extends BaseMapperPlus<SysColumnMetadat
      */
     default SysColumnMetadataVo selectByDatasourceAndTableAndColumn(Long datasourceId, String databaseName, String tableName, String columnName) {
         return selectVoOne(
-            new LambdaQueryWrapper<SysColumnMetadata>()
-                .eq(SysColumnMetadata::getDatasourceId, datasourceId)
-                .eq(SysColumnMetadata::getDatabaseName, databaseName)
-                .eq(SysColumnMetadata::getTableName, tableName)
-                .eq(SysColumnMetadata::getColumnName, columnName)
-                .eq(SysColumnMetadata::getDelFlag, SystemConstants.NORMAL)
+            new LambdaQueryWrapper<SysDatasourceColumnMetadata>()
+                .eq(SysDatasourceColumnMetadata::getDatasourceId, datasourceId)
+                .eq(SysDatasourceColumnMetadata::getDatabaseName, databaseName)
+                .eq(SysDatasourceColumnMetadata::getTableName, tableName)
+                .eq(SysDatasourceColumnMetadata::getColumnName, columnName)
+                .eq(SysDatasourceColumnMetadata::getDelFlag, SystemConstants.NORMAL)
         );
     }
 
@@ -99,10 +94,10 @@ public interface SysColumnMetadataMapper extends BaseMapperPlus<SysColumnMetadat
      */
     default List<SysColumnMetadataVo> selectBySyncStatus(String syncStatus) {
         return selectVoList(
-            new LambdaQueryWrapper<SysColumnMetadata>()
-                .eq(SysColumnMetadata::getSyncStatus, syncStatus)
-                .eq(SysColumnMetadata::getStatus, "0")
-                .orderByAsc(SysColumnMetadata::getLastSyncTime)
+            new LambdaQueryWrapper<SysDatasourceColumnMetadata>()
+                .eq(SysDatasourceColumnMetadata::getSyncStatus, syncStatus)
+                .eq(SysDatasourceColumnMetadata::getStatus, "0")
+                .orderByAsc(SysDatasourceColumnMetadata::getLastSyncTime)
         );
     }
 
@@ -116,13 +111,13 @@ public interface SysColumnMetadataMapper extends BaseMapperPlus<SysColumnMetadat
      */
     default List<SysColumnMetadataVo> selectPrimaryKeys(Long datasourceId, String databaseName, String tableName) {
         return selectVoList(
-            new LambdaQueryWrapper<SysColumnMetadata>()
-                .eq(SysColumnMetadata::getDatasourceId, datasourceId)
-                .eq(SysColumnMetadata::getDatabaseName, databaseName)
-                .eq(SysColumnMetadata::getTableName, tableName)
-                .eq(SysColumnMetadata::getIsPrimaryKey, "1")
-                .eq(SysColumnMetadata::getStatus, "0")
-                .orderByAsc(SysColumnMetadata::getOrdinalPosition)
+            new LambdaQueryWrapper<SysDatasourceColumnMetadata>()
+                .eq(SysDatasourceColumnMetadata::getDatasourceId, datasourceId)
+                .eq(SysDatasourceColumnMetadata::getDatabaseName, databaseName)
+                .eq(SysDatasourceColumnMetadata::getTableName, tableName)
+                .eq(SysDatasourceColumnMetadata::getIsPrimaryKey, "1")
+                .eq(SysDatasourceColumnMetadata::getStatus, "0")
+                .orderByAsc(SysDatasourceColumnMetadata::getOrdinalPosition)
         );
     }
 
@@ -136,13 +131,13 @@ public interface SysColumnMetadataMapper extends BaseMapperPlus<SysColumnMetadat
      */
     default List<SysColumnMetadataVo> selectForeignKeys(Long datasourceId, String databaseName, String tableName) {
         return selectVoList(
-            new LambdaQueryWrapper<SysColumnMetadata>()
-                .eq(SysColumnMetadata::getDatasourceId, datasourceId)
-                .eq(SysColumnMetadata::getDatabaseName, databaseName)
-                .eq(SysColumnMetadata::getTableName, tableName)
-                .eq(SysColumnMetadata::getIsForeignKey, "1")
-                .eq(SysColumnMetadata::getStatus, "0")
-                .orderByAsc(SysColumnMetadata::getOrdinalPosition)
+            new LambdaQueryWrapper<SysDatasourceColumnMetadata>()
+                .eq(SysDatasourceColumnMetadata::getDatasourceId, datasourceId)
+                .eq(SysDatasourceColumnMetadata::getDatabaseName, databaseName)
+                .eq(SysDatasourceColumnMetadata::getTableName, tableName)
+                .eq(SysDatasourceColumnMetadata::getIsForeignKey, "1")
+                .eq(SysDatasourceColumnMetadata::getStatus, "0")
+                .orderByAsc(SysDatasourceColumnMetadata::getOrdinalPosition)
         );
     }
 
@@ -155,13 +150,13 @@ public interface SysColumnMetadataMapper extends BaseMapperPlus<SysColumnMetadat
      */
     default List<SysColumnMetadataVo> selectSensitiveColumns(Long datasourceId, String sensitivityLevel) {
         return selectVoList(
-            new LambdaQueryWrapper<SysColumnMetadata>()
-                .eq(SysColumnMetadata::getDatasourceId, datasourceId)
-                .eq(SysColumnMetadata::getSensitivityLevel, sensitivityLevel)
-                .eq(SysColumnMetadata::getStatus, "0")
-                .orderByAsc(SysColumnMetadata::getDatabaseName)
-                .orderByAsc(SysColumnMetadata::getTableName)
-                .orderByAsc(SysColumnMetadata::getOrdinalPosition)
+            new LambdaQueryWrapper<SysDatasourceColumnMetadata>()
+                .eq(SysDatasourceColumnMetadata::getDatasourceId, datasourceId)
+                .eq(SysDatasourceColumnMetadata::getSensitivityLevel, sensitivityLevel)
+                .eq(SysDatasourceColumnMetadata::getStatus, "0")
+                .orderByAsc(SysDatasourceColumnMetadata::getDatabaseName)
+                .orderByAsc(SysDatasourceColumnMetadata::getTableName)
+                .orderByAsc(SysDatasourceColumnMetadata::getOrdinalPosition)
         );
     }
 
@@ -173,13 +168,13 @@ public interface SysColumnMetadataMapper extends BaseMapperPlus<SysColumnMetadat
      */
     default List<SysColumnMetadataVo> selectPiiColumns(Long datasourceId) {
         return selectVoList(
-            new LambdaQueryWrapper<SysColumnMetadata>()
-                .eq(SysColumnMetadata::getDatasourceId, datasourceId)
-                .eq(SysColumnMetadata::getIsPii, "1")
-                .eq(SysColumnMetadata::getStatus, "0")
-                .orderByAsc(SysColumnMetadata::getDatabaseName)
-                .orderByAsc(SysColumnMetadata::getTableName)
-                .orderByAsc(SysColumnMetadata::getOrdinalPosition)
+            new LambdaQueryWrapper<SysDatasourceColumnMetadata>()
+                .eq(SysDatasourceColumnMetadata::getDatasourceId, datasourceId)
+                .eq(SysDatasourceColumnMetadata::getIsPii, "1")
+                .eq(SysDatasourceColumnMetadata::getStatus, "0")
+                .orderByAsc(SysDatasourceColumnMetadata::getDatabaseName)
+                .orderByAsc(SysDatasourceColumnMetadata::getTableName)
+                .orderByAsc(SysDatasourceColumnMetadata::getOrdinalPosition)
         );
     }
 
@@ -191,9 +186,9 @@ public interface SysColumnMetadataMapper extends BaseMapperPlus<SysColumnMetadat
      */
     default long countByTableMetaId(Long tableMetaId) {
         return selectCount(
-            new LambdaQueryWrapper<SysColumnMetadata>()
-                .eq(SysColumnMetadata::getTableMetaId, tableMetaId)
-                .eq(SysColumnMetadata::getStatus, "0")
+            new LambdaQueryWrapper<SysDatasourceColumnMetadata>()
+                .eq(SysDatasourceColumnMetadata::getTableMetaId, tableMetaId)
+                .eq(SysDatasourceColumnMetadata::getStatus, "0")
         );
     }
 

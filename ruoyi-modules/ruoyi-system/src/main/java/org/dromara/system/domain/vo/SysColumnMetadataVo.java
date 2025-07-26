@@ -6,11 +6,7 @@ import io.github.linpeilie.annotations.AutoMapper;
 import lombok.Data;
 import org.dromara.common.excel.annotation.ExcelDictFormat;
 import org.dromara.common.excel.convert.ExcelDictConvert;
-import org.dromara.common.sensitive.annotation.Sensitive;
-import org.dromara.common.sensitive.core.SensitiveStrategy;
-import org.dromara.common.translation.annotation.Translation;
-import org.dromara.common.translation.constant.TransConstant;
-import org.dromara.system.domain.SysColumnMetadata;
+import org.dromara.system.domain.SysDatasourceColumnMetadata;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -23,7 +19,7 @@ import java.time.LocalDateTime;
  */
 @Data
 @ExcelIgnoreUnannotated
-@AutoMapper(target = SysColumnMetadata.class)
+@AutoMapper(target = SysDatasourceColumnMetadata.class)
 public class SysColumnMetadataVo implements Serializable {
 
     @Serial
@@ -82,6 +78,12 @@ public class SysColumnMetadataVo implements Serializable {
      */
     @ExcelProperty(value = "字段注释")
     private String columnComment;
+
+    /**
+     * 字段描述
+     */
+    @ExcelProperty(value = "字段描述")
+    private String columnDesc;
 
     /**
      * 字段在表中的位置（从1开始）

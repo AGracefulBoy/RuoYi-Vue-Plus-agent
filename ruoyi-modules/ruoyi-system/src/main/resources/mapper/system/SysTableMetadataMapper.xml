@@ -4,13 +4,14 @@
     "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="org.dromara.system.mapper.SysTableMetadataMapper">
 
-    <resultMap type="org.dromara.system.domain.SysTableMetadata" id="SysTableMetadataResult">
+    <resultMap type="org.dromara.system.domain.SysDatasourceTableMetadata" id="SysTableMetadataResult">
         <result property="tableMetaId" column="table_meta_id" />
         <result property="tenantId" column="tenant_id" />
         <result property="datasourceId" column="datasource_id" />
         <result property="databaseName" column="database_name" />
         <result property="tableName" column="table_name" />
         <result property="tableComment" column="table_comment" />
+        <result property="tableDesc" column="table_desc" />
         <result property="tableType" column="table_type" />
         <result property="engine" column="engine" />
         <result property="charset" column="charset" />
@@ -47,6 +48,7 @@
         <result property="databaseName" column="database_name" />
         <result property="tableName" column="table_name" />
         <result property="tableComment" column="table_comment" />
+        <result property="tableDesc" column="table_desc" />
         <result property="tableType" column="table_type" />
         <result property="engine" column="engine" />
         <result property="charset" column="charset" />
@@ -77,7 +79,7 @@
 
     <sql id="selectSysTableMetadataVo">
         select stm.table_meta_id, stm.tenant_id, stm.datasource_id, sd.datasource_name,
-               stm.database_name, stm.table_name, stm.table_comment, stm.table_type,
+               stm.database_name, stm.table_name, stm.table_comment, stm.table_desc, stm.table_type,
                stm.engine, stm.charset, stm.collation, stm.table_rows,
                stm.data_length, stm.index_length, stm.create_time_db, stm.update_time_db,
                stm.sync_status, stm.last_sync_time, stm.sync_error_message, stm.field_count,
@@ -85,12 +87,12 @@
                stm.business_description, stm.status, stm.remark, stm.create_by,
                u1.nick_name as createByName, stm.create_time, stm.update_by,
                u2.nick_name as updateByName, stm.update_time
-        from sys_table_metadata stm
+        from sys_datasource_table_metadata stm
         left join sys_datasource sd on stm.datasource_id = sd.datasource_id
         left join sys_user u1 on stm.create_by = u1.user_id
         left join sys_user u2 on stm.update_by = u2.user_id
     </sql>
 
     <!-- 由于使用了注解方式，大部分SQL已在Mapper接口中定义，此处仅保留基本的映射配置 -->
-    
+
 </mapper>

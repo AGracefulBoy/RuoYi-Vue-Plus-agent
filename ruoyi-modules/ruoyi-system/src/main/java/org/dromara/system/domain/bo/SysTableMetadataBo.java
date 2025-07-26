@@ -4,10 +4,9 @@ import io.github.linpeilie.annotations.AutoMapper;
 import jakarta.validation.constraints.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import org.dromara.common.core.validate.AddGroup;
 import org.dromara.common.core.validate.EditGroup;
 import org.dromara.common.mybatis.core.domain.BaseEntity;
-import org.dromara.system.domain.SysTableMetadata;
+import org.dromara.system.domain.SysDatasourceTableMetadata;
 
 import java.time.LocalDateTime;
 
@@ -18,7 +17,7 @@ import java.time.LocalDateTime;
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
-@AutoMapper(target = SysTableMetadata.class, reverseConvertGenerate = false)
+@AutoMapper(target = SysDatasourceTableMetadata.class, reverseConvertGenerate = false)
 public class SysTableMetadataBo extends BaseEntity {
 
     /**
@@ -52,6 +51,12 @@ public class SysTableMetadataBo extends BaseEntity {
      */
     @Size(max = 500, message = "表注释长度不能超过{max}个字符")
     private String tableComment;
+
+    /**
+     * 表描述
+     */
+    @Size(max = 1000, message = "表描述长度不能超过{max}个字符")
+    private String tableDesc;
 
     /**
      * 表类型（TABLE基表、VIEW视图、SYSTEM系统表等）

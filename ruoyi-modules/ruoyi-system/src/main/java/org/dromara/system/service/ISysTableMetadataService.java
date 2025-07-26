@@ -4,6 +4,7 @@ import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.system.domain.bo.SysTableMetadataBo;
 import org.dromara.system.domain.vo.SysTableMetadataVo;
+import org.dromara.system.domain.bo.SysTableDescUpdateBo;
 
 import java.util.Collection;
 import java.util.List;
@@ -57,6 +58,23 @@ public interface ISysTableMetadataService {
     Boolean updateByBo(SysTableMetadataBo bo);
 
     /**
+     * 更新表描述（仅允许智能体修改此字段）
+     *
+     * @param tableMetaId 表元数据ID
+     * @param tableDesc   表描述
+     * @return 更新结果
+     */
+    Boolean updateTableDesc(Long tableMetaId, String tableDesc);
+
+    /**
+     * 更新表描述和字段描述（仅允许智能体修改这些字段）
+     *
+     * @param bo 表和字段描述更新信息
+     * @return 更新结果
+     */
+    Boolean updateTableAndColumnDesc(SysTableDescUpdateBo bo);
+
+    /**
      * 校验并批量删除表元数据管理信息
      *
      * @param ids 表元数据ID集合
@@ -79,7 +97,7 @@ public interface ISysTableMetadataService {
      * @param pageQuery    分页参数
      * @return 表元数据列表（分页）
      */
-    TableDataInfo<SysTableMetadataVo> queryPageByDatasourceId(Long datasourceId, PageQuery pageQuery);
+    TableDataInfo<SysTableMetadataVo> queryPageByDatasourceId(Long datasourceId, String keyword,PageQuery pageQuery);
 
     /**
      * 根据数据源ID和数据库名称查询表元数据列表

@@ -4,7 +4,7 @@
     "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="org.dromara.system.mapper.SysColumnMetadataMapper">
 
-    <resultMap type="org.dromara.system.domain.SysColumnMetadata" id="SysColumnMetadataResult">
+    <resultMap type="org.dromara.system.domain.SysDatasourceColumnMetadata" id="SysColumnMetadataResult">
         <result property="columnMetaId" column="column_meta_id" />
         <result property="tenantId" column="tenant_id" />
         <result property="tableMetaId" column="table_meta_id" />
@@ -13,6 +13,7 @@
         <result property="tableName" column="table_name" />
         <result property="columnName" column="column_name" />
         <result property="columnComment" column="column_comment" />
+        <result property="columnDesc" column="column_desc" />
         <result property="ordinalPosition" column="ordinal_position" />
         <result property="columnDefault" column="column_default" />
         <result property="isNullable" column="is_nullable" />
@@ -62,6 +63,7 @@
         <result property="tableName" column="table_name" />
         <result property="columnName" column="column_name" />
         <result property="columnComment" column="column_comment" />
+        <result property="columnDesc" column="column_desc" />
         <result property="ordinalPosition" column="ordinal_position" />
         <result property="columnDefault" column="column_default" />
         <result property="isNullable" column="is_nullable" />
@@ -104,7 +106,7 @@
     <sql id="selectSysColumnMetadataVo">
         select scm.column_meta_id, scm.tenant_id, scm.table_meta_id, scm.datasource_id,
                sd.datasource_name, scm.database_name, scm.table_name, scm.column_name,
-               scm.column_comment, scm.ordinal_position, scm.column_default, scm.is_nullable,
+               scm.column_comment, scm.column_desc, scm.ordinal_position, scm.column_default, scm.is_nullable,
                scm.data_type, scm.character_maximum_length, scm.numeric_precision, scm.numeric_scale,
                scm.datetime_precision, scm.character_set_name, scm.collation_name, scm.column_type,
                scm.column_key, scm.extra, scm.is_primary_key, scm.is_foreign_key, scm.is_unique_key,
@@ -114,12 +116,12 @@
                scm.last_sync_time, scm.status, scm.remark, scm.create_by,
                u1.nick_name as createByName, scm.create_time, scm.update_by,
                u2.nick_name as updateByName, scm.update_time
-        from sys_column_metadata scm
+        from sys_datasource_column_metadata scm
         left join sys_datasource sd on scm.datasource_id = sd.datasource_id
         left join sys_user u1 on scm.create_by = u1.user_id
         left join sys_user u2 on scm.update_by = u2.user_id
     </sql>
 
     <!-- 由于使用了注解方式，大部分SQL已在Mapper接口中定义，此处仅保留基本的映射配置 -->
-    
+
 </mapper>

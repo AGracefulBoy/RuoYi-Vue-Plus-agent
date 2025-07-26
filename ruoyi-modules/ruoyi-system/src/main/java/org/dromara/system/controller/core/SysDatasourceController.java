@@ -77,11 +77,6 @@ public class SysDatasourceController extends BaseController {
     @RepeatSubmit
     @PostMapping("/add")
     public R<Void> add(@Validated(AddGroup.class) @RequestBody SysDatasourceBo bo) {
-        // 校验数据源名称唯一性
-        if (!datasourceService.checkDatasourceNameUnique(bo)) {
-            return R.fail("新增数据源'" + bo.getDatasourceName() + "'失败，数据源名称已存在");
-        }
-
         // 校验数据源类型相关字段
         String validateResult = datasourceService.validateDatasourceFields(bo);
         if (validateResult != null) {

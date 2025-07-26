@@ -17,8 +17,8 @@ import java.time.LocalDateTime;
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
-@TableName("sys_column_metadata")
-public class SysColumnMetadata extends TenantEntity {
+@TableName("sys_datasource_column_metadata")
+public class SysDatasourceColumnMetadata extends TenantEntity {
 
     @Serial
     private static final long serialVersionUID = 1L;
@@ -58,6 +58,11 @@ public class SysColumnMetadata extends TenantEntity {
      * 字段注释
      */
     private String columnComment;
+
+    /**
+     * 字段描述
+     */
+    private String columnDesc;
 
     /**
      * 字段在表中的位置（从1开始）

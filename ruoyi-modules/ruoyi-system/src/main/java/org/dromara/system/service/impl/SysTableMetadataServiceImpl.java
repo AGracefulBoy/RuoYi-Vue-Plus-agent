@@ -14,16 +14,19 @@ import org.dromara.common.core.utils.MapstructUtils;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
-import org.dromara.system.domain.SysTableMetadata;
+import org.dromara.system.domain.SysDatasourceTableMetadata;
 import org.dromara.system.domain.SysDatasource;
 import org.dromara.system.domain.SysUser;
 import org.dromara.system.domain.bo.SysTableMetadataBo;
 import org.dromara.system.domain.bo.SysDatasourceBo;
+import org.dromara.system.domain.bo.SysTableDescUpdateBo;
+import org.dromara.system.domain.bo.SysColumnDescUpdateBo;
 import org.dromara.system.domain.vo.SysTableMetadataVo;
 import org.dromara.system.mapper.SysTableMetadataMapper;
 import org.dromara.system.mapper.SysDatasourceMapper;
 import org.dromara.system.mapper.SysUserMapper;
 import org.dromara.system.service.ISysTableMetadataService;
+import org.dromara.system.service.ISysColumnMetadataService;
 import org.dromara.system.util.DatasourceValidatorUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,6 +58,7 @@ public class SysTableMetadataServiceImpl implements ISysTableMetadataService {
     private final SysTableMetadataMapper baseMapper;
     private final SysDatasourceMapper datasourceMapper;
     private final SysUserMapper userMapper;
+    private final ISysColumnMetadataService columnMetadataService;
 
     @Override
     public SysTableMetadataVo queryById(Long tableMetaId) {
@@ -68,8 +72,8 @@ public class SysTableMetadataServiceImpl implements ISysTableMetadataService {
 
     @Override
     public TableDataInfo<SysTableMetadataVo> queryPageList(SysTableMetadataBo bo, PageQuery pageQuery) {
-        LambdaQueryWrapper<SysTableMetadata> lqw = buildQueryWrapper(bo);
-        Page<SysTableMetadata> page = pageQuery.build();
+        LambdaQueryWrapper<SysDatasourceTableMetadata> lqw = buildQueryWrapper(bo);
+        Page<SysDatasourceTableMetadata> page = pageQuery.build();
         IPage<SysTableMetadataVo> result = baseMapper.selectVoPage(page, lqw);
 
         // 填充关联数据
@@ -82,7 +86,7 @@ public class SysTableMetadataServiceImpl implements ISysTableMetadataService {
 
     @Override
     public List<SysTableMetadataVo> queryList(SysTableMetadataBo bo) {
-        LambdaQueryWrapper<SysTableMetadata> lqw = buildQueryWrapper(bo);
+        LambdaQueryWrapper<SysDatasourceTableMetadata> lqw = buildQueryWrapper(bo);
         List<SysTableMetadataVo> list = baseMapper.selectVoList(lqw);
 
         // 填充关联数据
@@ -168,29 +172,30 @@ public class SysTableMetadataServiceImpl implements ISysTableMetadataService {
         });
     }
 
-    private LambdaQueryWrapper<SysTableMetadata> buildQueryWrapper(SysTableMetadataBo bo) {
-        LambdaQueryWrapper<SysTableMetadata> lqw = Wrappers.lambdaQuery();
-        lqw.eq(ObjectUtil.isNotNull(bo.getDatasourceId()), SysTableMetadata::getDatasourceId, bo.getDatasourceId());
-        lqw.like(StringUtils.isNotBlank(bo.getDatabaseName()), SysTableMetadata::getDatabaseName, bo.getDatabaseName());
-        lqw.like(StringUtils.isNotBlank(bo.getTableName()), SysTableMetadata::getTableName, bo.getTableName());
-        lqw.like(StringUtils.isNotBlank(bo.getTableComment()), SysTableMetadata::getTableComment, bo.getTableComment());
-        lqw.eq(StringUtils.isNotBlank(bo.getTableType()), SysTableMetadata::getTableType, bo.getTableType());
-        lqw.eq(StringUtils.isNotBlank(bo.getEngine()), SysTableMetadata::getEngine, bo.getEngine());
-        lqw.eq(StringUtils.isNotBlank(bo.getSyncStatus()), SysTableMetadata::getSyncStatus, bo.getSyncStatus());
-        lqw.eq(StringUtils.isNotBlank(bo.getIsPartitioned()), SysTableMetadata::getIsPartitioned, bo.getIsPartitioned());
-        lqw.like(StringUtils.isNotBlank(bo.getBusinessDescription()), SysTableMetadata::getBusinessDescription, bo.getBusinessDescription());
-        lqw.eq(StringUtils.isNotBlank(bo.getStatus()), SysTableMetadata::getStatus, bo.getStatus());
+    private LambdaQueryWrapper<SysDatasourceTableMetadata> buildQueryWrapper(SysTableMetadataBo bo) {
+        LambdaQueryWrapper<SysDatasourceTableMetadata> lqw = Wrappers.lambdaQuery();
+        lqw.eq(ObjectUtil.isNotNull(bo.getDatasourceId()), SysDatasourceTableMetadata::getDatasourceId, bo.getDatasourceId());
+        lqw.like(StringUtils.isNotBlank(bo.getDatabaseName()), SysDatasourceTableMetadata::getDatabaseName, bo.getDatabaseName());
+        lqw.like(StringUtils.isNotBlank(bo.getTableName()), SysDatasourceTableMetadata::getTableName, bo.getTableName());
+        lqw.like(StringUtils.isNotBlank(bo.getTableComment()), SysDatasourceTableMetadata::getTableComment, bo.getTableComment());
+        lqw.like(StringUtils.isNotBlank(bo.getTableDesc()), SysDatasourceTableMetadata::getTableDesc, bo.getTableDesc());
+        lqw.eq(StringUtils.isNotBlank(bo.getTableType()), SysDatasourceTableMetadata::getTableType, bo.getTableType());
+        lqw.eq(StringUtils.isNotBlank(bo.getEngine()), SysDatasourceTableMetadata::getEngine, bo.getEngine());
+        lqw.eq(StringUtils.isNotBlank(bo.getSyncStatus()), SysDatasourceTableMetadata::getSyncStatus, bo.getSyncStatus());
+        lqw.eq(StringUtils.isNotBlank(bo.getIsPartitioned()), SysDatasourceTableMetadata::getIsPartitioned, bo.getIsPartitioned());
+        lqw.like(StringUtils.isNotBlank(bo.getBusinessDescription()), SysDatasourceTableMetadata::getBusinessDescription, bo.getBusinessDescription());
+        lqw.eq(StringUtils.isNotBlank(bo.getStatus()), SysDatasourceTableMetadata::getStatus, bo.getStatus());
         lqw.between(ObjectUtil.isAllNotEmpty(bo.getParams().get("beginCreateTime"), bo.getParams().get("endCreateTime")),
-            SysTableMetadata::getCreateTime, bo.getParams().get("beginCreateTime"), bo.getParams().get("endCreateTime"));
-        lqw.orderByDesc(SysTableMetadata::getLastSyncTime);
-        lqw.orderByDesc(SysTableMetadata::getCreateTime);
+            SysDatasourceTableMetadata::getCreateTime, bo.getParams().get("beginCreateTime"), bo.getParams().get("endCreateTime"));
+        lqw.orderByDesc(SysDatasourceTableMetadata::getLastSyncTime);
+        lqw.orderByDesc(SysDatasourceTableMetadata::getCreateTime);
         return lqw;
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Boolean insertByBo(SysTableMetadataBo bo) {
-        SysTableMetadata add = MapstructUtils.convert(bo, SysTableMetadata.class);
+        SysDatasourceTableMetadata add = MapstructUtils.convert(bo, SysDatasourceTableMetadata.class);
 
         // 检查是否已存在相同的表
         SysTableMetadataVo existingTable = baseMapper.selectByDatasourceIdAndDatabaseAndTable(
@@ -223,8 +228,47 @@ public class SysTableMetadataServiceImpl implements ISysTableMetadataService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Boolean updateByBo(SysTableMetadataBo bo) {
-        SysTableMetadata update = MapstructUtils.convert(bo, SysTableMetadata.class);
+        SysDatasourceTableMetadata update = MapstructUtils.convert(bo, SysDatasourceTableMetadata.class);
         return baseMapper.updateById(update) > 0;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Boolean updateTableDesc(Long tableMetaId, String tableDesc) {
+        // 验证表元数据是否存在
+        SysDatasourceTableMetadata existing = baseMapper.selectById(tableMetaId);
+        if (ObjectUtil.isNull(existing)) {
+            throw new ServiceException("表元数据不存在");
+        }
+
+        // 创建更新对象，只设置需要更新的字段
+        SysDatasourceTableMetadata update = new SysDatasourceTableMetadata();
+        update.setTableMetaId(tableMetaId);
+        update.setTableDesc(tableDesc);
+
+        return baseMapper.updateById(update) > 0;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Boolean updateTableAndColumnDesc(SysTableDescUpdateBo bo) {
+        // 更新表描述
+        Boolean tableUpdateResult = updateTableDesc(bo.getTableMetaId(), bo.getTableDesc());
+
+        // 更新字段描述（如果有提供）
+        if (ObjectUtil.isNotEmpty(bo.getSysColumnDescUpdateBoList())) {
+            for (SysColumnDescUpdateBo columnBo : bo.getSysColumnDescUpdateBoList()) {
+                Boolean columnUpdateResult = columnMetadataService.updateColumnDesc(
+                    columnBo.getColumnMetaId(),
+                    columnBo.getColumnDesc()
+                );
+                if (!columnUpdateResult) {
+                    throw new ServiceException("更新字段描述失败：" + columnBo.getColumnName());
+                }
+            }
+        }
+
+        return tableUpdateResult;
     }
 
     @Override
@@ -255,10 +299,12 @@ public class SysTableMetadataServiceImpl implements ISysTableMetadataService {
     }
 
     @Override
-    public TableDataInfo<SysTableMetadataVo> queryPageByDatasourceId(Long datasourceId, PageQuery pageQuery) {
-        LambdaQueryWrapper<SysTableMetadata> lqw = Wrappers.lambdaQuery();
-        lqw.eq(SysTableMetadata::getDatasourceId, datasourceId);
-        lqw.orderByDesc(SysTableMetadata::getCreateTime);
+    public TableDataInfo<SysTableMetadataVo> queryPageByDatasourceId(Long datasourceId, String keyword, PageQuery pageQuery) {
+        LambdaQueryWrapper<SysDatasourceTableMetadata> lqw = Wrappers.lambdaQuery();
+        lqw.eq(SysDatasourceTableMetadata::getDatasourceId, datasourceId);
+        lqw.like(StringUtils.isNotBlank(keyword), SysDatasourceTableMetadata::getTableName, keyword);
+        lqw.like(StringUtils.isNotBlank(keyword), SysDatasourceTableMetadata::getTableComment, keyword);
+        lqw.orderByDesc(SysDatasourceTableMetadata::getCreateTime);
 
         Page<SysTableMetadataVo> result = baseMapper.selectVoPage(pageQuery.build(), lqw);
         List<SysTableMetadataVo> records = result.getRecords();
@@ -327,11 +373,11 @@ public class SysTableMetadataServiceImpl implements ISysTableMetadataService {
             // 4. 更新同步状态和时间
 
             // 暂时只更新同步时间作为示例
-            LambdaUpdateWrapper<SysTableMetadata> updateWrapper = new LambdaUpdateWrapper<>();
-            updateWrapper.eq(SysTableMetadata::getDatasourceId, datasourceId)
-                .eq(SysTableMetadata::getSyncStatus, "0")
-                .set(SysTableMetadata::getLastSyncTime, LocalDateTime.now())
-                .set(SysTableMetadata::getSyncStatus, "1");
+            LambdaUpdateWrapper<SysDatasourceTableMetadata> updateWrapper = new LambdaUpdateWrapper<>();
+            updateWrapper.eq(SysDatasourceTableMetadata::getDatasourceId, datasourceId)
+                .eq(SysDatasourceTableMetadata::getSyncStatus, "0")
+                .set(SysDatasourceTableMetadata::getLastSyncTime, LocalDateTime.now())
+                .set(SysDatasourceTableMetadata::getSyncStatus, "1");
 
             baseMapper.update(null, updateWrapper);
 
@@ -341,12 +387,12 @@ public class SysTableMetadataServiceImpl implements ISysTableMetadataService {
             log.error("同步数据源表结构信息失败，数据源ID：{}，错误信息：{}", datasourceId, e.getMessage(), e);
 
             // 更新同步状态为失败
-            LambdaUpdateWrapper<SysTableMetadata> updateWrapper = new LambdaUpdateWrapper<>();
-            updateWrapper.eq(SysTableMetadata::getDatasourceId, datasourceId)
-                .eq(SysTableMetadata::getSyncStatus, "0")
-                .set(SysTableMetadata::getLastSyncTime, LocalDateTime.now())
-                .set(SysTableMetadata::getSyncStatus, "2")
-                .set(SysTableMetadata::getSyncErrorMessage, e.getMessage());
+            LambdaUpdateWrapper<SysDatasourceTableMetadata> updateWrapper = new LambdaUpdateWrapper<>();
+            updateWrapper.eq(SysDatasourceTableMetadata::getDatasourceId, datasourceId)
+                .eq(SysDatasourceTableMetadata::getSyncStatus, "0")
+                .set(SysDatasourceTableMetadata::getLastSyncTime, LocalDateTime.now())
+                .set(SysDatasourceTableMetadata::getSyncStatus, "2")
+                .set(SysDatasourceTableMetadata::getSyncErrorMessage, e.getMessage());
 
             baseMapper.update(null, updateWrapper);
 
@@ -371,11 +417,11 @@ public class SysTableMetadataServiceImpl implements ISysTableMetadataService {
             // 3. 更新同步状态和时间
 
             // 暂时只更新同步时间作为示例
-            LambdaUpdateWrapper<SysTableMetadata> updateWrapper = new LambdaUpdateWrapper<>();
-            updateWrapper.eq(SysTableMetadata::getTableMetaId, tableMetaId)
-                .set(SysTableMetadata::getLastSyncTime, LocalDateTime.now())
-                .set(SysTableMetadata::getSyncStatus, "1")
-                .set(SysTableMetadata::getSyncErrorMessage, null);
+            LambdaUpdateWrapper<SysDatasourceTableMetadata> updateWrapper = new LambdaUpdateWrapper<>();
+            updateWrapper.eq(SysDatasourceTableMetadata::getTableMetaId, tableMetaId)
+                .set(SysDatasourceTableMetadata::getLastSyncTime, LocalDateTime.now())
+                .set(SysDatasourceTableMetadata::getSyncStatus, "1")
+                .set(SysDatasourceTableMetadata::getSyncErrorMessage, null);
 
             baseMapper.update(null, updateWrapper);
 
@@ -385,11 +431,11 @@ public class SysTableMetadataServiceImpl implements ISysTableMetadataService {
             log.error("同步单个表结构信息失败，表元数据ID：{}，错误信息：{}", tableMetaId, e.getMessage(), e);
 
             // 更新同步状态为失败
-            LambdaUpdateWrapper<SysTableMetadata> updateWrapper = new LambdaUpdateWrapper<>();
-            updateWrapper.eq(SysTableMetadata::getTableMetaId, tableMetaId)
-                .set(SysTableMetadata::getLastSyncTime, LocalDateTime.now())
-                .set(SysTableMetadata::getSyncStatus, "2")
-                .set(SysTableMetadata::getSyncErrorMessage, e.getMessage());
+            LambdaUpdateWrapper<SysDatasourceTableMetadata> updateWrapper = new LambdaUpdateWrapper<>();
+            updateWrapper.eq(SysDatasourceTableMetadata::getTableMetaId, tableMetaId)
+                .set(SysDatasourceTableMetadata::getLastSyncTime, LocalDateTime.now())
+                .set(SysDatasourceTableMetadata::getSyncStatus, "2")
+                .set(SysDatasourceTableMetadata::getSyncErrorMessage, e.getMessage());
 
             baseMapper.update(null, updateWrapper);
 
@@ -400,15 +446,15 @@ public class SysTableMetadataServiceImpl implements ISysTableMetadataService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Boolean updateSyncStatus(Long tableMetaId, String syncStatus, String syncErrorMessage) {
-        LambdaUpdateWrapper<SysTableMetadata> updateWrapper = new LambdaUpdateWrapper<>();
-        updateWrapper.eq(SysTableMetadata::getTableMetaId, tableMetaId)
-            .set(SysTableMetadata::getLastSyncTime, LocalDateTime.now())
-            .set(SysTableMetadata::getSyncStatus, syncStatus);
+        LambdaUpdateWrapper<SysDatasourceTableMetadata> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(SysDatasourceTableMetadata::getTableMetaId, tableMetaId)
+            .set(SysDatasourceTableMetadata::getLastSyncTime, LocalDateTime.now())
+            .set(SysDatasourceTableMetadata::getSyncStatus, syncStatus);
 
         if (StringUtils.isNotBlank(syncErrorMessage)) {
-            updateWrapper.set(SysTableMetadata::getSyncErrorMessage, syncErrorMessage);
+            updateWrapper.set(SysDatasourceTableMetadata::getSyncErrorMessage, syncErrorMessage);
         } else {
-            updateWrapper.set(SysTableMetadata::getSyncErrorMessage, null);
+            updateWrapper.set(SysDatasourceTableMetadata::getSyncErrorMessage, null);
         }
 
         return baseMapper.update(null, updateWrapper) > 0;
@@ -465,13 +511,6 @@ public class SysTableMetadataServiceImpl implements ISysTableMetadataService {
                     // 获取元数据信息
                     ResultSetMetaData metaData = resultSet.getMetaData();
                     int columnCount = metaData.getColumnCount();
-
-                    // 添加列信息作为第一条记录
-                    Map<String, Object> columnInfo = new LinkedHashMap<>();
-                    for (int i = 1; i <= columnCount; i++) {
-                        columnInfo.put("column_" + i, metaData.getColumnName(i) + " (" + metaData.getColumnTypeName(i) + ")");
-                    }
-                    result.add(columnInfo);
 
                     // 遍历结果集
                     while (resultSet.next()) {
