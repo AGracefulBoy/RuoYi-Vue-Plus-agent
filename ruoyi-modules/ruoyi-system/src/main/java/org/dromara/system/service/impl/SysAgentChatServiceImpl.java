@@ -74,9 +74,9 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
      */
     private Flux<String> handleTaskAgent(SysAgent agent, List<ToolDto> availableTools, ChatRequestDto chatRequest) {
         // 创建或获取任务记忆
-        String sessionId = StringUtils.hasText(chatRequest.getChatId()) ?
+        String chatId = StringUtils.hasText(chatRequest.getChatId()) ?
                           chatRequest.getChatId() :
-                          "session_" + agent.getAgentId() + "_" + System.currentTimeMillis();
+                          "chat_" + agent.getAgentId() + "_" + System.currentTimeMillis();
 
 
         // 检查退出条件
@@ -88,10 +88,10 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
         return taskAgentService.executeReActStream(agent, availableTools, chatRequest.getMessage())
                 .doOnComplete(() -> {
                     // 保存记忆
-                    log.info("任务智能体对话完成，会话ID: {}", sessionId);
+                    log.info("任务智能体对话完成，会话ID: {}", chatId);
                 })
                 .doOnError(error -> {
-                    log.error("任务智能体处理失败，会话ID: {}", sessionId, error);
+                    log.error("任务智能体处理失败，会话ID: {}", chatId, error);
                 });
     }
 

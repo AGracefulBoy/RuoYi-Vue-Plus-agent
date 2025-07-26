@@ -62,136 +62,16 @@ public class TaskAgentServiceImpl implements TaskAgentService {
      */
     private void performStreamingReasoningChain(SysAgent agent, List<ToolDto> availableTools,
                                                 String userInput, reactor.core.publisher.FluxSink<String> sink) {
-
-        // 先根据 agent 中的 model 和 enhanceModel 去模型配置表中查询对应的模型信息
-        SysModelConfigVo mainModelConfig = null;
-        SysModelConfigVo enhanceModelConfig = null;
-
         try {
-            // 查询主要模型配置
-            if (agent.getModel() != null) {
-                mainModelConfig = modelConfigService.queryById(agent.getModel());
-                if (mainModelConfig != null) {
-                    log.info("获取主要模型配置成功: modelCode={}, provider={}",
-                        mainModelConfig.getModelCode(), mainModelConfig.getModelProvider());
-                } else {
-                    log.warn("未找到主要模型配置，模型ID: {}", agent.getModel());
-                }
-            } else {
-                log.warn("智能体未配置主要模型，agentId: {}", agent.getAgentId());
-            }
+            // 1. 获取并验证模型配置
+            ModelConfigContext modelContext = getAndValidateModelConfigs(agent, sink);
+            if (modelContext == null) return;
 
-            // 查询增强模型配置
-            if (agent.getEnhanceModel() != null) {
-                enhanceModelConfig = modelConfigService.queryById(agent.getEnhanceModel());
-                if (enhanceModelConfig != null) {
-                    log.info("获取增强模型配置成功: modelCode={}, provider={}",
-                        enhanceModelConfig.getModelCode(), enhanceModelConfig.getModelProvider());
-                } else {
-                    log.warn("未找到增强模型配置，模型ID: {}", agent.getEnhanceModel());
-                }
-            } else {
-                log.debug("智能体未配置增强模型，agentId: {}", agent.getAgentId());
-            }
+            // 3. 构建提示词
+            String cotPrompt = buildPrompt(agent, availableTools, userInput);
 
-            // 验证模型配置有效性
-            if (mainModelConfig == null) {
-                sink.error(new RuntimeException("智能体主要模型配置不存在或无效，无法执行推理任务"));
-                return;
-            }
-
-            // 检查模型是否支持chat类型
-            if (!mainModelConfig.getModelType().contains("chat") && !mainModelConfig.getModelType().contains("llm")) {
-                sink.error(new RuntimeException("主要模型不支持聊天功能，请检查模型配置"));
-                return;
-            }
-
-        } catch (Exception e) {
-            log.error("查询模型配置失败", e);
-            sink.error(new RuntimeException("查询模型配置失败: " + e.getMessage()));
-            return;
-        }
-
-        // 模拟流式思考过程
-        sink.next("🤔 开始思考您的问题...\n");
-        sink.next("📋 使用模型: " + mainModelConfig.getModelCode() + " (" + mainModelConfig.getModelProvider() + ")\n");
-        if (enhanceModelConfig != null) {
-            sink.next("⚡ 增强模型: " + enhanceModelConfig.getModelCode() + " (" + enhanceModelConfig.getModelProvider() + ")\n");
-        }
-
-        try {
-            // 构建提示词
-            String promptContent = agent.getPromptContent();
-            if (!StringUtils.hasText(promptContent)) {
-                promptContent = "你是一个智能助手，请根据用户的问题提供有帮助的回答。\n用户问题：{{query}}";
-            }
-
-            String cotPrompt = promptContent.replace("{{agent_personality}}",
-                    StringUtils.hasText(agent.getAgentPersonality()) ? agent.getAgentPersonality() : "专业助手")
-                .replace("{{tool_list}}", CollectionUtils.isEmpty(availableTools) ? "[]" : JSONUtil.toJsonStr(availableTools))
-                .replace("{{query}}", userInput);
-
-            log.info("构建的提示词: {}", cotPrompt);
-
-            // 获取聊天服务
-            IChatService chatService = aiService.getChatService(mainModelConfig.getModelProvider());
-            if (chatService == null) {
-                sink.error(new RuntimeException("无法获取聊天服务，提供商: " + mainModelConfig.getModelProvider()));
-                return;
-            }
-
-            // 构建聊天请求
-            IChatRequest iChatRequest = new IChatRequest();
-            iChatRequest.setStream(true);
-            iChatRequest.setModel(mainModelConfig.getModelCode());
-            iChatRequest.setApiKey(mainModelConfig.getApiKey());
-            iChatRequest.setBaseUrl(mainModelConfig.getBaseUrl());
-            iChatRequest.setPrompt(cotPrompt);
-
-            log.info("开始流式调用AI模型: {}", mainModelConfig.getModelCode());
-            sink.next("🚀 正在调用AI模型生成回复...\n");
-
-            // 执行流式调用并处理响应
-            Flux<IChatResponse> modelStream = chatService.stream(iChatRequest);
-
-            StringBuilder fullResponse = new StringBuilder();
-
-            SysModelConfigVo finalEnhanceModelConfig = enhanceModelConfig;
-            modelStream
-                .doOnNext(chunk -> {
-                    // 将模型输出的每个chunk转发到sink
-                    if (StringUtils.hasText(chunk.getResult().getOutput().getText())) {
-                        sink.next(chunk.getResult().getOutput().getText());
-                        fullResponse.append(chunk);
-                    }
-                })
-                .doOnComplete(() -> {
-                    log.info("AI模型流式调用完成");
-
-                    String finalResponse = fullResponse.toString();
-
-                    // 如果配置了增强模型，使用增强模型优化回复
-                    if (finalEnhanceModelConfig != null && StringUtils.hasText(finalResponse)) {
-                        try {
-                            sink.next("\n\n🔧 使用增强模型优化回复...\n");
-                            String enhancedResponse = enhanceResponse(finalResponse, finalEnhanceModelConfig, agent);
-                            if (!enhancedResponse.equals(finalResponse)) {
-                                sink.next("\n✨ 优化后的回复：\n");
-                                sink.next(enhancedResponse);
-                            }
-                        } catch (Exception e) {
-                            log.error("增强模型处理失败", e);
-                            sink.next("\n⚠️ 增强模型处理失败，已返回原始回复\n");
-                        }
-                    }
-
-                    sink.complete();
-                })
-                .doOnError(error -> {
-                    log.error("AI模型流式调用失败", error);
-                    sink.error(new RuntimeException("AI模型调用失败: " + error.getMessage()));
-                })
-                .subscribe();
+            // 4. 执行流式AI调用
+            executeStreamingAICall(cotPrompt, modelContext, sink);
 
         } catch (Exception e) {
             log.error("流式推理执行失败", e);
@@ -199,6 +79,196 @@ public class TaskAgentServiceImpl implements TaskAgentService {
         }
     }
 
+    /**
+     * 获取并验证模型配置
+     */
+    private ModelConfigContext getAndValidateModelConfigs(SysAgent agent, reactor.core.publisher.FluxSink<String> sink) {
+        try {
+            SysModelConfigVo mainModelConfig = getModelConfig(agent.getModel(), "主要模型");
+            SysModelConfigVo enhanceModelConfig = getModelConfig(agent.getEnhanceModel(), "增强模型");
+
+            // 验证主要模型配置
+            if (mainModelConfig == null) {
+                sink.error(new RuntimeException("智能体主要模型配置不存在或无效，无法执行推理任务"));
+                return null;
+            }
+
+            // 检查模型类型
+            if (!isValidModelType(mainModelConfig)) {
+                sink.error(new RuntimeException("主要模型不支持聊天功能，请检查模型配置"));
+                return null;
+            }
+
+            return new ModelConfigContext(mainModelConfig, enhanceModelConfig);
+
+        } catch (Exception e) {
+            log.error("查询模型配置失败", e);
+            sink.error(new RuntimeException("查询模型配置失败: " + e.getMessage()));
+            return null;
+        }
+    }
+
+    /**
+     * 获取模型配置
+     */
+    private SysModelConfigVo getModelConfig(Long modelId, String modelType) {
+        if (modelId == null) {
+            log.debug("未配置{}，modelId为null", modelType);
+            return null;
+        }
+
+        SysModelConfigVo modelConfig = modelConfigService.queryById(modelId);
+        if (modelConfig != null) {
+            log.info("获取{}配置成功: modelCode={}, provider={}",
+                modelType, modelConfig.getModelCode(), modelConfig.getModelProvider());
+        } else {
+            log.warn("未找到{}配置，模型ID: {}", modelType, modelId);
+        }
+        return modelConfig;
+    }
+
+    /**
+     * 验证模型类型是否支持聊天
+     */
+    private boolean isValidModelType(SysModelConfigVo modelConfig) {
+        List<String> modelType = modelConfig.getModelType();
+        return modelType != null && (modelType.contains("chat") || modelType.contains("llm"));
+    }
+
+    /**
+     * 构建提示词
+     */
+    private String buildPrompt(SysAgent agent, List<ToolDto> availableTools, String userInput) {
+        String promptContent = agent.getPromptContent();
+        if (!StringUtils.hasText(promptContent)) {
+            promptContent = "你是一个智能助手，请根据用户的问题提供有帮助的回答。\n用户问题：{{query}}";
+        }
+
+        String cotPrompt = promptContent
+            .replace("{{agent_personality}}",
+                StringUtils.hasText(agent.getAgentPersonality()) ? agent.getAgentPersonality() : "专业助手")
+            .replace("{{tool_list}}",
+                CollectionUtils.isEmpty(availableTools) ? "[]" : JSONUtil.toJsonStr(availableTools))
+            .replace("{{query}}", userInput);
+
+        log.info("构建的提示词: {}", cotPrompt);
+        return cotPrompt;
+    }
+
+    /**
+     * 执行流式AI调用
+     */
+    private void executeStreamingAICall(String cotPrompt, ModelConfigContext modelContext,
+                                        reactor.core.publisher.FluxSink<String> sink) {
+        // 获取聊天服务
+        IChatService chatService = aiService.getChatService(modelContext.getMainModel().getModelProvider());
+        if (chatService == null) {
+            sink.error(new RuntimeException("无法获取聊天服务，提供商: " + modelContext.getMainModel().getModelProvider()));
+            return;
+        }
+
+        // 构建聊天请求
+        IChatRequest chatRequest = buildChatRequest(cotPrompt, modelContext.getMainModel());
+
+        // 执行流式调用
+        Flux<IChatResponse> modelStream = chatService.stream(chatRequest);
+        processModelStream(modelStream, modelContext, sink);
+    }
+
+    /**
+     * 构建聊天请求
+     */
+    private IChatRequest buildChatRequest(String prompt, SysModelConfigVo modelConfig) {
+        IChatRequest request = new IChatRequest();
+        request.setStream(true);
+        request.setModel(modelConfig.getModelCode());
+        request.setApiKey(modelConfig.getApiKey());
+        request.setBaseUrl(modelConfig.getBaseUrl());
+        request.setPrompt(prompt);
+        return request;
+    }
+
+    /**
+     * 处理模型流式响应
+     */
+    private void processModelStream(Flux<IChatResponse> modelStream, ModelConfigContext modelContext,
+                                    reactor.core.publisher.FluxSink<String> sink) {
+        StringBuilder fullResponse = new StringBuilder();
+
+        modelStream
+            .doOnNext(chunk -> handleStreamChunk(chunk, sink, fullResponse))
+            .doOnComplete(() -> handleStreamComplete(fullResponse.toString(), modelContext, sink))
+            .doOnError(error -> handleStreamError(error, sink))
+            .subscribe();
+    }
+
+    /**
+     * 处理流式响应块
+     */
+    private void handleStreamChunk(IChatResponse chunk, reactor.core.publisher.FluxSink<String> sink,
+                                   StringBuilder fullResponse) {
+        if (chunk.getResult() != null && chunk.getResult().getOutput() != null) {
+            String text = chunk.getResult().getOutput().getText();
+            if (StringUtils.hasText(text)) {
+                sink.next(text);
+                fullResponse.append(text);
+            }
+        }
+    }
+
+    /**
+     * 处理流式响应完成
+     */
+    private void handleStreamComplete(String finalResponse, ModelConfigContext modelContext,
+                                      reactor.core.publisher.FluxSink<String> sink) {
+        log.info("AI模型流式调用完成");
+
+        // 如果配置了增强模型，使用增强模型优化回复
+        if (modelContext.getEnhanceModel() != null && StringUtils.hasText(finalResponse)) {
+            try {
+                sink.next("\n\n🔧 使用增强模型优化回复...\n");
+                String enhancedResponse = enhanceResponse(finalResponse, modelContext.getEnhanceModel(), null);
+                if (!enhancedResponse.equals(finalResponse)) {
+                    sink.next("\n✨ 优化后的回复：\n");
+                    sink.next(enhancedResponse);
+                }
+            } catch (Exception e) {
+                log.error("增强模型处理失败", e);
+                sink.next("\n⚠️ 增强模型处理失败，已返回原始回复\n");
+            }
+        }
+
+        sink.complete();
+    }
+
+    /**
+     * 处理流式响应错误
+     */
+    private void handleStreamError(Throwable error, reactor.core.publisher.FluxSink<String> sink) {
+        log.error("AI模型流式调用失败", error);
+        sink.error(new RuntimeException("AI模型调用失败: " + error.getMessage()));
+    }
+
+    /**
+     * 模型配置上下文类
+     */
+    private static class ModelConfigContext {
+        private final SysModelConfigVo mainModel;
+        private final SysModelConfigVo enhanceModel;
+
+        public ModelConfigContext(SysModelConfigVo mainModel, SysModelConfigVo enhanceModel) {
+            this.mainModel = mainModel;
+            this.enhanceModel = enhanceModel;
+        }
+
+        public SysModelConfigVo getMainModel() {
+            return mainModel;
+        }
+
+        public SysModelConfigVo getEnhanceModel() {
+            return enhanceModel;
+        }
+    }
 
     @Override
     public boolean checkExitCondition(String input) {
