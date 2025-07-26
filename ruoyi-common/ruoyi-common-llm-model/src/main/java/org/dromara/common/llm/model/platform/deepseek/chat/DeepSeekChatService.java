@@ -24,7 +24,6 @@ public class DeepSeekChatService implements IChatService {
         DeepSeekApi deepSeekApi = DeepSeekApi.builder()
             .apiKey(iChatRequest.getApiKey())
             .baseUrl(iChatRequest.getBaseUrl())
-            .completionsPath(iChatRequest.getCompletionsPath())
             .build();
 
         DeepSeekChatModel built = DeepSeekChatModel.builder()

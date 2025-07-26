@@ -67,6 +67,12 @@ public class SysAgentVo implements Serializable {
     private String avatar;
 
     /**
+     * 智能体人设
+     */
+    @ExcelProperty(value = "智能体人设")
+    private String agentPersonality;
+
+    /**
      * 智能体提示词
      */
     private String promptContent;
@@ -92,16 +98,28 @@ public class SysAgentVo implements Serializable {
     private String conversationMode;
 
     /**
-     * 主要模型
+     * 主要模型ID，关联sys_model_config.model_id
      */
-    @ExcelProperty(value = "主要模型")
-    private String model;
+    @ExcelProperty(value = "主要模型ID")
+    private Long model;
 
     /**
-     * 增强回复模型
+     * 增强回复模型ID，关联sys_model_config.model_id
      */
-    @ExcelProperty(value = "增强回复模型")
-    private String enhanceModel;
+    @ExcelProperty(value = "增强回复模型ID")
+    private Long enhanceModel;
+
+    /**
+     * 主要模型名称（用于前端展示）
+     */
+    @TableField(exist = false)
+    private String modelName;
+
+    /**
+     * 增强回复模型名称（用于前端展示）
+     */
+    @TableField(exist = false)
+    private String enhanceModelName;
 
     /**
      * 工具列表（JSON数组，存储工具ID）

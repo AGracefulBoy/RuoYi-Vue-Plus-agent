@@ -53,6 +53,11 @@ public class SysAgent extends TenantEntity {
     private String avatar;
 
     /**
+     * 智能体人设
+     */
+    private String agentPersonality;
+
+    /**
      * 智能体提示词
      */
     private String promptContent;
@@ -69,19 +74,19 @@ public class SysAgent extends TenantEntity {
     private String status;
 
     /**
-     * 对话模式（single单轮、multi多轮、context上下文）
+     * 对话模式（free单轮、multi多轮、context上下文）
      */
     private String conversationMode;
 
     /**
-     * 主要模型
+     * 主要模型ID，关联sys_model_config.model_id
      */
-    private String model;
+    private Long model;
 
     /**
-     * 增强回复模型
+     * 增强回复模型ID，关联sys_model_config.model_id
      */
-    private String enhanceModel;
+    private Long enhanceModel;
 
     /**
      * 工具列表（JSON数组，存储工具ID）

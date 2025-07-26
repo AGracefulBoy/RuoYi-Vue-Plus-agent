@@ -56,6 +56,11 @@ public class SysAgentBo extends BaseEntity {
     private String avatar;
 
     /**
+     * 智能体人设
+     */
+    private String agentPersonality;
+
+    /**
      * 智能体提示词
      */
     private String promptContent;
@@ -76,16 +81,14 @@ public class SysAgentBo extends BaseEntity {
     private String conversationMode;
 
     /**
-     * 主要模型
+     * 主要模型ID，关联sys_model_config.model_id
      */
-    @Size(min = 0, max = 255, message = "主要模型长度不能超过{max}个字符")
-    private String model;
+    private Long model;
 
     /**
-     * 增强回复模型
+     * 增强回复模型ID，关联sys_model_config.model_id
      */
-    @Size(min = 0, max = 255, message = "增强回复模型长度不能超过{max}个字符")
-    private String enhanceModel;
+    private Long enhanceModel;
 
     /**
      * 工具列表（JSON数组，存储工具ID）

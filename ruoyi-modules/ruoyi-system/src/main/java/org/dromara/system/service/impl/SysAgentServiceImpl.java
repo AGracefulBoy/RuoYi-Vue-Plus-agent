@@ -21,6 +21,7 @@ import org.dromara.system.mapper.SysAgentMapper;
 import org.dromara.system.mapper.SysToolMapper;
 import org.dromara.system.mapper.SysKnowledgeBaseMapper;
 import org.dromara.system.mapper.SysDatasourceMapper;
+import org.dromara.system.mapper.SysModelConfigMapper;
 import org.dromara.system.service.ISysAgentService;
 
 import org.springframework.stereotype.Service;
@@ -43,6 +44,7 @@ public class SysAgentServiceImpl implements ISysAgentService {
     private final SysToolMapper toolMapper;
     private final SysKnowledgeBaseMapper knowledgeBaseMapper;
     private final SysDatasourceMapper datasourceMapper;
+    private final SysModelConfigMapper modelConfigMapper;
 
     /**
      * 查询智能体管理
@@ -52,6 +54,21 @@ public class SysAgentServiceImpl implements ISysAgentService {
         SysAgentVo agentVo = baseMapper.selectVoById(agentId);
         if (agentVo == null) {
             return null;
+        }
+        
+        // 设置模型名称（用于前端展示）
+        if (agentVo.getModel() != null) {
+            SysModelConfigVo modelConfig = modelConfigMapper.selectVoById(agentVo.getModel());
+            if (modelConfig != null) {
+                agentVo.setModelName(modelConfig.getModelCode());
+            }
+        }
+        
+        if (agentVo.getEnhanceModel() != null) {
+            SysModelConfigVo enhanceModelConfig = modelConfigMapper.selectVoById(agentVo.getEnhanceModel());
+            if (enhanceModelConfig != null) {
+                agentVo.setEnhanceModelName(enhanceModelConfig.getModelCode());
+            }
         }
         
         // 转换工具列表
@@ -151,8 +168,8 @@ public class SysAgentServiceImpl implements ISysAgentService {
         lqw.eq(StringUtils.isNotBlank(bo.getAgentType()), SysAgent::getAgentType, bo.getAgentType());
         lqw.eq(StringUtils.isNotBlank(bo.getStatus()), SysAgent::getStatus, bo.getStatus());
         lqw.eq(StringUtils.isNotBlank(bo.getConversationMode()), SysAgent::getConversationMode, bo.getConversationMode());
-        lqw.like(StringUtils.isNotBlank(bo.getModel()), SysAgent::getModel, bo.getModel());
-        lqw.like(StringUtils.isNotBlank(bo.getEnhanceModel()), SysAgent::getEnhanceModel, bo.getEnhanceModel());
+        lqw.eq(ObjectUtil.isNotNull(bo.getModel()), SysAgent::getModel, bo.getModel());
+        lqw.eq(ObjectUtil.isNotNull(bo.getEnhanceModel()), SysAgent::getEnhanceModel, bo.getEnhanceModel());
         // 注意：del_flag 的过滤已经在 Mapper 的 SQL 中处理，这里不再添加
         lqw.orderByDesc(SysAgent::getCreateTime);
         return lqw;
