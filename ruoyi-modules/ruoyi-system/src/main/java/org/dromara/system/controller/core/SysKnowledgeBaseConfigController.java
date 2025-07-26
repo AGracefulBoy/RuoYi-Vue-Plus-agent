@@ -1,4 +1,4 @@
-package org.dromara.system.controller.system;
+package org.dromara.system.controller.core;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import jakarta.servlet.http.HttpServletResponse;
@@ -112,4 +112,4 @@ public class SysKnowledgeBaseConfigController extends BaseController {
         return toAjax(knowledgeBaseConfigService.deleteWithValidByIds(List.of(knowledgeBaseConfigIds), true));
     }
 
-} 
+}

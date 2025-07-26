@@ -1,4 +1,4 @@
-package org.dromara.system.controller.system;
+package org.dromara.system.controller.core;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import jakarta.servlet.http.HttpServletResponse;
@@ -22,7 +22,6 @@ import org.dromara.system.domain.vo.SysKnowledgeBaseEsDocumentVo;
 import org.dromara.system.service.IDocumentSplitService;
 import org.dromara.system.service.IElasticsearchDocumentService;
 import org.dromara.system.service.ISysKnowledgeBaseDocumentService;
-import org.dromara.system.service.split.DocumentChunk;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
