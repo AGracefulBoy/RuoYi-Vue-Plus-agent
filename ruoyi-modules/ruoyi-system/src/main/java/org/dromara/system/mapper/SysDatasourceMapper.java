@@ -69,7 +69,7 @@ public interface SysDatasourceMapper extends BaseMapperPlus<SysDatasource, SysDa
      * @param wrapper 查询条件
      * @return 数据源管理列表（只包含核心字段）
      */
-    @Select("SELECT sd.datasource_id, sd.datasource_name, sd.datasource_type, " +
+    @Select("SELECT sd.datasource_id, sd.datasource_name, sd.datasource_type, sd.database_type," +
             "u1.nick_name AS createByName, sd.create_time, sd.update_time, sd.status " +
             "FROM sys_datasource sd " +
             "LEFT JOIN sys_user u1 ON sd.create_by = u1.user_id " +

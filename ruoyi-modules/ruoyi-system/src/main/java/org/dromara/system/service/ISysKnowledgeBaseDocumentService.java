@@ -3,6 +3,7 @@ package org.dromara.system.service;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.system.domain.bo.SysKnowledgeBaseDocumentBo;
+import org.dromara.system.domain.bo.SysKnowledgeBaseDocumentSliceUpdateBo;
 import org.dromara.system.domain.vo.SysKnowledgeBaseDocumentVo;
 
 import java.util.Collection;
@@ -97,6 +98,14 @@ public interface ISysKnowledgeBaseDocumentService {
      * @return 结果
      */
     Boolean updateDocumentStatus(Long documentId, String status);
+
+    /**
+     * 更新文档切片参数
+     *
+     * @param bo 文档切片参数更新对象
+     * @return 结果
+     */
+    Boolean updateSliceParams(SysKnowledgeBaseDocumentSliceUpdateBo bo);
 
 
 } 

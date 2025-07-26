@@ -16,6 +16,7 @@ import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.common.web.core.BaseController;
 import org.dromara.system.domain.bo.SysKnowledgeBaseDocumentBo;
+import org.dromara.system.domain.bo.SysKnowledgeBaseDocumentSliceUpdateBo;
 import org.dromara.system.domain.vo.SysKnowledgeBaseDocumentVo;
 import org.dromara.system.domain.vo.SysKnowledgeBaseEsDocumentVo;
 import org.dromara.system.service.IDocumentSplitService;
@@ -113,6 +114,17 @@ public class SysKnowledgeBaseDocumentController extends BaseController {
     @PostMapping("/updateStatus")
     public R<Void> updateStatus(@RequestParam Long documentId, @RequestParam String status) {
         return toAjax(knowledgeBaseDocumentService.updateDocumentStatus(documentId, status));
+    }
+
+    /**
+     * 更新文档切片参数
+     */
+    @SaCheckPermission("system:knowledgeBaseDocument:edit")
+    @Log(title = "知识库文档切片参数", businessType = BusinessType.UPDATE)
+    @RepeatSubmit()
+    @PostMapping("/updateSliceParams")
+    public R<Void> updateSliceParams(@Validated(EditGroup.class) @RequestBody SysKnowledgeBaseDocumentSliceUpdateBo bo) {
+        return toAjax(knowledgeBaseDocumentService.updateSliceParams(bo));
     }
 
     /**

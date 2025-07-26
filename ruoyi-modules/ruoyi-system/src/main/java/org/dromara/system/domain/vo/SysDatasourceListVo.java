@@ -39,8 +39,13 @@ public class SysDatasourceListVo implements Serializable {
      * 数据源类型（database数据库、excel表格文件）
      */
     @ExcelProperty(value = "数据源类型", converter = ExcelDictConvert.class)
-    @ExcelDictFormat(dictType = "sys_datasource_type")
     private String datasourceType;
+
+    /**
+     * 数据库类型（mysql、clickhouse、postgresql、oracle、sqlserver、sqlite等）
+     */
+    @ExcelDictFormat(dictType = "agent_database_source_type")
+    private String databaseType;
 
     /**
      * 创建者名称
@@ -64,7 +69,6 @@ public class SysDatasourceListVo implements Serializable {
      * 状态（0正常 1停用）
      */
     @ExcelProperty(value = "状态", converter = ExcelDictConvert.class)
-    @ExcelDictFormat(dictType = "sys_normal_disable")
     private String status;
 
 }
