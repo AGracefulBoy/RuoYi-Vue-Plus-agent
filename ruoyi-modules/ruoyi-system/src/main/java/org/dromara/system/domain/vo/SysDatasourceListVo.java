@@ -71,4 +71,11 @@ public class SysDatasourceListVo implements Serializable {
     @ExcelProperty(value = "状态", converter = ExcelDictConvert.class)
     private String status;
 
+    /**
+     * 数据库同步状态（0 同步中 1 同步成功 2 同步失败）
+     */
+    @ExcelProperty(value = "同步状态", converter = ExcelDictConvert.class)
+    @ExcelDictFormat(readConverterExp = "0=同步中,1=同步成功,2=同步失败")
+    private String syncStatus;
+
 }

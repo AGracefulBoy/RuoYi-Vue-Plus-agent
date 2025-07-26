@@ -150,6 +150,11 @@ public class SysDatasource extends TenantEntity {
     private String errorMessage;
 
     /**
+     * 数据库同步状态（0 同步中 1 同步成功 2 同步失败）
+     */
+    private String syncStatus;
+
+    /**
      * 删除标志（0代表存在 1代表删除）
      */
     @TableLogic

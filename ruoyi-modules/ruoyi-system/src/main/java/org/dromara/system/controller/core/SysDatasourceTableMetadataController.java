@@ -116,7 +116,7 @@ public class SysDatasourceTableMetadataController extends BaseController {
     @SaCheckPermission("system:table:metadata:list")
     @GetMapping("/datasource/{datasourceId}")
     public TableDataInfo<SysTableMetadataVo> listByDatasourceId(@NotNull(message = "数据源ID不能为空") @PathVariable Long datasourceId,
-                                                                @RequestParam("keyword") String keyword,
+                                                                @RequestParam(value = "keyword",required = false) String keyword,
                                                                 PageQuery pageQuery) {
         return tableMetadataService.queryPageByDatasourceId(datasourceId, keyword,pageQuery);
     }

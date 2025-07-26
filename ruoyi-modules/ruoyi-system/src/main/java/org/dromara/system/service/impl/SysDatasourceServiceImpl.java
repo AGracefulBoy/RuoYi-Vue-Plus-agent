@@ -101,6 +101,7 @@ public class SysDatasourceServiceImpl implements ISysDatasourceService {
         lqw.eq(StringUtils.isNotBlank(bo.getStatus()), SysDatasource::getStatus, bo.getStatus());
         lqw.eq(StringUtils.isNotBlank(bo.getIsDefault()), SysDatasource::getIsDefault, bo.getIsDefault());
         lqw.eq(StringUtils.isNotBlank(bo.getConnectionStatus()), SysDatasource::getConnectionStatus, bo.getConnectionStatus());
+        lqw.eq(StringUtils.isNotBlank(bo.getSyncStatus()), SysDatasource::getSyncStatus, bo.getSyncStatus());
         // 注意：del_flag 的过滤已经在 Mapper 的 SQL 中处理，这里不再添加
         lqw.orderByDesc(SysDatasource::getCreateTime);
         return lqw;
@@ -143,6 +144,9 @@ public class SysDatasourceServiceImpl implements ISysDatasourceService {
             // If datasource is MySQL database type, asynchronously fetch metadata
             if ("database".equals(add.getDatasourceType()) && "mysql".equalsIgnoreCase(add.getDatabaseType())) {
                 asyncFetchMysqlMetadata(add);
+            } else {
+                // 对于非MySQL数据库或Excel文件，直接设置同步状态为成功
+                updateSyncStatus(add.getDatasourceId(), "1", null);
             }
         }
         return flag;
@@ -401,6 +405,10 @@ public class SysDatasourceServiceImpl implements ISysDatasourceService {
         if (StringUtils.isBlank(datasource.getConnectionStatus())) {
             datasource.setConnectionStatus("0");
         }
+        // 设置同步状态默认值：0-同步中
+        if (StringUtils.isBlank(datasource.getSyncStatus())) {
+            datasource.setSyncStatus("0");
+        }
     }
 
     /**
@@ -453,15 +461,24 @@ public class SysDatasourceServiceImpl implements ISysDatasourceService {
                     // 从MySQL数据库获取元数据
                     fetchMysqlDatabaseMetadata(connectionConfig);
 
+                    // 更新同步状态为成功
+                    updateSyncStatus(datasource.getDatasourceId(), "1", null);
+
                     log.info("成功完成数据源的异步元数据获取: {}", datasource.getDatasourceName());
                 } catch (Exception exception) {
                     log.error("获取数据源元数据失败: {}, 错误: {}",
                         datasource.getDatasourceName(), exception.getMessage(), exception);
+                    
+                    // 更新同步状态为失败
+                    updateSyncStatus(datasource.getDatasourceId(), "2", exception.getMessage());
                 }
             }, metadataFetchExecutor)
             .exceptionally(throwable -> {
                 log.error("异步获取元数据任务执行失败: {}, 错误: {}",
                     datasource.getDatasourceName(), throwable.getMessage(), throwable);
+                
+                // 更新同步状态为失败
+                updateSyncStatus(datasource.getDatasourceId(), "2", throwable.getMessage());
                 return null;
             });
     }
@@ -847,6 +864,39 @@ public class SysDatasourceServiceImpl implements ISysDatasourceService {
         return lowerType.contains("int") || lowerType.contains("decimal") ||
             lowerType.contains("numeric") || lowerType.contains("float") ||
             lowerType.contains("double");
+    }
+
+    /**
+     * 更新数据源同步状态
+     *
+     * @param datasourceId 数据源ID
+     * @param syncStatus   同步状态 (0-同步中, 1-同步成功, 2-同步失败)
+     * @param errorMessage 错误信息（可选）
+     */
+    private void updateSyncStatus(Long datasourceId, String syncStatus, String errorMessage) {
+        try {
+            LambdaUpdateWrapper<SysDatasource> updateWrapper = Wrappers.lambdaUpdate();
+            updateWrapper.eq(SysDatasource::getDatasourceId, datasourceId)
+                .set(SysDatasource::getSyncStatus, syncStatus);
+            
+            // 如果有错误信息，同时更新错误信息字段
+            if (StringUtils.isNotBlank(errorMessage)) {
+                // 截断过长的错误信息，避免数据库字段长度限制
+                String truncatedErrorMessage = errorMessage.length() > 500 ? 
+                    errorMessage.substring(0, 500) + "..." : errorMessage;
+                updateWrapper.set(SysDatasource::getErrorMessage, truncatedErrorMessage);
+            } else if ("1".equals(syncStatus)) {
+                // 同步成功时清空错误信息
+                updateWrapper.set(SysDatasource::getErrorMessage, null);
+            }
+
+            baseMapper.update(null, updateWrapper);
+            
+            log.debug("更新数据源同步状态成功: datasourceId={}, syncStatus={}", datasourceId, syncStatus);
+        } catch (Exception e) {
+            log.error("更新数据源同步状态失败: datasourceId={}, syncStatus={}, error={}", 
+                datasourceId, syncStatus, e.getMessage(), e);
+        }
     }
 
 }

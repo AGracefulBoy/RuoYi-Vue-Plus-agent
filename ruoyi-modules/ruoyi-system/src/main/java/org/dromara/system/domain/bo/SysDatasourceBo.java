@@ -174,6 +174,12 @@ public class SysDatasourceBo extends BaseEntity {
     private String errorMessage;
 
     /**
+     * 数据库同步状态（0 同步中 1 同步成功 2 同步失败）
+     */
+    @Pattern(regexp = "^[012]$", message = "同步状态只能是0、1或2")
+    private String syncStatus;
+
+    /**
      * 备注
      */
     @Size(max = 500, message = "备注长度不能超过{max}个字符")
