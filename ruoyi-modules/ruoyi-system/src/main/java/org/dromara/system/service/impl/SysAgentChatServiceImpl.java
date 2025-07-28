@@ -1,6 +1,5 @@
 package org.dromara.system.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.system.domain.SysAgent;
@@ -8,7 +7,7 @@ import org.dromara.system.domain.SysDatasource;
 import org.dromara.system.domain.SysKnowledgeBase;
 import org.dromara.system.domain.SysTool;
 import org.dromara.system.domain.dto.ChatRequestDto;
-import org.dromara.system.domain.dto.TaskAgentDto.*;
+import org.dromara.system.domain.dto.ChatResponseDto;
 import org.dromara.system.domain.dto.ToolDto;
 import org.dromara.system.mapper.SysAgentMapper;
 import org.dromara.system.mapper.SysDatasourceMapper;
@@ -20,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -41,7 +41,7 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
     public Flux<String> completions(ChatRequestDto chatRequest) {
         try {
             log.info("开始处理智能体对话，智能体ID: {}, 用户消息: {}",
-                    chatRequest.getAgentId(), chatRequest.getMessage());
+                chatRequest.getAgentId(), chatRequest.getMessage());
 
             // 1. 获取智能体信息
             SysAgent agent = getAgentById(chatRequest.getAgentId());
@@ -67,16 +67,16 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
     /**
      * 处理任务类型智能体（使用ReAct思维链）
      *
-     * @param agent 智能体信息
+     * @param agent          智能体信息
      * @param availableTools 可用工具列表
-     * @param chatRequest 聊天请求
+     * @param chatRequest    聊天请求
      * @return 流式响应
      */
     private Flux<String> handleTaskAgent(SysAgent agent, List<ToolDto> availableTools, ChatRequestDto chatRequest) {
         // 创建或获取任务记忆
         String chatId = StringUtils.hasText(chatRequest.getChatId()) ?
-                          chatRequest.getChatId() :
-                          "chat_" + agent.getAgentId() + "_" + System.currentTimeMillis();
+            chatRequest.getChatId() :
+            "chat_" + agent.getAgentId() + "_" + System.currentTimeMillis();
 
 
         // 检查退出条件
@@ -86,13 +86,13 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
 
         // 执行ReAct思维链处理
         return taskAgentService.executeReActStream(agent, availableTools, chatRequest.getMessage())
-                .doOnComplete(() -> {
-                    // 保存记忆
-                    log.info("任务智能体对话完成，会话ID: {}", chatId);
-                })
-                .doOnError(error -> {
-                    log.error("任务智能体处理失败，会话ID: {}", chatId, error);
-                });
+            .doOnComplete(() -> {
+                // 保存记忆
+                log.info("任务智能体对话完成，会话ID: {}", chatId);
+            })
+            .doOnError(error -> {
+                log.error("任务智能体处理失败，会话ID: {}", chatId, error);
+            });
     }
 
     /**
@@ -210,10 +210,10 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
     private ToolDto convertToolToDto(SysTool tool) {
         List<ToolDto.Parameter> parameters = buildToolParameters(tool);
         return ToolDto.builder()
-                .name(tool.getToolName())
-                .desc(StringUtils.hasText(tool.getToolDesc()) ? tool.getToolDesc() : "工具: " + tool.getToolName())
-                .parameters(parameters)
-                .build();
+            .name(tool.getToolName())
+            .desc(StringUtils.hasText(tool.getToolDesc()) ? tool.getToolDesc() : "工具: " + tool.getToolName())
+            .parameters(parameters)
+            .build();
     }
 
     /**
@@ -225,11 +225,11 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
     private ToolDto convertKnowledgeBaseToDto(SysKnowledgeBase knowledgeBase) {
         List<ToolDto.Parameter> parameters = buildKnowledgeBaseParameters(knowledgeBase);
         return ToolDto.builder()
-                .name(knowledgeBase.getName())
-                .desc(StringUtils.hasText(knowledgeBase.getDescription()) ?
-                      knowledgeBase.getDescription() : "知识库: " + knowledgeBase.getName())
-                .parameters(parameters)
-                .build();
+            .name(knowledgeBase.getName())
+            .desc(StringUtils.hasText(knowledgeBase.getDescription()) ?
+                knowledgeBase.getDescription() : "知识库: " + knowledgeBase.getName())
+            .parameters(parameters)
+            .build();
     }
 
     /**
@@ -241,36 +241,36 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
     private ToolDto convertDatasourceToDto(SysDatasource datasource) {
         List<ToolDto.Parameter> parameters = buildDatasourceParameters(datasource);
         return ToolDto.builder()
-                .name(datasource.getDatasourceName())
-                .desc(StringUtils.hasText(datasource.getDescription()) ?
-                      datasource.getDescription() : "数据源: " + datasource.getDatasourceName())
-                .parameters(parameters)
-                .build();
+            .name(datasource.getDatasourceName())
+            .desc(StringUtils.hasText(datasource.getDescription()) ?
+                datasource.getDescription() : "数据源: " + datasource.getDatasourceName())
+            .parameters(parameters)
+            .build();
     }
 
     /**
      * 生成流式响应
      *
-     * @param agent 智能体信息
+     * @param agent          智能体信息
      * @param availableTools 可用工具列表
-     * @param chatRequest 聊天请求
+     * @param chatRequest    聊天请求
      * @return 流式响应
      */
     private Flux<String> generateStreamResponse(SysAgent agent, List<ToolDto> availableTools, ChatRequestDto chatRequest) {
         // 模拟流式响应（实际项目中这里应该调用AI模型API）
         return Flux.interval(Duration.ofMillis(100))
-                .take(10)
-                .map(i -> buildResponseMessage(i, agent, availableTools, chatRequest.getMessage()))
-                .doOnComplete(() -> log.info("流式对话完成"));
+            .take(10)
+            .map(i -> buildResponseMessage(i, agent, availableTools, chatRequest.getMessage()))
+            .doOnComplete(() -> log.info("流式对话完成"));
     }
 
     /**
      * 构建响应消息
      *
-     * @param step 当前步骤
-     * @param agent 智能体信息
+     * @param step           当前步骤
+     * @param agent          智能体信息
      * @param availableTools 可用工具列表
-     * @param userMessage 用户输入的消息
+     * @param userMessage    用户输入的消息
      * @return 响应消息
      */
     private String buildResponseMessage(Long step, SysAgent agent, List<ToolDto> availableTools, String userMessage) {
@@ -295,16 +295,16 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
         }
         int maxLength = 50;
         return promptContent.length() > maxLength ?
-               promptContent.substring(0, maxLength) + "..." :
-               promptContent;
+            promptContent.substring(0, maxLength) + "..." :
+            promptContent;
     }
 
     /**
      * 获取处理后的提示词预览（替换变量后）
      *
-     * @param agent 智能体信息
+     * @param agent          智能体信息
      * @param availableTools 可用工具列表
-     * @param userMessage 用户输入的消息
+     * @param userMessage    用户输入的消息
      * @return 处理后的提示词预览
      */
     private String getProcessedPromptPreview(SysAgent agent, List<ToolDto> availableTools, String userMessage) {
@@ -315,9 +315,9 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
     /**
      * 处理提示词模板，替换其中的变量
      *
-     * @param agent 智能体信息
+     * @param agent          智能体信息
      * @param availableTools 可用工具列表
-     * @param userMessage 用户输入的消息
+     * @param userMessage    用户输入的消息
      * @return 处理后的提示词
      */
     private String processPromptTemplate(SysAgent agent, List<ToolDto> availableTools, String userMessage) {
@@ -329,7 +329,7 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
 
         // 替换 {{agent_personality}} 为智能体人设
         String agentPersonality = StringUtils.hasText(agent.getAgentPersonality()) ?
-                                  agent.getAgentPersonality() : "通用智能助手";
+            agent.getAgentPersonality() : "通用智能助手";
         promptContent = promptContent.replace("{{agent_personality}}", agentPersonality);
 
         // 替换 {{tool_list}} 为可用工具列表
@@ -341,7 +341,7 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
         promptContent = promptContent.replace("{{query}}", query);
 
         log.debug("提示词模板处理完成，原长度: {}, 处理后长度: {}",
-                  agent.getPromptContent().length(), promptContent.length());
+            agent.getPromptContent().length(), promptContent.length());
 
         return promptContent;
     }
@@ -368,9 +368,9 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
             if (!CollectionUtils.isEmpty(tool.getParameters())) {
                 toolDescription.append("\n   参数: ");
                 List<String> paramNames = tool.getParameters().stream()
-                        .map(param -> param.getName() + "(" + param.getType() + ")" +
-                                     (param.getRequired() ? "*" : ""))
-                        .collect(Collectors.toList());
+                    .map(param -> param.getName() + "(" + param.getType() + ")" +
+                        (param.getRequired() ? "*" : ""))
+                    .collect(Collectors.toList());
                 toolDescription.append(String.join(", ", paramNames));
             }
 
@@ -488,6 +488,11 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
         }
 
         return parameters;
+    }
+
+    @Override
+    public Mono<ChatResponseDto> completionsSync(ChatRequestDto chatRequest) {
+        return null;
     }
 }
 

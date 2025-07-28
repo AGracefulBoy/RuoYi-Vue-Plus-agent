@@ -127,6 +127,10 @@
             <artifactId>elasticsearch-java</artifactId>
             <version>8.17.2</version>
         </dependency>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-ratelimiter</artifactId>
+        </dependency>
     </dependencies>
 
 </project>
