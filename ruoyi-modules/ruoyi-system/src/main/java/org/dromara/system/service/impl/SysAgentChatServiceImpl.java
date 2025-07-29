@@ -7,7 +7,7 @@ import org.dromara.system.domain.SysDatasource;
 import org.dromara.system.domain.SysKnowledgeBase;
 import org.dromara.system.domain.SysTool;
 import org.dromara.system.domain.dto.ChatRequestDto;
-import org.dromara.system.domain.dto.ChatResponseDto;
+import org.dromara.system.domain.dto.StreamMessageResponseDto;
 import org.dromara.system.domain.dto.ToolDto;
 import org.dromara.system.mapper.SysAgentMapper;
 import org.dromara.system.mapper.SysDatasourceMapper;
@@ -19,12 +19,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -38,7 +35,7 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
     private final TaskAgentService taskAgentService;
 
     @Override
-    public Flux<String> completions(ChatRequestDto chatRequest) {
+    public Flux<StreamMessageResponseDto> completions(ChatRequestDto chatRequest) {
         try {
             log.info("开始处理智能体对话，智能体ID: {}, 用户消息: {}",
                 chatRequest.getAgentId(), chatRequest.getMessage());
@@ -49,13 +46,15 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
             // 2. 构建可用工具列表
             List<ToolDto> availableTools = buildAvailableToolsList(agent);
 
-            // 3. 根据智能体类型选择处理方式
-            if ("task".equals(agent.getAgentType())) {
-                // 任务类型智能体：使用ReAct思维链处理
+            // 3. 根据对话模式选择处理方式
+            if ("self_planning".equals(agent.getConversationMode())) {
+                // 自主规划模式：使用ReAct思维链处理
+                log.info("智能体{}使用自主规划模式处理对话", agent.getAgentId());
                 return handleTaskAgent(agent, availableTools, chatRequest);
             } else {
-                // 其他类型智能体：使用原有逻辑
-                return generateStreamResponse(agent, availableTools, chatRequest);
+                // 自由对话模式：直接对话，不使用思维链
+                log.info("智能体{}使用自由对话模式处理对话", agent.getAgentId());
+                return handleFreeChatAgent(agent, chatRequest);
             }
 
         } catch (Exception e) {
@@ -72,7 +71,7 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
      * @param chatRequest    聊天请求
      * @return 流式响应
      */
-    private Flux<String> handleTaskAgent(SysAgent agent, List<ToolDto> availableTools, ChatRequestDto chatRequest) {
+    private Flux<StreamMessageResponseDto> handleTaskAgent(SysAgent agent, List<ToolDto> availableTools, ChatRequestDto chatRequest) {
         // 创建或获取任务记忆
         String chatId = StringUtils.hasText(chatRequest.getChatId()) ?
             chatRequest.getChatId() :
@@ -81,10 +80,18 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
 
         // 检查退出条件
         if (taskAgentService.checkExitCondition(chatRequest.getMessage())) {
-            return Flux.just("检测到退出指令，对话结束！感谢您的使用。");
+            StreamMessageResponseDto exitResponse = StreamMessageResponseDto.createAnswerMessage(
+                "检测到退出指令，对话结束！感谢您的使用。",
+                chatId,
+                "exit_" + System.currentTimeMillis(),
+                null,
+                0,
+                true
+            );
+            return Flux.just(exitResponse);
         }
 
-        // 执行ReAct思维链处理
+        // 执行ReAct思维链
         return taskAgentService.executeReActStream(agent, availableTools, chatRequest.getMessage())
             .doOnComplete(() -> {
                 // 保存记忆
@@ -92,6 +99,42 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
             })
             .doOnError(error -> {
                 log.error("任务智能体处理失败，会话ID: {}", chatId, error);
+            });
+    }
+
+    /**
+     * 处理自由对话模式智能体
+     *
+     * @param agent       智能体信息
+     * @param chatRequest 聊天请求
+     * @return 流式响应
+     */
+    private Flux<StreamMessageResponseDto> handleFreeChatAgent(SysAgent agent, ChatRequestDto chatRequest) {
+        // 创建或获取会话ID
+        String chatId = StringUtils.hasText(chatRequest.getChatId()) ?
+            chatRequest.getChatId() :
+            "chat_" + agent.getAgentId() + "_" + System.currentTimeMillis();
+
+        // 检查退出条件
+        if (taskAgentService.checkExitCondition(chatRequest.getMessage())) {
+            StreamMessageResponseDto exitResponse = StreamMessageResponseDto.createAnswerMessage(
+                "检测到退出指令，对话结束！感谢您的使用。",
+                chatId,
+                "exit_" + System.currentTimeMillis(),
+                null,
+                0,
+                true
+            );
+            return Flux.just(exitResponse);
+        }
+
+        // 执行自由对话处理
+        return taskAgentService.executeFreeChatStream(agent, chatRequest.getMessage())
+            .doOnComplete(() -> {
+                log.info("自由对话完成，会话ID: {}", chatId);
+            })
+            .doOnError(error -> {
+                log.error("自由对话处理失败，会话ID: {}", chatId, error);
             });
     }
 
@@ -248,139 +291,6 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
             .build();
     }
 
-    /**
-     * 生成流式响应
-     *
-     * @param agent          智能体信息
-     * @param availableTools 可用工具列表
-     * @param chatRequest    聊天请求
-     * @return 流式响应
-     */
-    private Flux<String> generateStreamResponse(SysAgent agent, List<ToolDto> availableTools, ChatRequestDto chatRequest) {
-        // 模拟流式响应（实际项目中这里应该调用AI模型API）
-        return Flux.interval(Duration.ofMillis(100))
-            .take(10)
-            .map(i -> buildResponseMessage(i, agent, availableTools, chatRequest.getMessage()))
-            .doOnComplete(() -> log.info("流式对话完成"));
-    }
-
-    /**
-     * 构建响应消息
-     *
-     * @param step           当前步骤
-     * @param agent          智能体信息
-     * @param availableTools 可用工具列表
-     * @param userMessage    用户输入的消息
-     * @return 响应消息
-     */
-    private String buildResponseMessage(Long step, SysAgent agent, List<ToolDto> availableTools, String userMessage) {
-        return switch (step.intValue()) {
-            case 0 -> "智能体 [" + agent.getAgentName() + "] 正在处理您的问题...\n";
-            case 1 -> "可用工具: " + availableTools.size() + " 个\n";
-            case 2 -> "智能体提示词: " + getProcessedPromptPreview(agent, availableTools, userMessage) + "\n";
-            case 9 -> "处理完成。\n";
-            default -> "正在思考中... (" + step + "/10)\n";
-        };
-    }
-
-    /**
-     * 获取提示词预览
-     *
-     * @param promptContent 提示词内容
-     * @return 提示词预览
-     */
-    private String getPromptPreview(String promptContent) {
-        if (!StringUtils.hasText(promptContent)) {
-            return "未设置";
-        }
-        int maxLength = 50;
-        return promptContent.length() > maxLength ?
-            promptContent.substring(0, maxLength) + "..." :
-            promptContent;
-    }
-
-    /**
-     * 获取处理后的提示词预览（替换变量后）
-     *
-     * @param agent          智能体信息
-     * @param availableTools 可用工具列表
-     * @param userMessage    用户输入的消息
-     * @return 处理后的提示词预览
-     */
-    private String getProcessedPromptPreview(SysAgent agent, List<ToolDto> availableTools, String userMessage) {
-        String processedPrompt = processPromptTemplate(agent, availableTools, userMessage);
-        return getPromptPreview(processedPrompt);
-    }
-
-    /**
-     * 处理提示词模板，替换其中的变量
-     *
-     * @param agent          智能体信息
-     * @param availableTools 可用工具列表
-     * @param userMessage    用户输入的消息
-     * @return 处理后的提示词
-     */
-    private String processPromptTemplate(SysAgent agent, List<ToolDto> availableTools, String userMessage) {
-        String promptContent = agent.getPromptContent();
-
-        if (!StringUtils.hasText(promptContent)) {
-            return "未设置提示词";
-        }
-
-        // 替换 {{agent_personality}} 为智能体人设
-        String agentPersonality = StringUtils.hasText(agent.getAgentPersonality()) ?
-            agent.getAgentPersonality() : "通用智能助手";
-        promptContent = promptContent.replace("{{agent_personality}}", agentPersonality);
-
-        // 替换 {{tool_list}} 为可用工具列表
-        String toolList = buildToolListDescription(availableTools);
-        promptContent = promptContent.replace("{{tool_list}}", toolList);
-
-        // 替换 {{query}} 为用户输入的消息
-        String query = StringUtils.hasText(userMessage) ? userMessage : "";
-        promptContent = promptContent.replace("{{query}}", query);
-
-        log.debug("提示词模板处理完成，原长度: {}, 处理后长度: {}",
-            agent.getPromptContent().length(), promptContent.length());
-
-        return promptContent;
-    }
-
-    /**
-     * 构建工具列表描述
-     *
-     * @param availableTools 可用工具列表
-     * @return 工具列表描述字符串
-     */
-    private String buildToolListDescription(List<ToolDto> availableTools) {
-        if (CollectionUtils.isEmpty(availableTools)) {
-            return "无可用工具";
-        }
-
-        StringBuilder toolDescription = new StringBuilder();
-        toolDescription.append("可用工具列表:\n");
-
-        for (int i = 0; i < availableTools.size(); i++) {
-            ToolDto tool = availableTools.get(i);
-            toolDescription.append(String.format("%d. %s: %s", i + 1, tool.getName(), tool.getDesc()));
-
-            // 添加参数信息
-            if (!CollectionUtils.isEmpty(tool.getParameters())) {
-                toolDescription.append("\n   参数: ");
-                List<String> paramNames = tool.getParameters().stream()
-                    .map(param -> param.getName() + "(" + param.getType() + ")" +
-                        (param.getRequired() ? "*" : ""))
-                    .collect(Collectors.toList());
-                toolDescription.append(String.join(", ", paramNames));
-            }
-
-            if (i < availableTools.size() - 1) {
-                toolDescription.append("\n");
-            }
-        }
-
-        return toolDescription.toString();
-    }
 
     /**
      * 构建工具参数
@@ -488,11 +398,6 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
         }
 
         return parameters;
-    }
-
-    @Override
-    public Mono<ChatResponseDto> completionsSync(ChatRequestDto chatRequest) {
-        return null;
     }
 }
 

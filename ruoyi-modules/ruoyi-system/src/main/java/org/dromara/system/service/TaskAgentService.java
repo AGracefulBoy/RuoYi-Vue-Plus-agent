@@ -1,6 +1,7 @@
 package org.dromara.system.service;
 
 import org.dromara.system.domain.SysAgent;
+import org.dromara.system.domain.dto.StreamMessageResponseDto;
 import org.dromara.system.domain.dto.TaskAgentDto.*;
 import org.dromara.system.domain.dto.ToolDto;
 import org.dromara.system.service.impl.TaskAgentServiceImpl;
@@ -22,7 +23,7 @@ public interface TaskAgentService {
      * @param userInput 用户输入
      * @return 流式响应
      */
-    Flux<String> executeReActStream(SysAgent agent,List<ToolDto> availableTools, String userInput);
+    Flux<StreamMessageResponseDto> executeReActStream(SysAgent agent,List<ToolDto> availableTools, String userInput);
 
     /**
      * 流式ReAct处理（带完整响应）
@@ -41,4 +42,22 @@ public interface TaskAgentService {
      * @return 是否退出
      */
     boolean checkExitCondition(String input);
+
+    /**
+     * 执行自由对话模式的流式处理
+     *
+     * @param agent 智能体信息
+     * @param userInput 用户输入
+     * @return 流式响应
+     */
+    Flux<StreamMessageResponseDto> executeFreeChatStream(SysAgent agent, String userInput);
+
+    /**
+     * 执行自由对话模式的流式处理（带完整响应）
+     *
+     * @param agent 智能体信息
+     * @param userInput 用户输入
+     * @return 包含流式响应和完整响应的结果对象
+     */
+    TaskAgentServiceImpl.StreamResult executeFreeChatStreamWithFullResponse(SysAgent agent, String userInput);
 }

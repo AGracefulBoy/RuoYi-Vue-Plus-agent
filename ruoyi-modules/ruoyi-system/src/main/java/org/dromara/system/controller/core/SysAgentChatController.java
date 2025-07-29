@@ -18,6 +18,7 @@ import org.dromara.common.satoken.utils.LoginHelper;
 import org.dromara.system.domain.SysAgentChat;
 import org.dromara.system.domain.dto.ChatRequestDto;
 import org.dromara.system.domain.dto.ChatResponseDto;
+import org.dromara.system.domain.dto.StreamMessageResponseDto;
 import org.dromara.system.domain.dto.StreamingChatResponseDto;
 import org.dromara.system.domain.vo.ChatHistoryVo;
 import org.dromara.system.domain.vo.ChatSessionVo;
@@ -63,7 +64,7 @@ public class SysAgentChatController {
     @SaCheckLogin
     @RateLimiter(key = "chat:completions", time = 60, count = 10, limitType = LimitType.IP)
     @PostMapping(path = "/completions", produces = {MediaType.APPLICATION_JSON_VALUE, MediaType.TEXT_EVENT_STREAM_VALUE})
-    public Flux<ServerSentEvent<String>> stream(@Valid @RequestBody ChatRequestDto chatRequest) {
+    public Flux<ServerSentEvent<StreamMessageResponseDto>> stream(@Valid @RequestBody ChatRequestDto chatRequest) {
         // 生成追踪ID
         if (StrUtil.isBlank(chatRequest.getTraceId())) {
             chatRequest.setTraceId(IdUtil.fastSimpleUUID());
@@ -72,59 +73,48 @@ public class SysAgentChatController {
         log.info("开始处理聊天请求，追踪ID: {}, 用户ID: {}, 智能体ID: {}",
                 chatRequest.getTraceId(), LoginHelper.getUserId(), chatRequest.getAgentId());
 
-        // 获取当前上下文
-        SaTokenContext context = SaHolder.getContext();
-
         // 调用服务层处理流式对话
         return sysAgentChatService.completions(chatRequest)
                 .map(data -> {
-                    // 根据数据内容决定事件类型
+                    // 根据消息类型决定事件类型
                     String eventType = "message";
-                    if (data.contains("[ENHANCING]")) {
-                        eventType = "enhancing";
-                    } else if (data.contains("[ENHANCED]")) {
-                        eventType = "enhanced";
-                    } else if (data.contains("[ENHANCEMENT_COMPLETE]")) {
-                        eventType = "enhancement_complete";
-                    } else if (data.contains("[ENHANCEMENT_FAILED]")) {
-                        eventType = "enhancement_failed";
-                    } else if (data.contains("[ENHANCEMENT_SKIPPED]")) {
-                        eventType = "enhancement_skipped";
-                    } else if (data.contains("[DONE]")) {
+                    if (data.getMessage() != null) {
+                        String messageType = data.getMessage().getType();
+                        if ("thought".equals(messageType)) {
+                            eventType = "thought";
+                        } else if ("action".equals(messageType)) {
+                            eventType = "action";
+                        } else if ("observation".equals(messageType)) {
+                            eventType = "observation";
+                        } else if ("answer".equals(messageType)) {
+                            eventType = "answer";
+                        } else if ("error".equals(messageType)) {
+                            eventType = "error";
+                        } else if ("finish".equals(messageType)) {
+                            eventType = "complete";
+                        }
+                    }
+
+                    if (data.getIsFinish() != null && data.getIsFinish()) {
                         eventType = "complete";
                     }
-                    
-                    return ServerSentEvent.<String>builder()
+
+                    return ServerSentEvent.<StreamMessageResponseDto>builder()
                             .id(IdUtil.fastSimpleUUID())
                             .event(eventType)
                             .data(data)
                             .build();
                 })
                 .doOnError(error -> log.error("聊天请求处理失败，追踪ID: {}", chatRequest.getTraceId(), error))
-                .onErrorResume(error -> Flux.just(ServerSentEvent.<String>builder()
+                .onErrorResume(error -> Flux.just(ServerSentEvent.<StreamMessageResponseDto>builder()
                         .event("error")
-                        .data("{\"error\": \"" + error.getMessage() + "\"}")
+                        .data(StreamMessageResponseDto.createErrorMessage(
+                            error.getMessage(),
+                            "error_" + System.currentTimeMillis(),
+                            String.valueOf(System.currentTimeMillis()),
+                            0
+                        ))
                         .build()));
-    }
-
-    /**
-     * 同步生成接口 - 获取完整响应
-     */
-    @SaCheckPermission("system:agent:list")
-    @SaCheckLogin
-    @RateLimiter(key = "chat:sync", time = 60, count = 20, limitType = LimitType.IP)
-    @PostMapping("/completions/sync")
-    public Mono<R<ChatResponseDto>> syncCompletions(@Valid @RequestBody ChatRequestDto chatRequest) {
-        chatRequest.setStream(false);
-
-        if (StrUtil.isBlank(chatRequest.getTraceId())) {
-            chatRequest.setTraceId(IdUtil.fastSimpleUUID());
-        }
-
-        return sysAgentChatService.completionsSync(chatRequest)
-                .map(R::ok)
-                .doOnError(error -> log.error("同步聊天请求处理失败，追踪ID: {}", chatRequest.getTraceId(), error))
-                .onErrorReturn(R.fail("处理请求时发生错误"));
     }
 
     /**

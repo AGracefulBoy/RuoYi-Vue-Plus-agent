@@ -74,7 +74,7 @@ public class SysAgent extends TenantEntity {
     private String status;
 
     /**
-     * 对话模式（free单轮、multi多轮、context上下文）
+     * 对话模式（free_chat 自由对话、self_planning自主规划）
      */
     private String conversationMode;
 
@@ -122,6 +122,6 @@ public class SysAgent extends TenantEntity {
      */
     public SysAgent() {
         this.status = "0"; // 默认正常状态
-        this.conversationMode = "single"; // 默认单轮对话
+        this.conversationMode = "free_chat"; // 默认自由对话模式
     }
 }

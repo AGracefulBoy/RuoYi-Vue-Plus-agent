@@ -16,6 +16,7 @@ import org.dromara.common.satoken.utils.LoginHelper;
 import org.dromara.system.domain.SysAgent;
 import org.dromara.system.domain.SysAgentChat;
 import org.dromara.system.domain.SysAgentChatMessage;
+import org.dromara.system.domain.dto.StreamMessageResponseDto;
 import org.dromara.system.domain.dto.ToolDto;
 import org.dromara.system.domain.vo.SysModelConfigVo;
 import org.dromara.system.service.ISysModelConfigService;
@@ -107,22 +108,31 @@ public class TaskAgentServiceImpl implements TaskAgentService {
     private ChatContextService chatContextService;
 
     @Override
-    public Flux<String> executeReActStream(SysAgent agent, List<ToolDto> availableTools, String userInput) {
+    public Flux<StreamMessageResponseDto> executeReActStream(SysAgent agent, List<ToolDto> availableTools, String userInput) {
         SaTokenContext context = SaHolder.getContext();
 
-        return Flux.create(sink -> {
+        return Flux.<StreamMessageResponseDto>create(sink -> {
             try {
                 SaTokenContextMockUtil.setMockContext(() -> {
                     SaManager.setSaTokenContext(context);
                 });
+                // 清理线程本地变量
+                clearThreadLocals();
                 // 执行流式推理
                 performStreamingReasoningChain(agent, availableTools, userInput, sink);
 
             } catch (Exception e) {
                 log.error("流式ReAct执行失败", e);
-                sink.error(e);
+                // 发送错误消息
+                sink.next(StreamMessageResponseDto.createErrorMessage(
+                    e.getMessage(),
+                    currentChatId.get(),
+                    generateMessageId(),
+                    getAndIncrementMessageIndex()
+                ));
+                sink.complete();
             }
-        });
+        }).doFinally(signal -> clearThreadLocals()); // 确保清理线程本地变量
     }
 
     @Override
@@ -149,28 +159,36 @@ public class TaskAgentServiceImpl implements TaskAgentService {
      * 执行流式推理链
      */
     private void performStreamingReasoningChain(SysAgent agent, List<ToolDto> availableTools,
-                                                String userInput, reactor.core.publisher.FluxSink<String> sink) {
+                                                String userInput, reactor.core.publisher.FluxSink<StreamMessageResponseDto> sink) {
         try {
             // 1. 获取并验证模型配置
-            ModelConfigContext modelContext = getAndValidateModelConfigs(agent, sink);
+            ModelConfigContext modelContext = getAndValidateModelConfigsForStreamMessage(agent, sink);
             if (modelContext == null) return;
 
             // 2. 创建或获取会话
             SysAgentChat chat = createOrGetChat(agent.getAgentId(), userInput);
             Long chatId = chat.getChatId();
+            String chatIdStr = String.valueOf(chatId);
+
+            // 设置会话信息和用户消息ID
+            String userMsgId = generateMessageId();
+            setCurrentChatInfo(chatIdStr, userMsgId);
 
             // 3. 保存用户消息
             saveUserMessage(chatId, userInput);
-
-            // 4. 清理对话历史（新对话开始）
-            clearConversationHistory();
 
             // 5. 启动ReAct循环
             startReActLoopWithChat(agent, availableTools, userInput, modelContext, sink, 0, chatId);
 
         } catch (Exception e) {
             log.error("流式推理执行失败", e);
-            sink.error(new RuntimeException("流式推理执行失败: " + e.getMessage()));
+            sink.next(StreamMessageResponseDto.createErrorMessage(
+                "流式推理执行失败: " + e.getMessage(),
+                currentChatId.get(),
+                generateMessageId(),
+                getAndIncrementMessageIndex()
+            ));
+            sink.complete();
         }
     }
 
@@ -178,33 +196,25 @@ public class TaskAgentServiceImpl implements TaskAgentService {
      * 启动ReAct循环（带会话管理）
      */
     private void startReActLoopWithChat(SysAgent agent, List<ToolDto> availableTools, String userInput,
-                                       ModelConfigContext modelContext, reactor.core.publisher.FluxSink<String> sink,
-                                       int currentStep, Long chatId) {
+                                        ModelConfigContext modelContext, reactor.core.publisher.FluxSink<StreamMessageResponseDto> sink,
+                                        int currentStep, Long chatId) {
         startReActLoop(agent, availableTools, userInput, modelContext, sink, currentStep, chatId);
-    }
-
-    /**
-     * 启动ReAct循环
-     */
-    private void startReActLoop(SysAgent agent, List<ToolDto> availableTools, String userInput,
-                                ModelConfigContext modelContext, reactor.core.publisher.FluxSink<String> sink,
-                                int currentStep) {
-        startReActLoop(agent, availableTools, userInput, modelContext, sink, currentStep, null);
     }
 
     /**
      * 启动ReAct循环（核心实现）
      */
     private void startReActLoop(SysAgent agent, List<ToolDto> availableTools, String userInput,
-                                ModelConfigContext modelContext, reactor.core.publisher.FluxSink<String> sink,
+                                ModelConfigContext modelContext, reactor.core.publisher.FluxSink<StreamMessageResponseDto> sink,
                                 int currentStep, Long chatId) {
 
         // 设置最大循环次数防止无限循环
         final int MAX_STEPS = 20;
         if (currentStep >= MAX_STEPS) {
-            sink.next("\n\n⚠️ 已达到最大推理步数限制，停止执行\n");
-            // 使用handleFinalStepComplete确保增强处理逻辑能执行
-            handleFinalStepComplete("已达到最大推理步数限制", modelContext, sink, response -> {});
+            sink.next(createStreamMessage("\n\n⚠️ 已达到最大推理步数限制，停止执行\n", "answer", false));
+            // 使用handleFinalStepCompleteForMessage确保增强处理逻辑能执行
+            handleFinalStepCompleteForMessage("已达到最大推理步数限制", modelContext, sink, response -> {
+            });
             return;
         }
 
@@ -212,20 +222,24 @@ public class TaskAgentServiceImpl implements TaskAgentService {
             // 构建当前步骤的提示词
             String cotPrompt = buildPromptForStep(agent, availableTools, userInput, currentStep);
 
-            sink.next(String.format("\n🤔 **推理步骤 %d:**\n", currentStep + 1));
-
             // 执行流式AI调用
-            executeStreamingAICall(cotPrompt, modelContext, sink, fullResponse -> {
+            executeStreamingAICallForMessage(cotPrompt, modelContext, sink, fullResponse -> {
                 log.info("第{}步获取到完整响应: {}", currentStep + 1, fullResponse);
 
                 // 解析响应，判断是否需要执行工具调用
                 processReActResponse(agent, availableTools, userInput, fullResponse,
-                    modelContext, sink, currentStep,chatId);
+                    modelContext, sink, currentStep, chatId);
             }, false); // 标记为中间步骤
 
         } catch (Exception e) {
             log.error("ReAct循环执行失败，步骤: {}", currentStep + 1, e);
-            sink.error(new RuntimeException("ReAct循环执行失败: " + e.getMessage()));
+            sink.next(StreamMessageResponseDto.createErrorMessage(
+                "ReAct循环执行失败: " + e.getMessage(),
+                currentChatId.get(),
+                generateMessageId(),
+                getAndIncrementMessageIndex()
+            ));
+            sink.complete();
         }
     }
 
@@ -234,7 +248,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
      */
     private void processReActResponse(SysAgent agent, List<ToolDto> availableTools, String userInput,
                                       String aiResponse, ModelConfigContext modelContext,
-                                      reactor.core.publisher.FluxSink<String> sink, int currentStep, Long chatId) {
+                                      reactor.core.publisher.FluxSink<StreamMessageResponseDto> sink, int currentStep, Long chatId) {
 
         try {
             // 解析AI响应，查找工具调用指令
@@ -245,13 +259,13 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                 saveThoughtStep(chatId, aiResponse, "action", currentStep);
 
                 // 需要执行工具调用
-                sink.next(String.format("\n🔧 **执行工具:** %s\n", toolCall.getToolName()));
-                sink.next(String.format("📝 **参数:** %s\n", toolCall.getParameters()));
+                sink.next(createStreamMessage(String.format("\n🔧 **执行工具:** %s\n", toolCall.getToolName()), "action", false));
+                sink.next(createStreamMessage(String.format("📝 **参数:** %s\n", toolCall.getParameters()), "action", false));
 
                 // 执行工具调用
                 String toolResult = executeToolCall(toolCall);
 
-                sink.next(String.format("✅ **工具结果:** %s\n", toolResult));
+                sink.next(createStreamMessage(String.format("✅ **工具结果:** %s\n", toolResult), "observation", false));
 
                 // 保存工具执行结果
                 saveToolResult(chatId, toolCall, toolResult, currentStep);
@@ -263,10 +277,11 @@ public class TaskAgentServiceImpl implements TaskAgentService {
             } else {
                 // 没有工具调用，检查是否包含最终答案
                 if (containsFinalAnswer(aiResponse)) {
-                    sink.next("\n✨ **推理完成**\n");
-                    // 使用handleFinalStepComplete确保增强处理逻辑能执行
+                    sink.next(createStreamMessage("\n✨ **推理完成**\n", "answer", false));
+                    // 使用handleFinalStepCompleteForMessage确保增强处理逻辑能执行
                     String finalAnswer = extractFinalAnswer(aiResponse);
-                    handleFinalStepComplete(finalAnswer, modelContext, sink, response -> {});
+                    handleFinalStepCompleteForMessage(finalAnswer, modelContext, sink, response -> {
+                    });
                 } else {
                     // 保存思考步骤
                     saveThoughtStep(chatId, aiResponse, "thought", currentStep);
@@ -279,7 +294,13 @@ public class TaskAgentServiceImpl implements TaskAgentService {
 
         } catch (Exception e) {
             log.error("处理ReAct响应失败", e);
-            sink.error(new RuntimeException("处理ReAct响应失败: " + e.getMessage()));
+            sink.next(StreamMessageResponseDto.createErrorMessage(
+                "处理ReAct响应失败: " + e.getMessage(),
+                currentChatId.get(),
+                generateMessageId(),
+                getAndIncrementMessageIndex()
+            ));
+            sink.complete();
         }
     }
 
@@ -303,7 +324,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
      */
     private void continueReasoning(SysAgent agent, List<ToolDto> availableTools, String userInput,
                                    String previousResponse, ModelConfigContext modelContext,
-                                   reactor.core.publisher.FluxSink<String> sink, int currentStep, Long chatId) {
+                                   reactor.core.publisher.FluxSink<StreamMessageResponseDto> sink, int currentStep, Long chatId) {
 
         // 将之前的响应添加到历史记录
         appendToConversationHistory("Assistant", previousResponse);
@@ -317,7 +338,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
      */
     private void appendToolResultAndContinue(SysAgent agent, List<ToolDto> availableTools, String userInput,
                                              String aiResponse, ToolCallInstruction toolCall, String toolResult,
-                                             ModelConfigContext modelContext, reactor.core.publisher.FluxSink<String> sink,
+                                             ModelConfigContext modelContext, reactor.core.publisher.FluxSink<StreamMessageResponseDto> sink,
                                              int currentStep, Long chatId) {
 
         // 将AI响应和工具执行结果添加到历史记录
@@ -331,6 +352,15 @@ public class TaskAgentServiceImpl implements TaskAgentService {
 
     // 对话历史记录
     private final ThreadLocal<StringBuilder> conversationHistory = ThreadLocal.withInitial(StringBuilder::new);
+
+    // 消息索引计数器
+    private final ThreadLocal<Integer> messageIndexCounter = ThreadLocal.withInitial(() -> 0);
+
+    // 当前会话ID
+    private final ThreadLocal<String> currentChatId = ThreadLocal.withInitial(() -> null);
+
+    // 用户消息ID（用于回复）
+    private final ThreadLocal<String> userMessageId = ThreadLocal.withInitial(() -> null);
 
     /**
      * 添加到对话历史
@@ -347,11 +377,45 @@ public class TaskAgentServiceImpl implements TaskAgentService {
         return conversationHistory.get().toString();
     }
 
+
     /**
-     * 清理对话历史
+     * 生成消息ID
      */
-    private void clearConversationHistory() {
-        conversationHistory.get().setLength(0);
+    private String generateMessageId() {
+        return String.valueOf(System.currentTimeMillis() + (int) (Math.random() * 1000));
+    }
+
+    /**
+     * 获取并增加消息索引
+     */
+    private int getAndIncrementMessageIndex() {
+        Integer current = messageIndexCounter.get();
+        messageIndexCounter.set(current + 1);
+        return current;
+    }
+
+    /**
+     * 重置消息索引
+     */
+    private void resetMessageIndex() {
+        messageIndexCounter.set(0);
+    }
+
+    /**
+     * 设置当前会话信息
+     */
+    private void setCurrentChatInfo(String chatId, String userMsgId) {
+        currentChatId.set(chatId);
+        userMessageId.set(userMsgId);
+    }
+
+    /**
+     * 清理线程本地变量
+     */
+    private void clearThreadLocals() {
+        resetMessageIndex();
+        currentChatId.remove();
+        userMessageId.remove();
     }
 
     /**
@@ -434,6 +498,26 @@ public class TaskAgentServiceImpl implements TaskAgentService {
         message.setToolCalls(toolCalls);
 
         chatContextService.addMessage(message);
+    }
+
+    /**
+     * 创建流式消息响应（用于将字符串内容转换为结构化消息）
+     */
+    private StreamMessageResponseDto createStreamMessage(String content, String type, boolean isFinish) {
+        return StreamMessageResponseDto.builder()
+            .message(StreamMessageResponseDto.MessageData.builder()
+                .role("assistant")
+                .type(type)
+                .content(content)
+                .contentType("text")
+                .messageId(generateMessageId())
+                .replyId(userMessageId.get())
+                .contentTime(System.currentTimeMillis())
+                .build())
+            .isFinish(isFinish)
+            .index(getAndIncrementMessageIndex())
+            .chatId(currentChatId.get())
+            .build();
     }
 
     /**
@@ -580,8 +664,6 @@ public class TaskAgentServiceImpl implements TaskAgentService {
             // 3. 保存用户消息
             saveUserMessage(chatId, userInput);
 
-            // 4. 清理对话历史（新对话开始）
-            clearConversationHistory();
 
             // 5. 启动ReAct循环（带完整响应收集）
             startReActLoopWithFullResponse(agent, availableTools, userInput, modelContext,
@@ -608,7 +690,8 @@ public class TaskAgentServiceImpl implements TaskAgentService {
             sink.next("\n\n⚠️ 已达到最大推理步数限制，停止执行\n");
             fullResponseFuture.complete(accumulatedResponse.toString());
             // 使用handleFinalStepComplete确保增强处理逻辑能执行
-            handleFinalStepComplete(accumulatedResponse.toString(), modelContext, sink, response -> {});
+            handleFinalStepComplete(accumulatedResponse.toString(), modelContext, sink, response -> {
+            });
             return;
         }
 
@@ -679,7 +762,8 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                     fullResponseFuture.complete(accumulatedResponse.toString());
                     // 使用handleFinalStepComplete确保增强处理逻辑能执行
                     String finalAnswer = extractFinalAnswer(aiResponse);
-                    handleFinalStepComplete(finalAnswer, modelContext, sink, response -> {});
+                    handleFinalStepComplete(finalAnswer, modelContext, sink, response -> {
+                    });
                 } else {
                     // 继续推理
                     continueReasoningWithFullResponse(agent, availableTools, userInput, aiResponse,
@@ -732,7 +816,47 @@ public class TaskAgentServiceImpl implements TaskAgentService {
     }
 
     /**
-     * 获取并验证模型配置
+     * 获取并验证模型配置（用于StreamMessageResponseDto）
+     */
+    private ModelConfigContext getAndValidateModelConfigsForStreamMessage(SysAgent agent, reactor.core.publisher.FluxSink<StreamMessageResponseDto> sink) {
+        try {
+            SysModelConfigVo mainModelConfig = getModelConfig(agent.getModel(), "主要模型");
+            SysModelConfigVo enhanceModelConfig = getModelConfig(agent.getEnhanceModel(), "增强模型");
+
+            // 验证主要模型配置
+            if (mainModelConfig == null) {
+                sink.next(StreamMessageResponseDto.createErrorMessage(
+                    "智能体主要模型配置不存在或无效，无法执行推理任务",
+                    currentChatId.get(),
+                    generateMessageId(),
+                    getAndIncrementMessageIndex()
+                ));
+                sink.complete();
+                return null;
+            }
+
+            log.info("智能体主要模型配置获取成功");
+
+            if (enhanceModelConfig != null) {
+                log.info("智能体增强模型配置获取成功");
+            }
+
+            return new ModelConfigContext(mainModelConfig, enhanceModelConfig);
+        } catch (Exception e) {
+            log.error("获取模型配置失败", e);
+            sink.next(StreamMessageResponseDto.createErrorMessage(
+                "获取模型配置失败: " + e.getMessage(),
+                currentChatId.get(),
+                generateMessageId(),
+                getAndIncrementMessageIndex()
+            ));
+            sink.complete();
+            return null;
+        }
+    }
+
+    /**
+     * 获取并验证模型配置（用于String，保留兼容性）
      */
     private ModelConfigContext getAndValidateModelConfigs(SysAgent agent, reactor.core.publisher.FluxSink<String> sink) {
         try {
@@ -800,9 +924,9 @@ public class TaskAgentServiceImpl implements TaskAgentService {
         String cotPrompt = promptContent
             .replace("{{agent_personality}}",
                 StringUtils.hasText(agent.getAgentPersonality()) ? agent.getAgentPersonality() : "专业助手")
-            .replace("{{tool_list}}",
+            .replace("{{tools}}",
                 CollectionUtils.isEmpty(availableTools) ? "[]" : buildToolListDescription(availableTools))
-            .replace("{{query}}", userInput);
+            .replace("{{input}}", userInput);
 
         log.info("构建的提示词: {}", cotPrompt);
         return cotPrompt;
@@ -838,27 +962,47 @@ public class TaskAgentServiceImpl implements TaskAgentService {
      */
     private String buildToolListDescription(List<ToolDto> availableTools) {
         if (CollectionUtils.isEmpty(availableTools)) {
-            return "无可用工具";
+            return "[]";
         }
 
-        StringBuilder toolDesc = new StringBuilder();
+        List<Map<String, Object>> toolList = new ArrayList<>();
         for (ToolDto tool : availableTools) {
-            toolDesc.append("- ").append(tool.getName());
-            if (StringUtils.hasText(tool.getDesc())) {
-                toolDesc.append(": ").append(tool.getDesc());
-            }
-            toolDesc.append("\n");
-        }
-        return toolDesc.toString();
-    }
+            Map<String, Object> toolMap = new LinkedHashMap<>();
 
-    /**
-     * 执行流式AI调用
-     */
-    private void executeStreamingAICall(String cotPrompt, ModelConfigContext modelContext,
-                                        reactor.core.publisher.FluxSink<String> sink,
-                                        Consumer<String> fullResponseCallback) {
-        executeStreamingAICall(cotPrompt, modelContext, sink, fullResponseCallback, false);
+            if (StringUtils.hasText(tool.getDesc())) {
+                toolMap.put("desc", tool.getDesc());
+            }
+
+            toolMap.put("name", tool.getName());
+
+            if (!CollectionUtils.isEmpty(tool.getParameters())) {
+                List<Map<String, Object>> paramList = new ArrayList<>();
+                for (ToolDto.Parameter param : tool.getParameters()) {
+                    Map<String, Object> paramMap = new LinkedHashMap<>();
+
+                    if (StringUtils.hasText(param.getDesc())) {
+                        paramMap.put("desc", param.getDesc());
+                    }
+
+                    paramMap.put("name", param.getName());
+
+                    if (param.getRequired() != null) {
+                        paramMap.put("required", param.getRequired());
+                    }
+
+                    if (StringUtils.hasText(param.getType())) {
+                        paramMap.put("type", param.getType());
+                    }
+
+                    paramList.add(paramMap);
+                }
+                toolMap.put("parameters", paramList);
+            }
+
+            toolList.add(toolMap);
+        }
+
+        return JSONUtil.toJsonStr(toolList);
     }
 
     /**
@@ -882,6 +1026,35 @@ public class TaskAgentServiceImpl implements TaskAgentService {
         Flux<IChatResponse> modelStream = chatService.stream(chatRequest);
         processModelStream(modelStream, modelContext, sink, fullResponseCallback, isFinalStep);
 
+    }
+
+    /**
+     * 执行流式AI调用（用于StreamMessageResponseDto）
+     */
+    private void executeStreamingAICallForMessage(String cotPrompt, ModelConfigContext modelContext,
+                                                  reactor.core.publisher.FluxSink<StreamMessageResponseDto> sink,
+                                                  Consumer<String> fullResponseCallback,
+                                                  boolean isFinalStep) {
+        // 获取聊天服务
+        IChatService chatService = aiService.getChatService(modelContext.getMainModel().getModelProvider());
+        if (chatService == null) {
+            sink.next(StreamMessageResponseDto.createErrorMessage(
+                "无法获取聊天服务，提供商: " + modelContext.getMainModel().getModelProvider(),
+                currentChatId.get(),
+                generateMessageId(),
+                getAndIncrementMessageIndex()
+            ));
+            sink.complete();
+            return;
+        }
+
+        // 构建聊天请求
+        IChatRequest chatRequest = buildChatRequest(cotPrompt, modelContext.getMainModel());
+
+        chatRequest.setStop(Collections.singletonList("Observation"));
+        // 执行流式调用
+        Flux<IChatResponse> modelStream = chatService.stream(chatRequest);
+        processModelStreamForMessage(modelStream, modelContext, sink, fullResponseCallback, isFinalStep);
     }
 
     /**
@@ -921,6 +1094,28 @@ public class TaskAgentServiceImpl implements TaskAgentService {
     }
 
     /**
+     * 处理模型流式响应（用于StreamMessageResponseDto）
+     */
+    private void processModelStreamForMessage(Flux<IChatResponse> modelStream, ModelConfigContext modelContext,
+                                              reactor.core.publisher.FluxSink<StreamMessageResponseDto> sink,
+                                              java.util.function.Consumer<String> fullResponseCallback,
+                                              boolean isFinalStep) {
+        StringBuilder fullResponse = new StringBuilder();
+
+        modelStream
+            .doOnNext(chunk -> handleStreamChunkForMessage(chunk, sink, fullResponse))
+            .doOnComplete(() -> {
+                if (isFinalStep) {
+                    handleFinalStepCompleteForMessage(fullResponse.toString(), modelContext, sink, fullResponseCallback);
+                } else {
+                    handleIntermediateStepCompleteForMessage(fullResponse.toString(), sink, fullResponseCallback);
+                }
+            })
+            .doOnError(error -> handleStreamErrorForMessage(error, sink))
+            .subscribe();
+    }
+
+    /**
      * 处理流式响应块
      */
     private void handleStreamChunk(IChatResponse chunk, reactor.core.publisher.FluxSink<String> sink,
@@ -934,6 +1129,20 @@ public class TaskAgentServiceImpl implements TaskAgentService {
         }
     }
 
+    /**
+     * 处理流式响应块（用于StreamMessageResponseDto）
+     */
+    private void handleStreamChunkForMessage(IChatResponse chunk, reactor.core.publisher.FluxSink<StreamMessageResponseDto> sink,
+                                             StringBuilder fullResponse) {
+        if (chunk.getResult() != null && chunk.getResult().getOutput() != null) {
+            String text = chunk.getResult().getOutput().getText();
+            if (StringUtils.hasText(text)) {
+                sink.next(createStreamMessage(text, "thought", false));
+                fullResponse.append(text);
+            }
+        }
+    }
+
 
     /**
      * 处理流式响应完成
@@ -942,8 +1151,8 @@ public class TaskAgentServiceImpl implements TaskAgentService {
      * 处理中间步骤的流式响应完成
      */
     private void handleIntermediateStepComplete(String stepResponse,
-                                               reactor.core.publisher.FluxSink<String> sink,
-                                               java.util.function.Consumer<String> fullResponseCallback) {
+                                                reactor.core.publisher.FluxSink<String> sink,
+                                                java.util.function.Consumer<String> fullResponseCallback) {
         log.info("ReAct中间步骤流式调用完成");
         // 调用回调函数继续处理，但不关闭流
         fullResponseCallback.accept(stepResponse);
@@ -954,8 +1163,8 @@ public class TaskAgentServiceImpl implements TaskAgentService {
      * 处理最终步骤的流式响应完成（包含增强和关闭流）
      */
     private void handleFinalStepComplete(String finalResponse, ModelConfigContext modelContext,
-                                       reactor.core.publisher.FluxSink<String> sink,
-                                       java.util.function.Consumer<String> fullResponseCallback) {
+                                         reactor.core.publisher.FluxSink<String> sink,
+                                         java.util.function.Consumer<String> fullResponseCallback) {
         log.info("ReAct最终步骤流式调用完成");
         fullResponseCallback.accept(finalResponse); // 调用回调函数
 
@@ -985,21 +1194,75 @@ public class TaskAgentServiceImpl implements TaskAgentService {
     }
 
     /**
-     * 处理流式响应完成（保留以兼容旧代码）
-     */
-    private void handleStreamComplete(String finalResponse, ModelConfigContext modelContext,
-                                      reactor.core.publisher.FluxSink<String> sink,
-                                      java.util.function.Consumer<String> fullResponseCallback) {
-        // 默认作为最终步骤处理
-        handleFinalStepComplete(finalResponse, modelContext, sink, fullResponseCallback);
-    }
-
-    /**
      * 处理流式响应错误
      */
     private void handleStreamError(Throwable error, reactor.core.publisher.FluxSink<String> sink) {
         log.error("AI模型流式调用失败", error);
         sink.error(new RuntimeException("AI模型调用失败: " + error.getMessage()));
+    }
+
+    /**
+     * 处理流式响应错误（用于StreamMessageResponseDto）
+     */
+    private void handleStreamErrorForMessage(Throwable error, reactor.core.publisher.FluxSink<StreamMessageResponseDto> sink) {
+        log.error("AI模型流式调用失败", error);
+        sink.next(StreamMessageResponseDto.createErrorMessage(
+            "AI模型调用失败: " + error.getMessage(),
+            currentChatId.get(),
+            generateMessageId(),
+            getAndIncrementMessageIndex()
+        ));
+        sink.complete();
+    }
+
+    /**
+     * 处理中间步骤的流式响应完成（用于StreamMessageResponseDto）
+     */
+    private void handleIntermediateStepCompleteForMessage(String stepResponse,
+                                                          reactor.core.publisher.FluxSink<StreamMessageResponseDto> sink,
+                                                          java.util.function.Consumer<String> fullResponseCallback) {
+        log.info("ReAct中间步骤流式调用完成");
+        // 调用回调函数继续处理，但不关闭流
+        fullResponseCallback.accept(stepResponse);
+        // 注意：这里不调用 sink.complete()，保持流开放
+    }
+
+    /**
+     * 处理最终步骤的流式响应完成（用于StreamMessageResponseDto）
+     */
+    private void handleFinalStepCompleteForMessage(String finalResponse, ModelConfigContext modelContext,
+                                                   reactor.core.publisher.FluxSink<StreamMessageResponseDto> sink,
+                                                   java.util.function.Consumer<String> fullResponseCallback) {
+        log.info("ReAct最终步骤流式调用完成");
+        fullResponseCallback.accept(finalResponse); // 调用回调函数
+
+        // 如果配置了增强模型，使用增强模型优化回复
+        if (modelContext.getEnhanceModel() != null && StringUtils.hasText(finalResponse)) {
+            try {
+                // 明确告知客户端还有增强内容
+                sink.next(createStreamMessage("\n\n[ENHANCING] 正在优化回复...\n", "thought", false));
+                String enhancedResponse = enhanceResponse(finalResponse, modelContext.getEnhanceModel(), null);
+
+                if (!enhancedResponse.equals(finalResponse)) {
+                    sink.next(createStreamMessage("[ENHANCED]\n", "thought", false));
+                    sink.next(createStreamMessage(enhancedResponse, "answer", false));
+                    sink.next(createStreamMessage("\n[ENHANCEMENT_COMPLETE]\n", "thought", false));
+                } else {
+                    sink.next(createStreamMessage("[ENHANCEMENT_SKIPPED] 优化后内容与原始内容相同\n", "thought", false));
+                }
+            } catch (Exception e) {
+                log.error("增强模型处理失败", e);
+                sink.next(createStreamMessage("[ENHANCEMENT_FAILED] 增强失败，使用原始回复\n", "thought", false));
+            }
+        }
+
+        // 发送完成消息
+        sink.next(StreamMessageResponseDto.createFinishMessage(
+            currentChatId.get(),
+            generateMessageId(),
+            getAndIncrementMessageIndex()
+        ));
+        sink.complete();
     }
 
     /**
@@ -1123,6 +1386,171 @@ public class TaskAgentServiceImpl implements TaskAgentService {
             } catch (Exception e) {
                 throw new RuntimeException("获取完整响应失败", e);
             }
+        }
+    }
+
+    /**
+     * 执行自由对话模式的流式处理
+     */
+    @Override
+    public Flux<StreamMessageResponseDto> executeFreeChatStream(SysAgent agent, String userInput) {
+        return Flux.<StreamMessageResponseDto>create(sink -> {
+            try {
+                SaTokenContext context = SaHolder.getContext();
+                SaTokenContextMockUtil.setMockContext(() -> {
+                    SaManager.setSaTokenContext(context);
+                });
+                // 清理线程本地变量
+                clearThreadLocals();
+
+                // 创建简单的自由对话流式处理
+                String chatIdStr = "chat_" + System.currentTimeMillis();
+                String userMsgId = generateMessageId();
+                setCurrentChatInfo(chatIdStr, userMsgId);
+
+                // 发送开始消息
+                sink.next(createStreamMessage("开始处理您的问题...", "thought", false));
+
+                // 构建提示词
+                String prompt = buildFreeChatPrompt(agent, userInput);
+
+                // 发送回答
+                String response = "这是一个模拟的回答。实际实现中应该调用AI模型。";
+                sink.next(createStreamMessage(response, "answer", false));
+
+                // 发送完成消息
+                sink.next(StreamMessageResponseDto.createFinishMessage(chatIdStr, generateMessageId(), getAndIncrementMessageIndex()));
+                sink.complete();
+
+            } catch (Exception e) {
+                log.error("自由对话流式执行失败", e);
+                sink.next(StreamMessageResponseDto.createErrorMessage(
+                    e.getMessage(),
+                    currentChatId.get(),
+                    generateMessageId(),
+                    getAndIncrementMessageIndex()
+                ));
+                sink.complete();
+            }
+        }).doFinally(signal -> clearThreadLocals());
+    }
+
+    /**
+     * 执行自由对话模式的流式处理（带完整响应）
+     */
+    @Override
+    public StreamResult executeFreeChatStreamWithFullResponse(SysAgent agent, String userInput) {
+        CompletableFuture<String> fullResponseFuture = new CompletableFuture<>();
+
+        Flux<String> stream = Flux.create(sink -> {
+            try {
+                SaTokenContext context = SaHolder.getContext();
+                SaTokenContextMockUtil.setMockContext(() -> {
+                    SaManager.setSaTokenContext(context);
+                });
+                // 执行自由对话的流式处理，并在完成时设置完整响应
+                performFreeChatStreamingWithFullResponse(agent, userInput, sink, fullResponseFuture);
+            } catch (Exception e) {
+                log.error("自由对话流式执行失败", e);
+                fullResponseFuture.completeExceptionally(e);
+                sink.error(e);
+            }
+        });
+
+        return new StreamResult(stream, fullResponseFuture);
+    }
+
+
+    /**
+     * 执行自由对话的流式处理（带完整响应）
+     */
+    private void performFreeChatStreamingWithFullResponse(SysAgent agent, String userInput,
+                                                          reactor.core.publisher.FluxSink<String> sink,
+                                                          CompletableFuture<String> fullResponseFuture) {
+        try {
+            // 1. 获取并验证模型配置
+            ModelConfigContext modelContext = getAndValidateModelConfigs(agent, sink);
+            if (modelContext == null) {
+                fullResponseFuture.complete("");
+                return;
+            }
+
+            // 2. 创建或获取会话
+            SysAgentChat chat = createOrGetChat(agent.getAgentId(), userInput);
+            Long chatId = chat.getChatId();
+
+            // 3. 保存用户消息
+            saveUserMessage(chatId, userInput);
+
+            // 4. 构建对话提示词
+            String prompt = buildFreeChatPrompt(agent, userInput);
+
+            // 5. 直接执行流式AI调用
+            executeStreamingAICall(prompt, modelContext, sink, fullResponse -> {
+                log.info("自由对话完成，响应长度: {}", fullResponse.length());
+
+                // 保存AI响应到数据库
+                saveAssistantMessage(chatId, fullResponse, "text");
+
+                // 设置完整响应
+                fullResponseFuture.complete(fullResponse);
+
+                // 处理最终的响应
+                handleFinalStepComplete(fullResponse, modelContext, sink, response -> {
+                    log.info("自由对话流式处理完成（带完整响应）");
+                });
+            }, true);
+
+        } catch (Exception e) {
+            log.error("自由对话流式处理失败", e);
+            fullResponseFuture.completeExceptionally(e);
+            sink.error(new RuntimeException("自由对话流式处理失败: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * 构建自由对话的提示词
+     */
+    private String buildFreeChatPrompt(SysAgent agent, String userInput) {
+        StringBuilder prompt = new StringBuilder();
+
+        // 获取智能体人设，如果为空则使用默认值
+        String agentPersonality = StringUtils.hasText(agent.getAgentPersonality()) ?
+            agent.getAgentPersonality() : "智能助手";
+
+        // 添加系统角色设定
+        prompt.append("你是一个").append(agentPersonality).append("。\n\n");
+
+        // 添加自定义提示词
+        if (StringUtils.hasText(agent.getPromptContent())) {
+            String processedPrompt = agent.getPromptContent()
+                .replace("{{agent_personality}}", agentPersonality)
+                .replace("{{query}}", userInput);
+            prompt.append(processedPrompt).append("\n\n");
+        }
+
+        // 添加用户输入
+        prompt.append("用户问题：").append(userInput);
+
+        return prompt.toString();
+    }
+
+    /**
+     * 保存助手消息到数据库
+     */
+    private void saveAssistantMessage(Long chatId, String content, String messageType) {
+        try {
+            SysAgentChatMessage message = new SysAgentChatMessage();
+            message.setChatId(chatId);
+            message.setRole("assistant");
+            message.setContent(content);
+            message.setMessageType(messageType);
+            message.setStatus("completed");
+
+            chatContextService.addMessage(message);
+            log.debug("成功保存助手消息到会话: {}", chatId);
+        } catch (Exception e) {
+            log.error("保存助手消息失败，会话ID: {}", chatId, e);
         }
     }
 }
