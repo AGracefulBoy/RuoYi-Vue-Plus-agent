@@ -18,6 +18,7 @@ import org.dromara.system.domain.SysAgent;
 import org.dromara.system.domain.SysAgentChat;
 import org.dromara.system.domain.SysAgentChatMessage;
 import org.dromara.system.domain.dto.StreamMessageResponseDto;
+import org.dromara.system.domain.dto.TokenUsageDto;
 import org.dromara.system.domain.dto.ToolDto;
 import org.dromara.system.domain.vo.SysModelConfigVo;
 import org.dromara.system.service.ISysModelConfigService;
@@ -32,6 +33,7 @@ import reactor.core.publisher.Flux;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -412,6 +414,15 @@ public class TaskAgentServiceImpl implements TaskAgentService {
     // 是否已经检测到Final Answer
     private final ThreadLocal<Boolean> finalAnswerDetected = ThreadLocal.withInitial(() -> false);
 
+    // Token使用量累计
+    private final ThreadLocal<IChatResponse.Usage> totalTokenUsage = ThreadLocal.withInitial(() -> {
+        IChatResponse.Usage usage = new IChatResponse.Usage();
+        usage.setPromptTokens(0);
+        usage.setCompletionTokens(0);
+        usage.setTotalTokens(0);
+        return usage;
+    });
+
     /**
      * 添加到对话历史
      */
@@ -498,6 +509,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
         currentStreamType.remove();
         actionDetected.remove();
         finalAnswerDetected.remove();
+        totalTokenUsage.remove();
     }
 
     /**
@@ -1196,10 +1208,17 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                                               java.util.function.Consumer<String> fullResponseCallback,
                                               boolean isFinalStep, String initialStreamType) {
         StringBuilder fullResponse = new StringBuilder();
+        AtomicReference<IChatResponse> lastChunk = new AtomicReference<>();
 
         modelStream
-            .doOnNext(chunk -> handleStreamChunkForMessage(chunk, sink, fullResponse, initialStreamType))
+            .doOnNext(chunk -> {
+                lastChunk.set(chunk);
+                handleStreamChunkForMessage(chunk, sink, fullResponse, initialStreamType);
+            })
             .doOnComplete(() -> {
+                // 在完成时累计token使用量
+                accumulateTokenUsage(lastChunk.get());
+
                 if (isFinalStep) {
                     handleFinalStepCompleteForMessage(fullResponse.toString(), modelContext, sink, fullResponseCallback);
                 } else {
@@ -1249,6 +1268,55 @@ public class TaskAgentServiceImpl implements TaskAgentService {
         if (buffer.length() > 0) {
             sink.next(createStreamMessage(buffer.toString(), currentType, false));
             buffer.setLength(0);
+        }
+    }
+
+    /**
+     * 累计Token使用量
+     */
+    private void accumulateTokenUsage(IChatResponse response) {
+        if (response != null && response.getMetadata() != null && response.getMetadata().getUsage() != null) {
+            IChatResponse.Usage currentUsage = response.getMetadata().getUsage();
+            IChatResponse.Usage totalUsage = totalTokenUsage.get();
+
+            // 累加token使用量
+            totalUsage.setPromptTokens(totalUsage.getPromptTokens() + currentUsage.getPromptTokens());
+            totalUsage.setCompletionTokens(totalUsage.getCompletionTokens() + currentUsage.getCompletionTokens());
+            totalUsage.setTotalTokens(totalUsage.getTotalTokens() + currentUsage.getTotalTokens());
+
+            log.info("Token usage for this step - Prompt: {}, Completion: {}, Total: {}",
+                currentUsage.getPromptTokens(),
+                currentUsage.getCompletionTokens(),
+                currentUsage.getTotalTokens());
+
+            log.info("Cumulative token usage - Prompt: {}, Completion: {}, Total: {}",
+                totalUsage.getPromptTokens(),
+                totalUsage.getCompletionTokens(),
+                totalUsage.getTotalTokens());
+        }
+    }
+
+    /**
+     * 获取Token使用量对象
+     */
+    private TokenUsageDto getTokenUsageObject() {
+        IChatResponse.Usage totalUsage = totalTokenUsage.get();
+        return TokenUsageDto.fromUsage(totalUsage);
+    }
+
+    /**
+     * 报告总Token使用量
+     */
+    private void reportTotalTokenUsage(reactor.core.publisher.FluxSink<StreamMessageResponseDto> sink) {
+        // 获取token使用量对象
+        TokenUsageDto tokenUsage = getTokenUsageObject();
+
+        // 只有在有使用量时才报告
+        if (tokenUsage.getTotalTokens() > 0) {
+            // 将对象转换为JSON字符串
+            String tokenUsageJson = JSONUtil.toJsonStr(tokenUsage);
+
+            log.info("Total token usage for entire ReAct loop: {}", tokenUsageJson);
         }
     }
 
@@ -1455,12 +1523,24 @@ public class TaskAgentServiceImpl implements TaskAgentService {
 
         }
 
-        // 发送完成消息
-        sink.next(StreamMessageResponseDto.createFinishMessage(
+        // 报告Token使用情况
+        reportTotalTokenUsage(sink);
+
+        // 创建带有token使用信息的完成消息
+        StreamMessageResponseDto finishMessage = StreamMessageResponseDto.createFinishMessage(
             currentChatId.get(),
             generateMessageId(),
             getAndIncrementMessageIndex()
-        ));
+        );
+
+        // 将token使用信息添加到extraInfo
+        TokenUsageDto tokenUsage = getTokenUsageObject();
+        if (tokenUsage != null && tokenUsage.getTotalTokens() > 0) {
+            finishMessage.getMessage().getExtraInfo().put("tokenUsage", tokenUsage);
+        }
+
+        // 发送完成消息
+        sink.next(finishMessage);
         sink.complete();
     }
 
