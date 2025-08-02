@@ -253,6 +253,8 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
     private ToolDto convertToolToDto(SysTool tool) {
         List<ToolDto.Parameter> parameters = buildToolParameters(tool);
         return ToolDto.builder()
+            .id(tool.getToolId())
+            .type("tool")
             .name(tool.getToolName())
             .desc(StringUtils.hasText(tool.getToolDesc()) ? tool.getToolDesc() : "工具: " + tool.getToolName())
             .parameters(parameters)
@@ -268,6 +270,8 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
     private ToolDto convertKnowledgeBaseToDto(SysKnowledgeBase knowledgeBase) {
         List<ToolDto.Parameter> parameters = buildKnowledgeBaseParameters(knowledgeBase);
         return ToolDto.builder()
+            .id(knowledgeBase.getKnowledgeBaseId())
+            .type("knowledge")
             .name(knowledgeBase.getName())
             .desc(StringUtils.hasText(knowledgeBase.getDescription()) ?
                 knowledgeBase.getDescription() : "知识库: " + knowledgeBase.getName())
@@ -284,6 +288,8 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
     private ToolDto convertDatasourceToDto(SysDatasource datasource) {
         List<ToolDto.Parameter> parameters = buildDatasourceParameters(datasource);
         return ToolDto.builder()
+            .id(datasource.getDatasourceId())
+            .type("datasource")
             .name(datasource.getDatasourceName())
             .desc(StringUtils.hasText(datasource.getDescription()) ?
                 datasource.getDescription() : "数据源: " + datasource.getDatasourceName())

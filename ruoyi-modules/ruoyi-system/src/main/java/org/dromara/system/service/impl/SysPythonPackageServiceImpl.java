@@ -654,19 +654,19 @@ public class SysPythonPackageServiceImpl implements ISysPythonPackageService {
             // 构建请求数据，匹配Flask API格式
             Map<String, String> data = new HashMap<>();
             String code = request.getCode().trim();
-            
+
             // 如果有文件路径，替换代码中的占位符
             if (request.getFiles() != null && !request.getFiles().isEmpty()) {
                 code = code.replace("{files}", request.getFiles());
             }
-            
+
             // 使用单独的funcName字段，默认为"main"
-            String functionName = request.getFuncName() != null && !request.getFuncName().trim().isEmpty() 
+            String functionName = request.getFuncName() != null && !request.getFuncName().trim().isEmpty()
                 ? request.getFuncName().trim() : "main";
-            
+
             // 处理参数，转换为JSON格式
             String paramsJson = buildParamsJson(request.getParams());
-            
+
             data.put("code", code);
             data.put("func_name", functionName);
             data.put("params", paramsJson);
@@ -700,15 +700,15 @@ public class SysPythonPackageServiceImpl implements ISysPythonPackageService {
      * 处理非流式响应
      */
     private void handleNonStreamResponse(String requestJson, HttpServletResponse response) throws IOException {
-        String url = "http://115.190.43.113:5000/exec";
+        String url = pythonProperties.getApi().getExecUrl();
         String result = HttpUtils.sendPost(url, requestJson);
-        
+
         log.info("Python代码调试完成，结果: {}", result);
-        
+
         // 设置响应头
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
-        
+
         // 构建标准响应格式
         R<String> responseResult = R.ok(result);
         response.getWriter().write(JSONUtil.toJsonStr(responseResult));
@@ -724,11 +724,11 @@ public class SysPythonPackageServiceImpl implements ISysPythonPackageService {
         response.setCharacterEncoding("UTF-8");
         response.setHeader("Cache-Control", "no-cache");
         response.setHeader("Connection", "keep-alive");
-        
+
         // 流式调用
-        String url = "http://115.190.43.113:5003/exec";
+        String url = pythonProperties.getApi().getStreamUrl();
         boolean success = HttpUtils.sendPostStream(url, requestJson, response.getOutputStream());
-        
+
         if (success) {
             log.info("Python代码调试流式请求完成");
         } else {
@@ -743,7 +743,7 @@ public class SysPythonPackageServiceImpl implements ISysPythonPackageService {
         if (params == null || params.isEmpty()) {
             return "{}";
         }
-        
+
         try {
             return JSONUtil.toJsonStr(params);
         } catch (Exception e) {

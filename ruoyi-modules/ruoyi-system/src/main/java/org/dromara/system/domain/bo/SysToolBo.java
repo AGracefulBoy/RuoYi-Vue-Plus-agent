@@ -75,4 +75,39 @@ public class SysToolBo extends BaseEntity {
     @Size(min = 0, max = 500, message = "备注长度不能超过{max}个字符")
     private String remark;
 
+    /**
+     * API配置信息（JSON格式）
+     */
+    private String apiConfig;
+
+    /**
+     * 参数模式定义（JSON Schema格式）
+     */
+    private String parameterSchema;
+
+    /**
+     * 结果模式定义（JSON Schema格式）
+     */
+    private String resultSchema;
+
+    /**
+     * 认证配置（JSON格式）
+     */
+    private String authConfig;
+
+    /**
+     * 执行超时时间（秒）
+     */
+    private Integer timeoutSeconds;
+
+    /**
+     * 重试次数
+     */
+    private Integer retryTimes;
+
+    /**
+     * 速率限制（次/分钟，0表示不限制）
+     */
+    private Integer rateLimit;
+
 } 

@@ -30,6 +30,11 @@ public class PythonProperties {
     private Remote remote = new Remote();
 
     /**
+     * API调试配置
+     */
+    private Api api = new Api();
+
+    /**
      * 本地执行配置
      */
     @Data
@@ -115,6 +120,32 @@ public class PythonProperties {
      */
     public boolean isRemoteMode() {
         return "remote".equals(executionMode);
+    }
+
+    /**
+     * API调试配置
+     */
+    @Data
+    public static class Api {
+        /**
+         * 非流式调试接口URL
+         */
+        private String execUrl = "http://115.190.43.113:5003/exec";
+
+        /**
+         * 流式调试接口URL
+         */
+        private String streamUrl = "http://115.190.43.113:5003/exec/stream";
+
+        /**
+         * 连接超时时间（毫秒）
+         */
+        private int connectTimeout = 30000;
+
+        /**
+         * 读取超时时间（毫秒）
+         */
+        private int readTimeout = 60000;
     }
 
 } 

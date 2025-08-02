@@ -33,7 +33,7 @@ public interface TaskAgentService {
      * @param userInput 用户输入
      * @return 包含流式响应和完整响应的结果对象
      */
-    TaskAgentServiceImpl.StreamResult executeReActStreamWithFullResponse(SysAgent agent, List<ToolDto> availableTools, String userInput);
+//    TaskAgentServiceImpl.StreamResult executeReActStreamWithFullResponse(SysAgent agent, List<ToolDto> availableTools, String userInput);
 
     /**
      * 检查退出条件

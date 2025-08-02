@@ -71,50 +71,50 @@ public class SysAgentChatController {
         }
 
         log.info("开始处理聊天请求，追踪ID: {}, 用户ID: {}, 智能体ID: {}",
-                chatRequest.getTraceId(), LoginHelper.getUserId(), chatRequest.getAgentId());
+            chatRequest.getTraceId(), LoginHelper.getUserId(), chatRequest.getAgentId());
 
         // 调用服务层处理流式对话
         return sysAgentChatService.completions(chatRequest)
-                .map(data -> {
-                    // 根据消息类型决定事件类型
-                    String eventType = "message";
-                    if (data.getMessage() != null) {
-                        String messageType = data.getMessage().getType();
-                        if ("thought".equals(messageType)) {
-                            eventType = "thought";
-                        } else if ("action".equals(messageType)) {
-                            eventType = "action";
-                        } else if ("observation".equals(messageType)) {
-                            eventType = "observation";
-                        } else if ("answer".equals(messageType)) {
-                            eventType = "answer";
-                        } else if ("error".equals(messageType)) {
-                            eventType = "error";
-                        } else if ("finish".equals(messageType)) {
-                            eventType = "complete";
-                        }
-                    }
-
-                    if (data.getIsFinish() != null && data.getIsFinish()) {
+            .map(data -> {
+                // 根据消息类型决定事件类型
+                String eventType = "message";
+                if (data.getMessage() != null) {
+                    String messageType = data.getMessage().getType();
+                    if ("thought".equals(messageType)) {
+                        eventType = "thought";
+                    } else if ("action".equals(messageType)) {
+                        eventType = "action";
+                    } else if ("observation".equals(messageType)) {
+                        eventType = "observation";
+                    } else if ("answer".equals(messageType)) {
+                        eventType = "answer";
+                    } else if ("error".equals(messageType)) {
+                        eventType = "error";
+                    } else if ("finish".equals(messageType)) {
                         eventType = "complete";
                     }
+                }
 
-                    return ServerSentEvent.<StreamMessageResponseDto>builder()
-                            .id(IdUtil.fastSimpleUUID())
-                            .event(eventType)
-                            .data(data)
-                            .build();
-                })
-                .doOnError(error -> log.error("聊天请求处理失败，追踪ID: {}", chatRequest.getTraceId(), error))
-                .onErrorResume(error -> Flux.just(ServerSentEvent.<StreamMessageResponseDto>builder()
-                        .event("error")
-                        .data(StreamMessageResponseDto.createErrorMessage(
-                            error.getMessage(),
-                            "error_" + System.currentTimeMillis(),
-                            String.valueOf(System.currentTimeMillis()),
-                            0
-                        ))
-                        .build()));
+                if (data.getIsFinish() != null && data.getIsFinish()) {
+                    eventType = "complete";
+                }
+
+                return ServerSentEvent.<StreamMessageResponseDto>builder()
+                    .id(IdUtil.fastSimpleUUID())
+                    .event(eventType)
+                    .data(data)
+                    .build();
+            })
+            .doOnError(error -> log.error("聊天请求处理失败，追踪ID: {}", chatRequest.getTraceId(), error))
+            .onErrorResume(error -> Flux.just(ServerSentEvent.<StreamMessageResponseDto>builder()
+                .event("error")
+                .data(StreamMessageResponseDto.createErrorMessage(
+                    error.getMessage(),
+                    "error_" + System.currentTimeMillis(),
+                    String.valueOf(System.currentTimeMillis()),
+                    0
+                ))
+                .build()));
     }
 
     /**
@@ -174,7 +174,7 @@ public class SysAgentChatController {
     @SaCheckLogin
     @GetMapping("/sessions/{chatUuid}/history")
     public R<ChatHistoryVo> getChatHistory(@PathVariable @NotBlank(message = "会话UUID不能为空") String chatUuid,
-                                          @RequestParam(defaultValue = "50") int limit) {
+                                           @RequestParam(defaultValue = "50") int limit) {
         SysAgentChat chat = chatContextService.getChatByUuid(chatUuid);
         if (chat == null) {
             return R.fail("会话不存在");
@@ -191,9 +191,9 @@ public class SysAgentChatController {
         historyVo.setTitle(chat.getChatTitle());
         historyVo.setMessages(chatContextService.getChatHistory(chat.getChatId(), limit, false));
         historyVo.setTokenUsage(new ChatHistoryVo.TokenUsage(
-                chat.getInputTokens(),
-                chat.getOutputTokens(),
-                chat.getTotalTokens()
+            chat.getInputTokens(),
+            chat.getOutputTokens(),
+            chat.getTotalTokens()
         ));
 
         return R.ok(historyVo);
@@ -247,11 +247,11 @@ public class SysAgentChatController {
     @GetMapping(value = "/health", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> health() {
         return Flux.interval(Duration.ofSeconds(5))
-                .take(3)
-                .map(seq -> ServerSentEvent.<String>builder()
-                        .id(String.valueOf(seq))
-                        .event("heartbeat")
-                        .data("{\"status\": \"healthy\", \"timestamp\": " + System.currentTimeMillis() + "}")
-                        .build());
+            .take(3)
+            .map(seq -> ServerSentEvent.<String>builder()
+                .id(String.valueOf(seq))
+                .event("heartbeat")
+                .data("{\"status\": \"healthy\", \"timestamp\": " + System.currentTimeMillis() + "}")
+                .build());
     }
 }

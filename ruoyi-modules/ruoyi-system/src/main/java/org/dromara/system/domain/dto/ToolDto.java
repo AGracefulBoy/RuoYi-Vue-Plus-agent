@@ -8,6 +8,8 @@ import java.util.List;
 @Data
 @Builder
 public class ToolDto {
+    private Long id; // 工具ID
+    private String type;
     private String name;
     private String desc;
     private List<Parameter> parameters;
