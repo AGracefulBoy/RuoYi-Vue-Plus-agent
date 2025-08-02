@@ -5,18 +5,23 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.common.core.constant.SystemConstants;
+import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.MapstructUtils;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.system.domain.SysTool;
+import org.dromara.system.domain.bo.PythonDebugRequestBo;
 import org.dromara.system.domain.bo.SysToolBo;
+import org.dromara.system.domain.bo.ToolDebugRequestBo;
 import org.dromara.system.domain.vo.SysToolListVo;
 import org.dromara.system.domain.vo.SysToolVo;
 import org.dromara.system.mapper.SysToolMapper;
+import org.dromara.system.service.ISysPythonPackageService;
 import org.dromara.system.service.ISysToolService;
 import org.springframework.stereotype.Service;
 
@@ -35,6 +40,7 @@ import java.util.Map;
 public class SysToolServiceImpl implements ISysToolService {
 
     private final SysToolMapper baseMapper;
+    private final ISysPythonPackageService pythonPackageService;
 
     /**
      * 查询工具管理（包含脚本代码）
@@ -211,6 +217,47 @@ public class SysToolServiceImpl implements ISysToolService {
 
         // 插入新的工具记录
         return insertByBo(copyToolBo);
+    }
+
+    /**
+     * 根据工具ID执行Python代码调试
+     */
+    @Override
+    public void debugToolCode(ToolDebugRequestBo request, HttpServletResponse response) {
+        // 1. 根据工具ID查询工具信息
+        SysToolVo tool = queryById(request.getToolId());
+        if (tool == null) {
+            throw new ServiceException("工具不存在");
+        }
+
+        // 2. 验证工具状态
+        if (!"0".equals(tool.getToolStatus())) {
+            throw new ServiceException("工具已停用");
+        }
+
+        // 3. 验证工具类型
+        if (!"script".equals(tool.getToolType())) {
+            throw new ServiceException("该工具不是脚本类型，无法调试");
+        }
+
+        // 4. 验证脚本代码是否存在
+        if (StringUtils.isBlank(tool.getScriptCode())) {
+            throw new ServiceException("工具脚本代码为空");
+        }
+
+        // 5. 构建Python调试请求对象
+        PythonDebugRequestBo pythonRequest = new PythonDebugRequestBo();
+        pythonRequest.setCode(tool.getScriptCode());
+        pythonRequest.setFuncName(tool.getFunctionName());
+        pythonRequest.setParams(request.getParams());
+        pythonRequest.setStream(request.getStream());
+
+        // 6. 记录调试信息
+        log.info("开始调试工具：{}, 工具ID：{}, 函数名：{}, 流式：{}", 
+            tool.getToolName(), tool.getToolId(), tool.getFunctionName(), request.getStream());
+
+        // 7. 调用Python调试服务
+        pythonPackageService.debugPythonCode(pythonRequest, response);
     }
 
 }

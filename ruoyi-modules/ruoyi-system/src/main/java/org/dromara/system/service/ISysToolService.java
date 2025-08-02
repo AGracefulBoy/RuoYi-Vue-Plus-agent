@@ -1,8 +1,10 @@
 package org.dromara.system.service;
 
+import jakarta.servlet.http.HttpServletResponse;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.system.domain.bo.SysToolBo;
+import org.dromara.system.domain.bo.ToolDebugRequestBo;
 import org.dromara.system.domain.vo.SysToolListVo;
 import org.dromara.system.domain.vo.SysToolVo;
 
@@ -114,5 +116,13 @@ public interface ISysToolService {
      * @return 结果
      */
     Boolean copyTool(Long toolId);
+
+    /**
+     * 根据工具ID执行Python代码调试
+     *
+     * @param request  调试请求对象
+     * @param response HTTP响应
+     */
+    void debugToolCode(ToolDebugRequestBo request, HttpServletResponse response);
 
 } 

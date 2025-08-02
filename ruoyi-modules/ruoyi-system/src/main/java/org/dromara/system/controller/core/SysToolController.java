@@ -14,6 +14,7 @@ import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.common.web.core.BaseController;
 import org.dromara.system.domain.bo.SysToolBo;
+import org.dromara.system.domain.bo.ToolDebugRequestBo;
 import org.dromara.system.domain.vo.SysToolListVo;
 import org.dromara.system.domain.vo.SysToolVo;
 import org.dromara.system.service.ISysToolService;
@@ -165,6 +166,23 @@ public class SysToolController extends BaseController {
             return R.ok("复制工具成功");
         }
         return R.fail("复制工具失败，原工具不存在");
+    }
+
+    /**
+     * 根据工具ID执行Python代码调试（支持流式和非流式）
+     *
+     * @param toolId   工具ID
+     * @param request  调试请求对象
+     * @param response HTTP响应
+     */
+    @SaCheckPermission("system:tool:debug")
+    @Log(title = "工具代码调试", businessType = BusinessType.OTHER)
+    @PostMapping("/debug/{toolId}")
+    public void debugByToolId(@PathVariable Long toolId,
+                              @RequestBody ToolDebugRequestBo request,
+                              HttpServletResponse response) {
+        request.setToolId(toolId);
+        toolService.debugToolCode(request, response);
     }
 
 }

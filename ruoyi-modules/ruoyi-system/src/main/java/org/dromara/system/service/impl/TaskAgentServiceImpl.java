@@ -392,11 +392,6 @@ public class TaskAgentServiceImpl implements TaskAgentService {
             data.put("code", request.getCode());
             data.put("func_name", request.getFuncName());
             data.put("params", parameters != null ? parameters : "{}");
-            String str = "{\n" +
-                "      \"data\": [1, 2, 3, 4, 5],\n" +
-                "      \"config\": 1\n" +
-                "    }";
-            data.put("params", str);
 
             String requestJson = JSONUtil.toJsonStr(data);
 
