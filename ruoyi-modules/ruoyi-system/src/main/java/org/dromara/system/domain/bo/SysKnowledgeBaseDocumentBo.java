@@ -107,4 +107,16 @@ public class SysKnowledgeBaseDocumentBo extends BaseEntity {
     @Size(min = 0, max = 500, message = "备注长度不能超过{max}个字符")
     private String remark;
 
+    /**
+     * 任务id
+     */
+    @Size(min = 0, max = 256, message = "任务id长度不能超过{max}个字符")
+    private String taskId;
+
+    /**
+     * 解析完成后的URL
+     */
+    @Size(min = 0, max = 512, message = "解析完成后的URL长度不能超过{max}个字符")
+    private String parseCompletedUrl;
+
 } 

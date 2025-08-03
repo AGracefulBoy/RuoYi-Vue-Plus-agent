@@ -35,7 +35,7 @@ import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
-public class KnowledgeBaseDocumentTask {
+public class KnowledgeBaseExcelDocumentTask {
 
     private final SysKnowledgeBaseDocumentMapper sysKnowledgeBaseDocumentMapper;
     private final SysKnowledgeBaseDocumentChunkMapper sysKnowledgeBaseDocumentChunkMapper;

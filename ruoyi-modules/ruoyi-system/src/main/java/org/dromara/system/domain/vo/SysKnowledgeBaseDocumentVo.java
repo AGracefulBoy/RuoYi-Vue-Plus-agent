@@ -159,4 +159,16 @@ public class SysKnowledgeBaseDocumentVo implements Serializable {
     @ExcelProperty(value = "备注")
     private String remark;
 
+    /**
+     * 任务id
+     */
+    @ExcelProperty(value = "任务id")
+    private String taskId;
+
+    /**
+     * 解析完成后的URL
+     */
+    @ExcelProperty(value = "解析完成后的URL")
+    private String parseCompletedUrl;
+
 }

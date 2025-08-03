@@ -109,4 +109,14 @@ public class SysKnowledgeBaseDocument extends TenantEntity {
      */
     private String remark;
 
+    /**
+     * 任务id
+     */
+    private String taskId;
+
+    /**
+     * 解析完成后的url
+     */
+    private String parseCompletedUrl;
+
 } 

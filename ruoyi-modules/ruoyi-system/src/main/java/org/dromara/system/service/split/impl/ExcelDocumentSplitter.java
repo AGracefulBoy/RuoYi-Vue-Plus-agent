@@ -26,12 +26,11 @@ import java.util.*;
 @Component
 public class ExcelDocumentSplitter implements DocumentSplitter {
 
-    private static final String EXCEL_TYPE_XLSX = "excel";
-    private static final String EXCEL_TYPE_XLS = "xls";
+    private static final String EXCEL_TYPE_XLSX = "xls";
+    private static final String EXCEL_TYPE_XLS = "xlsx";
 
     @Override
     public List<DocumentChunk> split(String documentUrl, Integer chunkSize, Integer overlapSize) {
-        List<DocumentChunk> chunks = new ArrayList<>();
 
         try (InputStream inputStream = new URL(documentUrl).openStream()) {
             ExcelContentCollector collector = new ExcelContentCollector();
@@ -50,7 +49,7 @@ public class ExcelDocumentSplitter implements DocumentSplitter {
     @Override
     public boolean supports(String documentType) {
         return EXCEL_TYPE_XLSX.equalsIgnoreCase(documentType) ||
-               EXCEL_TYPE_XLS.equalsIgnoreCase(documentType);
+            EXCEL_TYPE_XLS.equalsIgnoreCase(documentType);
     }
 
     /**
@@ -63,7 +62,7 @@ public class ExcelDocumentSplitter implements DocumentSplitter {
      * @return list of document chunks
      */
     private List<DocumentChunk> createChunksFromContent(Map<String, List<String>> sheetContents,
-                                                       Integer chunkSize, Integer overlapSize) {
+                                                        Integer chunkSize, Integer overlapSize) {
         List<DocumentChunk> chunks = new ArrayList<>();
         int globalChunkIndex = 0;
 
@@ -135,7 +134,7 @@ public class ExcelDocumentSplitter implements DocumentSplitter {
             int totalRows = sheetContents.values().stream()
                 .mapToInt(List::size)
                 .sum();
-            log.debug("Excel analysis completed for {} sheets with {} total rows", 
+            log.debug("Excel analysis completed for {} sheets with {} total rows",
                 sheetContents.size(), totalRows);
         }
 
