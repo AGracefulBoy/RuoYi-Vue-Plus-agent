@@ -47,14 +47,11 @@ public class KnowledgeBaseExcelDocumentTask {
     private final ElasticsearchClient elasticsearchClient;
 
     private static final int BATCH_SIZE = 10;
-    private static final int CHUNK_BATCH_SIZE = 100; // 每批次插入的切块数量
     private static final int EMBEDDING_BATCH_SIZE = 20; // 每批次向量化的数量
     private static final String VECTOR_STATUS_PENDING = "0";
     private static final String VECTOR_STATUS_PROCESSING = "1";
     private static final String VECTOR_STATUS_COMPLETED = "2";
     private static final String VECTOR_STATUS_FAILED = "3";
-    private static final int CHUNK_SIZE = 1000;
-    private static final int OVERLAP_SIZE = 100;
     private static final int MAX_CONTENT_LENGTH = 10000; // 最大内容长度限制
 
     @JobExecutor(name = "excelParsingJob")
@@ -270,11 +267,14 @@ public class KnowledgeBaseExcelDocumentTask {
             // 4. 清理可能存在的旧切块数据（防止重复处理时数据重复）
             cleanupExistingChunks(document.getDocumentId());
 
-            // 5. 批量写入文档切块到数据库
-            batchInsertDocumentChunks(document, chunks);
+            // 5. 生成ES索引名
+            String indexName = elasticsearchIndexService.generateIndexName(document.getKnowledgeBaseId().toString());
 
-            // 6. 更新文档状态为待向量化
-            updateDocumentStatus(document.getDocumentId(), SysKnowledgeBaseDocumentConstants.STATUS_DOCUMENT_EMBEDDING);
+            // 6. 处理文档切块并存储到ES
+            processAndStoreChunksToES(document, chunks, indexName);
+
+            // 7. 更新文档状态为已完成
+            updateDocumentStatus(document.getDocumentId(), SysKnowledgeBaseDocumentConstants.STATUS_DOCUMENT_FINISHED);
 
             SnailJobLog.REMOTE.info("文档 {} 处理完成", document.getName());
 
@@ -348,19 +348,21 @@ public class KnowledgeBaseExcelDocumentTask {
     }
 
     /**
-     * Batch insert document chunks for performance optimization.
-     * Uses chunked batch processing to handle large datasets efficiently.
+     * Process document chunks and store them directly to Elasticsearch.
+     * Generates embeddings and stores documents in batches.
      *
      * @param document the source document
-     * @param chunks   the document chunks to insert
+     * @param chunks   the document chunks to process
+     * @param indexName the Elasticsearch index name
      */
-    private void batchInsertDocumentChunks(SysKnowledgeBaseDocument document, List<DocumentChunk> chunks) {
+    private void processAndStoreChunksToES(SysKnowledgeBaseDocument document, List<DocumentChunk> chunks, String indexName) {
         if (CollUtil.isEmpty(chunks)) {
             return;
         }
 
-        List<SysKnowledgeBaseDocumentChunk> chunkEntities = new ArrayList<>();
+        List<Map<String, Object>> esDocuments = new ArrayList<>();
         int filteredCount = 0;
+        int processedCount = 0;
 
         for (DocumentChunk chunk : chunks) {
             // 验证和过滤内容
@@ -370,58 +372,70 @@ public class KnowledgeBaseExcelDocumentTask {
                 continue;
             }
 
-            // 限制内容长度，防止数据库存储问题
+            // 限制内容长度
             if (content.length() > MAX_CONTENT_LENGTH) {
                 content = content.substring(0, MAX_CONTENT_LENGTH);
                 SnailJobLog.REMOTE.warn("文档切块内容过长已截断: chunkIndex={}, originalLength={}",
                     chunk.getChunkIndex(), chunk.getContent().length());
             }
 
-            SysKnowledgeBaseDocumentChunk chunkEntity = new SysKnowledgeBaseDocumentChunk();
-            chunkEntity.setDocumentId(document.getDocumentId());
-            chunkEntity.setKnowledgeBaseId(document.getKnowledgeBaseId());
-            chunkEntity.setChunkIndex(chunk.getChunkIndex());
-            chunkEntity.setContent(content);
-            chunkEntity.setFileName(document.getName());
-            chunkEntity.setVectorStatus(VECTOR_STATUS_PENDING); // 0 待处理
-            chunkEntity.setMetadata(chunk.getMetadata());
+            try {
+                // 生成向量
+                float[] embedding = embeddingService.textToEmbeddingArray(content);
+                if (embedding == null || embedding.length == 0) {
+                    SnailJobLog.REMOTE.warn("切块 {} 向量化失败，跳过", chunk.getChunkIndex());
+                    continue;
+                }
 
-            chunkEntities.add(chunkEntity);
+                // 构建ES文档
+                Map<String, Object> esDocument = new HashMap<>();
+                esDocument.put("documentId", document.getDocumentId().toString());
+                esDocument.put("chunkId", document.getDocumentId() + "_" + chunk.getChunkIndex() + "_" + IdUtil.fastSimpleUUID());
+                esDocument.put("content", content);
+                esDocument.put("chunkTitle", content);
+                esDocument.put("fileName", document.getName());
+                esDocument.put("metadata", chunk.getMetadata() != null ? chunk.getMetadata() : new HashMap<>());
+                esDocument.put("createTime", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                esDocument.put("embedding", embedding);
+
+                esDocuments.add(esDocument);
+                processedCount++;
+
+                // 批量存储到ES
+                if (esDocuments.size() >= EMBEDDING_BATCH_SIZE) {
+                    int storedCount = elasticsearchIndexService.batchStoreDocuments(indexName, esDocuments);
+                    SnailJobLog.REMOTE.info("批量存储 {} 个文档到ES，成功 {} 个", esDocuments.size(), storedCount);
+                    if (storedCount < esDocuments.size()) {
+                        throw new RuntimeException("部分文档存储失败");
+                    }
+                    esDocuments.clear();
+                }
+
+            } catch (Exception exception) {
+                SnailJobLog.REMOTE.error("处理切块 {} 时发生错误: {}", chunk.getChunkIndex(), exception.getMessage());
+                throw new RuntimeException("处理文档切块失败: " + exception.getMessage(), exception);
+            }
+        }
+
+        // 存储剩余的文档
+        if (!esDocuments.isEmpty()) {
+            try {
+                int storedCount = elasticsearchIndexService.batchStoreDocuments(indexName, esDocuments);
+                SnailJobLog.REMOTE.info("批量存储最后 {} 个文档到ES，成功 {} 个", esDocuments.size(), storedCount);
+                if (storedCount < esDocuments.size()) {
+                    throw new RuntimeException("部分文档存储失败");
+                }
+            } catch (Exception exception) {
+                SnailJobLog.REMOTE.error("批量存储文档到ES失败", exception);
+                throw new RuntimeException("批量存储文档失败: " + exception.getMessage(), exception);
+            }
         }
 
         if (filteredCount > 0) {
             SnailJobLog.REMOTE.info("过滤了 {} 个空内容切块", filteredCount);
         }
 
-        if (CollUtil.isEmpty(chunkEntities)) {
-            SnailJobLog.REMOTE.warn("所有切块都被过滤，没有数据插入");
-            return;
-        }
-
-        // 分批插入，避免一次性插入过多数据导致内存或数据库性能问题
-        int totalSize = chunkEntities.size();
-        int insertedCount = 0;
-
-        for (int i = 0; i < totalSize; i += CHUNK_BATCH_SIZE) {
-            int endIndex = Math.min(i + CHUNK_BATCH_SIZE, totalSize);
-            List<SysKnowledgeBaseDocumentChunk> batchChunks = chunkEntities.subList(i, endIndex);
-
-            try {
-                boolean insertResult = sysKnowledgeBaseDocumentChunkMapper.insertBatch(batchChunks);
-                if (!insertResult) {
-                    throw new RuntimeException("批量插入文档切块失败");
-                }
-                insertedCount += batchChunks.size();
-                SnailJobLog.REMOTE.debug("成功插入第 {}/{} 批数据，共 {} 条",
-                    (i / CHUNK_BATCH_SIZE + 1), (totalSize - 1) / CHUNK_BATCH_SIZE + 1, batchChunks.size());
-
-            } catch (Exception exception) {
-                SnailJobLog.REMOTE.error("批量插入第 {} 批数据失败", (i / CHUNK_BATCH_SIZE + 1), exception);
-                throw new RuntimeException("批量插入文档切块失败: " + exception.getMessage(), exception);
-            }
-        }
-
-        SnailJobLog.REMOTE.info("成功插入文档 {} 的所有切块，总计 {} 个", document.getName(), insertedCount);
+        SnailJobLog.REMOTE.info("成功处理并存储文档 {} 的 {} 个切块到ES", document.getName(), processedCount);
     }
 
     /**

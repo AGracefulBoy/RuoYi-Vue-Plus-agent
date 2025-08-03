@@ -90,8 +90,6 @@ public class SysKnowledgeBaseServiceImpl implements ISysKnowledgeBaseService {
         boolean flag = baseMapper.insert(add) > 0;
         if (flag) {
             bo.setKnowledgeBaseId(add.getKnowledgeBaseId());
-
-            // Create Elasticsearch index for the knowledge base
             try {
                 Boolean indexCreated = elasticsearchIndexService.createKnowledgeBaseIndex(add.getKnowledgeBaseId().toString());
                 if (!indexCreated) {

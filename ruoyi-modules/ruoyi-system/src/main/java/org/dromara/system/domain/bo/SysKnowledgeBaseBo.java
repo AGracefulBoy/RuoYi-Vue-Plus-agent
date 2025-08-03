@@ -96,10 +96,4 @@ public class SysKnowledgeBaseBo extends BaseEntity {
      */
     private String status;
 
-    /**
-     * 备注
-     */
-    @Size(min = 0, max = 500, message = "备注长度不能超过{max}个字符")
-    private String remark;
-
-} 
+}
