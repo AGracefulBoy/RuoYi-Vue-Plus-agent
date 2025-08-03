@@ -1,6 +1,7 @@
 package org.dromara.job.snailjob;
 
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import com.aizuda.snailjob.client.job.core.annotation.JobExecutor;
 import com.aizuda.snailjob.client.job.core.dto.JobArgs;
@@ -477,7 +478,9 @@ public class KnowledgeBaseExcelDocumentTask {
 
         // Required fields according to ES mapping
         esDocument.put("documentId", chunk.getDocumentId().toString());
+        esDocument.put("chunkId", chunk.getChunkId().toString() + "_" + IdUtil.fastSimpleUUID());
         esDocument.put("content", chunk.getContent());
+        esDocument.put("chunkTitle", chunk.getContent());
         esDocument.put("fileName", chunk.getFileName());
         esDocument.put("metadata", chunk.getMetadata() != null ? chunk.getMetadata() : new HashMap<>());
         esDocument.put("createTime", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));

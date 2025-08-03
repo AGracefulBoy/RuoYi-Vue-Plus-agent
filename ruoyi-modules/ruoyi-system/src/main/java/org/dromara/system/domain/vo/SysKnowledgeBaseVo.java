@@ -70,7 +70,7 @@ public class SysKnowledgeBaseVo implements Serializable {
      * 模型
      */
     @ExcelProperty(value = "模型")
-    private String model;
+    private Long model;
 
     /**
      * 块大小

@@ -283,7 +283,7 @@ public class SysKnowledgeBaseDocumentServiceImpl implements ISysKnowledgeBaseDoc
         }
 
         // 如果文档没有配置 model，则从知识库获取
-        if (StringUtils.isBlank(document.getModel()) && StringUtils.isNotBlank(knowledgeBaseVo.getModel())) {
+        if (document.getModel() != null && knowledgeBaseVo.getModel() != null) {
             document.setModel(knowledgeBaseVo.getModel());
         }
 
@@ -346,18 +346,18 @@ public class SysKnowledgeBaseDocumentServiceImpl implements ISysKnowledgeBaseDoc
         if (ObjectUtil.isNull(bo.getDocumentId())) {
             throw new ServiceException("文档ID不能为空");
         }
-        
+
         // 先查询出实体对象
         SysKnowledgeBaseDocument entity = baseMapper.selectById(bo.getDocumentId());
         if (ObjectUtil.isNull(entity)) {
             throw new ServiceException("文档不存在");
         }
-        
+
         // 更新需要修改的字段
         if (ObjectUtil.isNotNull(bo.getMetadata())) {
             entity.setMetadata(bo.getMetadata());
         }
-        if (StringUtils.isNotBlank(bo.getModel())) {
+        if (bo.getModel() != null) {
             entity.setModel(bo.getModel());
         }
         if (ObjectUtil.isNotNull(bo.getBlockSize())) {
@@ -372,10 +372,10 @@ public class SysKnowledgeBaseDocumentServiceImpl implements ISysKnowledgeBaseDoc
         if (StringUtils.isNotBlank(bo.getImagePrompt())) {
             entity.setImagePrompt(bo.getImagePrompt());
         }
-        
+
         // 重要：修改完成后将状态设置为待执行
         entity.setStatus(SysKnowledgeBaseDocumentConstants.STATUS_TO_BE_EXECUTED);
-        
+
         // 使用updateById更新，这样会正确处理JSON字段
         return baseMapper.updateById(entity) > 0;
     }

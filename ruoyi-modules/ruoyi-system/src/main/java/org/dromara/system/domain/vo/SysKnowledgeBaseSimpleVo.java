@@ -35,7 +35,7 @@ public class SysKnowledgeBaseSimpleVo implements Serializable {
     /**
      * 模型
      */
-    private String model;
+    private Long model;
 
     /**
      * 状态（0正常 1停用）

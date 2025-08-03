@@ -56,7 +56,7 @@ public class SysKnowledgeBase extends TenantEntity {
     /**
      * 模型
      */
-    private String model;
+    private Long model;
 
     /**
      * 块大小

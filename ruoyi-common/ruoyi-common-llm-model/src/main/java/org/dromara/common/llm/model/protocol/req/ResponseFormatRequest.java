@@ -63,7 +63,10 @@ public class ResponseFormatRequest {
         this.schema = schema;
     }
 
-    private ResponseFormatRequest(Type type, JsonSchema jsonSchema, String name, Boolean strict, Map<String, Object> schema) {
+    public ResponseFormatRequest() {
+    }
+
+    public ResponseFormatRequest(Type type, JsonSchema jsonSchema, String name, Boolean strict, Map<String, Object> schema) {
         this.type = type;
         this.jsonSchema = jsonSchema;
         this.name = name;

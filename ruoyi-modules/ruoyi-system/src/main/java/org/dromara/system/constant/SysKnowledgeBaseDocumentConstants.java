@@ -12,18 +12,11 @@ public class SysKnowledgeBaseDocumentConstants {
      */
     public static final String STATUS_TO_BE_EXECUTED = "to_be_executed";
     public static final String STATUS_DOCUMENT_PARSING = "document_parsing";
+    public static final String STATUS_DOCUMENT_CHUNK = "document_chunk";
     public static final String STATUS_DOCUMENT_EMBEDDING = "document_embedding";
     public static final String STATUS_DOCUMENT_FINISHED = "document_finished";
     public static final String STATUS_DOCUMENT_FAIL = "document_fail";
 
-    /**
-     * 文档处理状态描述
-     */
-    public static final String STATUS_TO_BE_EXECUTED_DESC = "待执行";
-    public static final String STATUS_DOCUMENT_PARSING_DESC = "解析中";
-    public static final String STATUS_DOCUMENT_EMBEDDING_DESC = "文档向量化";
-    public static final String STATUS_DOCUMENT_FINISHED_DESC = "已完成";
-    public static final String STATUS_DOCUMENT_FAIL_DESC = "失败";
 
     /**
      * 获取所有有效的状态值

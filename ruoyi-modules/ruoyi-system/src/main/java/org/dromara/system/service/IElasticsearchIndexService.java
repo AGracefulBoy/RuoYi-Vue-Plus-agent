@@ -1,5 +1,8 @@
 package org.dromara.system.service;
 
+import java.util.List;
+import java.util.Map;
+
 /**
  * Elasticsearch index management service interface.
  * Provides operations for managing knowledge base indices in Elasticsearch.
@@ -42,4 +45,13 @@ public interface IElasticsearchIndexService {
      * @return the formatted index name with environment information
      */
     String generateIndexName(String knowledgeBaseName);
+    
+    /**
+     * Batch store documents to Elasticsearch.
+     * 
+     * @param indexName the index name to store documents
+     * @param documents a list of documents, each containing id and document data
+     * @return the number of successfully stored documents
+     */
+    int batchStoreDocuments(String indexName, List<Map<String, Object>> documents);
 }

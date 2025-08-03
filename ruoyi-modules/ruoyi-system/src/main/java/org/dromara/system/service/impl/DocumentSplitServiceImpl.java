@@ -67,7 +67,7 @@ public class DocumentSplitServiceImpl implements IDocumentSplitService {
 
     @Override
     public List<String> getSupportedDocumentTypes() {
-        return List.of("excel", "docx", "pdf");
+        return List.of("excel", "docx", "pdf", "txt");
     }
 
     /**

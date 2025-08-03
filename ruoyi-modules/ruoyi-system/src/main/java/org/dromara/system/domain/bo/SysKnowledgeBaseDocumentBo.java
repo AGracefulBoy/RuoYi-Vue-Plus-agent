@@ -78,8 +78,7 @@ public class SysKnowledgeBaseDocumentBo extends BaseEntity {
     /**
      * 模型
      */
-    @Size(min = 0, max = 255, message = "模型长度不能超过{max}个字符")
-    private String model;
+    private Long model;
 
     /**
      * 块大小

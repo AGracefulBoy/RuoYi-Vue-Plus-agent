@@ -72,7 +72,7 @@ public class SysKnowledgeBaseServiceImpl implements ISysKnowledgeBaseService {
         lqw.like(StringUtils.isNotBlank(bo.getDescription()), SysKnowledgeBase::getDescription, bo.getDescription());
         lqw.eq(ObjectUtil.isNotNull(bo.getTopK()), SysKnowledgeBase::getTopK, bo.getTopK());
         lqw.eq(ObjectUtil.isNotNull(bo.getVectorWeight()), SysKnowledgeBase::getVectorWeight, bo.getVectorWeight());
-        lqw.like(StringUtils.isNotBlank(bo.getModel()), SysKnowledgeBase::getModel, bo.getModel());
+        lqw.like(bo.getModel() != null, SysKnowledgeBase::getModel, bo.getModel());
         lqw.eq(ObjectUtil.isNotNull(bo.getBlockSize()), SysKnowledgeBase::getBlockSize, bo.getBlockSize());
         lqw.eq(ObjectUtil.isNotNull(bo.getOverlapSize()), SysKnowledgeBase::getOverlapSize, bo.getOverlapSize());
         lqw.eq(StringUtils.isNotBlank(bo.getStatus()), SysKnowledgeBase::getStatus, bo.getStatus());
