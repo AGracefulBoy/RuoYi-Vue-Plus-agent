@@ -1,31 +1,45 @@
 package org.dromara.system.service.impl;
 
+import cn.hutool.json.JSONUtil;
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import co.elastic.clients.elasticsearch._types.FieldValue;
+import co.elastic.clients.elasticsearch._types.KnnSearch;
 import co.elastic.clients.elasticsearch._types.Refresh;
 import co.elastic.clients.elasticsearch._types.SortOrder;
-import co.elastic.clients.elasticsearch.core.DeleteByQueryRequest;
-import co.elastic.clients.elasticsearch.core.DeleteRequest;
-import co.elastic.clients.elasticsearch.core.SearchRequest;
-import co.elastic.clients.elasticsearch.core.SearchResponse;
+import co.elastic.clients.elasticsearch._types.query_dsl.Query;
+import co.elastic.clients.elasticsearch._types.query_dsl.TextQueryType;
+import co.elastic.clients.elasticsearch.core.*;
 import co.elastic.clients.elasticsearch.core.search.Hit;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
+import org.dromara.system.domain.SysKnowledgeBase;
 import org.dromara.system.domain.SysKnowledgeBaseDocument;
 import org.dromara.system.domain.SysKnowledgeBaseDocumentChunk;
+import org.dromara.system.domain.dto.HitDocumentDTO;
+import org.dromara.system.domain.dto.HitSourceDTO;
 import org.dromara.system.domain.vo.SysKnowledgeBaseEsDocumentVo;
+import org.dromara.system.domain.vo.SysKnowledgeBaseVo;
 import org.dromara.system.mapper.SysKnowledgeBaseDocumentChunkMapper;
 import org.dromara.system.mapper.SysKnowledgeBaseDocumentMapper;
 import org.dromara.system.service.IElasticsearchDocumentService;
 import org.dromara.system.service.IElasticsearchIndexService;
+import org.dromara.system.service.IReRankService;
+import org.dromara.system.service.ISysKnowledgeBaseService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
  * Elasticsearch document management service implementation.
@@ -42,6 +56,21 @@ public class ElasticsearchDocumentServiceImpl implements IElasticsearchDocumentS
     private final IElasticsearchIndexService elasticsearchIndexService;
     private final SysKnowledgeBaseDocumentMapper knowledgeBaseDocumentMapper;
     private final SysKnowledgeBaseDocumentChunkMapper knowledgeBaseDocumentChunkMapper;
+    private final ISysKnowledgeBaseService knowledgeBaseService;
+    private final IReRankService reRankService;
+
+    @Value("${embedding.api.url:http://localhost:8001/embeddings}")
+    private String embeddingApiUrl;
+
+    @Value("${embedding.api.connect-timeout:30000}")
+    private Integer connectTimeout;
+
+    @Value("${embedding.api.read-timeout:30000}")
+    private Integer readTimeout;
+
+    private final OkHttpClient httpClient;
+
+    private static final List<String> INCLUDED_FIELDS = Arrays.asList("content", "fileName", "documentId", "createTime", "metadata");
 
     /**
      * {@inheritDoc}
@@ -198,7 +227,7 @@ public class ElasticsearchDocumentServiceImpl implements IElasticsearchDocumentS
             // Query the knowledge base document to get knowledge base ID
             LambdaQueryWrapper<SysKnowledgeBaseDocument> queryWrapper = new LambdaQueryWrapper<>();
             queryWrapper.eq(SysKnowledgeBaseDocument::getDocumentId, documentId)
-                       .select(SysKnowledgeBaseDocument::getKnowledgeBaseId);
+                .select(SysKnowledgeBaseDocument::getKnowledgeBaseId);
 
             SysKnowledgeBaseDocument document = knowledgeBaseDocumentMapper.selectOne(queryWrapper);
             if (document == null) {
@@ -298,5 +327,336 @@ public class ElasticsearchDocumentServiceImpl implements IElasticsearchDocumentS
         }
 
         return esDocument;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public SearchResponse<Map> embeddingSearch(String indexName, Integer size, String question,
+                                               Map<String, Object> metadata) {
+        if (metadata != null) {
+            log.info("Embedding search with metadata: {}", JSONUtil.toJsonStr(metadata));
+        }
+
+        try {
+            // 获取问题的向量表示
+            String requestBody = prepareRequestBody(Collections.singletonList(question));
+            Response response = sendEmbeddingRequest(requestBody);
+            String responseBody = response.body().string();
+
+            if (!response.isSuccessful()) {
+                log.error("向量化请求失败: {}", responseBody);
+                return null;
+            }
+
+            Map<String, Object> jsonResponse = JSONUtil.toBean(responseBody, Map.class);
+            if (!jsonResponse.containsKey("data") || !JSONUtil.isTypeJSONArray(jsonResponse.get("data").toString())) {
+                log.error("向量化返回数据格式不正确");
+                return null;
+            }
+
+            cn.hutool.json.JSONArray message = JSONUtil.parseArray(jsonResponse.get("data").toString());
+            List<Float> queryVector = JSONUtil.toList(message.getJSONArray(0), Float.class);
+
+            // 构建查询条件
+            KnnSearch.Builder knnBuilder = new KnnSearch.Builder()
+                .field("embedding")
+                .k(size)
+                .numCandidates(100)
+                .queryVector(queryVector);
+
+            // 添加元数据过滤
+            if (metadata != null && !metadata.isEmpty()) {
+                List<Query> filters = buildMetadataFilters(metadata);
+                if (!filters.isEmpty()) {
+                    knnBuilder.filter(filters);
+                }
+            }
+
+            SearchRequest searchRequest = new SearchRequest.Builder()
+                .index(indexName)
+                .knn(knnBuilder.build())
+                .size(size)
+                .source(src -> src
+                    .filter(f -> f
+                        .includes(INCLUDED_FIELDS)
+                    )
+                )
+                .build();
+
+            log.debug("Embedding search DSL: {}", searchRequest.toString());
+            return elasticsearchClient.search(searchRequest, Map.class);
+
+        } catch (Exception e) {
+            log.error("向量搜索发生异常", e);
+            return null;
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public SearchResponse<Map> keywordSearch(String indexName, Integer size, String question,
+                                             Map<String, Object> metadata) {
+        try {
+            // 构建多字段匹配查询
+            Query multiMatchQuery = Query.of(q -> q
+                .multiMatch(m -> m
+                    .fields(Collections.singletonList("content"))
+                    .type(TextQueryType.BestFields)
+                    .query(question)
+                )
+            );
+
+            // 构建最终查询
+            Query finalQuery;
+            if (metadata != null && !metadata.isEmpty()) {
+                List<Query> filters = buildMetadataFilters(metadata);
+                finalQuery = Query.of(q -> q
+                    .bool(b -> b
+                        .must(multiMatchQuery)
+                        .filter(filters)
+                    )
+                );
+            } else {
+                finalQuery = multiMatchQuery;
+            }
+
+            // 构建搜索请求
+            SearchRequest searchRequest = SearchRequest.of(s -> s
+                .index(indexName)
+                .query(finalQuery)
+                .from(0)
+                .size(size)
+            );
+
+            return elasticsearchClient.search(searchRequest, Map.class);
+        } catch (Exception e) {
+            log.error("关键词搜索发生异常: indexName={}, question={}", indexName, question, e);
+            throw new ServiceException("关键词搜索失败");
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public List<HitSourceDTO> hybridSearch(Long knowledgeBaseId, String question, String metadata, Boolean isKnowledge) {
+        SysKnowledgeBaseVo knowledgeBase = knowledgeBaseService.queryById(knowledgeBaseId);
+        
+        if (knowledgeBase == null) {
+            log.warn("知识库不存在: {}", knowledgeBaseId);
+            return new ArrayList<>();
+        }
+        
+        String indexName = elasticsearchIndexService.generateIndexName(knowledgeBase.getKnowledgeBaseId().toString());
+        Integer size = knowledgeBase.getTopK();
+        Map<String, Object> paramObject = null;
+
+        if (isKnowledge && metadata != null) {
+            paramObject = JSONUtil.toBean(metadata, Map.class);
+        }
+
+        // 执行向量搜索和关键词搜索
+        SearchResponse<Map> vectorResponse = embeddingSearch(indexName, size * 2, question, paramObject);
+        SearchResponse<Map> keywordResponse = keywordSearch(indexName, size * 2, question, paramObject);
+
+        if (vectorResponse == null || keywordResponse == null) {
+            return new ArrayList<>();
+        }
+        
+        // 归一化处理
+        List<HitSourceDTO> vectorResults = processSearchResponse(vectorResponse);
+        List<HitSourceDTO> keywordResults = processSearchResponse(keywordResponse);
+
+        if (vectorResults.isEmpty() && keywordResults.isEmpty()) {
+            return new ArrayList<>();
+        }
+        
+        // 获取最大和最小分数用于归一化
+        double vectorMaxScore = vectorResults.isEmpty() ? 0.0 : vectorResults.get(0).getScore();
+        double vectorMinScore = vectorResults.isEmpty() ? 0.0 : vectorResults.get(vectorResults.size() - 1).getScore();
+
+        double keywordMaxScore = keywordResults.isEmpty() ? 0.0 : keywordResults.get(0).getScore();
+        double keywordMinScore = keywordResults.isEmpty() ? 0.0 : keywordResults.get(keywordResults.size() - 1).getScore();
+
+        Map<String, HitSourceDTO> mergedResults = new HashMap<>();
+        
+        // 归一化处理,融合结果
+        for (HitSourceDTO vectorResult : vectorResults) {
+            Double score = vectorResult.getScore();
+            vectorResult.setNormalizedScore(normalize(score, vectorMinScore, vectorMaxScore) * knowledgeBase.getVectorWeight());
+            mergedResults.put(vectorResult.getHitDocument().getDocumentId() + "_" + vectorResult.getId(), vectorResult);
+        }
+
+        for (HitSourceDTO keywordResult : keywordResults) {
+            Double score = keywordResult.getScore();
+            keywordResult.setNormalizedScore(normalize(score, keywordMinScore, keywordMaxScore) * (1 - knowledgeBase.getVectorWeight()));
+            String key = keywordResult.getHitDocument().getDocumentId() + "_" + keywordResult.getId();
+
+            if (mergedResults.containsKey(key)) {
+                // 如果已存在，比较分数，保留分数较高的结果
+                HitSourceDTO existing = mergedResults.get(key);
+                double existingScore = existing.getNormalizedScore();
+                double currentScore = keywordResult.getNormalizedScore();
+
+                if (currentScore > existingScore) {
+                    mergedResults.put(key, keywordResult);
+                }
+            } else {
+                mergedResults.put(key, keywordResult);
+            }
+        }
+        
+        List<HitSourceDTO> sortedResults = mergedResults.values().stream()
+                // 根据 normalizedScore 降序排序
+                .sorted(Comparator.comparingDouble(HitSourceDTO::getNormalizedScore).reversed())
+                // 收集为 List
+                .collect(Collectors.toList());
+
+        // 调用reRank 方法进行重排序
+        List<List<String>> reRankList = new ArrayList<>();
+        for (HitSourceDTO hitSourceDTO : sortedResults) {
+            List<String> list = new ArrayList<>();
+            list.add(question);
+            list.add(hitSourceDTO.getHitDocument().getContent());
+            reRankList.add(list);
+        }
+
+        List<Double> reRankScoreList = reRankService.reRank(reRankList);
+
+        for (int i = 0; i < sortedResults.size(); i++) {
+            sortedResults.get(i).setReRandScore(reRankScoreList.get(i));
+        }
+
+        // 按照 reRandScore 降序排序
+        sortedResults.sort((a, b) -> Double.compare(b.getReRandScore(), a.getReRandScore()));
+
+        // 返回前 size 个结果
+        return sortedResults.subList(0, Math.min(size, sortedResults.size()));
+    }
+
+    /**
+     * 构建元数据过滤条件
+     */
+    private List<Query> buildMetadataFilters(Map<String, Object> metadata) {
+        List<Query> filters = new ArrayList<>();
+
+        for (Map.Entry<String, Object> entry : metadata.entrySet()) {
+            String fieldName = "metadata." + entry.getKey() + ".keyword";
+            Object value = entry.getValue();
+
+            // 处理值为 List 的情况（OR 关系）
+            if (value instanceof List) {
+                List<Query> shouldQueries = new ArrayList<>();
+                for (Object item : (List<?>) value) {
+                    shouldQueries.add(Query.of(q -> q
+                        .term(t -> t
+                            .field(fieldName)
+                            .value(FieldValue.of(item.toString()))
+                        )
+                    ));
+                }
+                // 将同一个 key 下的多个 value 用 should (OR) 组合
+                filters.add(Query.of(q -> q
+                    .bool(b -> b
+                        .should(shouldQueries)
+                        .minimumShouldMatch("1")
+                    )
+                ));
+            }
+            // 处理单个值的情况
+            else {
+                filters.add(Query.of(q -> q
+                    .term(t -> t
+                        .field(fieldName)
+                        .value(FieldValue.of(value.toString()))
+                    )
+                ));
+            }
+        }
+
+        return filters;
+    }
+
+    /**
+     * 准备向量化请求体
+     */
+    private String prepareRequestBody(List<String> texts) {
+        Map<String, Object> requestMap = new HashMap<>();
+        requestMap.put("text", texts);
+        return JSONUtil.toJsonStr(requestMap);
+    }
+
+    /**
+     * 发送向量化请求
+     */
+    private Response sendEmbeddingRequest(String requestBody) throws Exception {
+        Request request = new Request.Builder()
+            .url(embeddingApiUrl)
+            .post(RequestBody.create(requestBody, MediaType.parse("application/json")))
+            .build();
+
+        return httpClient.newCall(request).execute();
+    }
+
+
+    /**
+     * 处理搜索响应，将搜索结果转换为HitSourceDTO列表
+     */
+    private List<HitSourceDTO> processSearchResponse(SearchResponse<Map> searchResponse) {
+        List<HitSourceDTO> results = new ArrayList<>();
+        for (Hit<Map> hit : searchResponse.hits().hits()) {
+            HitSourceDTO hitSourceDTO = new HitSourceDTO();
+            hitSourceDTO.setId(hit.id());
+            hitSourceDTO.setScore(hit.score() != null ? hit.score().doubleValue() : 0.0);
+
+            HitDocumentDTO hitDocumentDTO = new HitDocumentDTO();
+            if (hit.source() != null) {
+                Map<String, Object> source = hit.source();
+                
+                hitDocumentDTO.setFileName(source.getOrDefault("fileName", "").toString());
+                Object createTimeObj = source.get("createTime");
+                if (createTimeObj instanceof Long) {
+                    hitDocumentDTO.setCreateTime((Long) createTimeObj);
+                }
+                hitDocumentDTO.setEmbeddingContent(source.getOrDefault("embeddingContent", "").toString());
+                
+                Object documentIdObj = source.get("documentId");
+                if (documentIdObj instanceof String) {
+                    hitDocumentDTO.setDocumentId(Long.valueOf(documentIdObj.toString()));
+                } else if (documentIdObj instanceof Long) {
+                    hitDocumentDTO.setDocumentId((Long) documentIdObj);
+                } else if (documentIdObj instanceof Integer) {
+                    hitDocumentDTO.setDocumentId(((Integer) documentIdObj).longValue());
+                }
+                
+                hitDocumentDTO.setPageContent(source.getOrDefault("pageContent", "").toString());
+                hitDocumentDTO.setContent(source.getOrDefault("content", "").toString());
+                
+                Object metadataObj = source.get("metadata");
+                if (metadataObj != null) {
+                    hitDocumentDTO.setMetadata(metadataObj.toString());
+                } else {
+                    hitDocumentDTO.setMetadata("");
+                }
+            }
+
+            hitSourceDTO.setHitDocument(hitDocumentDTO);
+            results.add(hitSourceDTO);
+        }
+        return results;
+    }
+
+    /**
+     * 归一化分数
+     */
+    private double normalize(Double score, double minScore, double maxScore) {
+        if (maxScore == minScore) {
+            return 0.5;
+        }
+        return (score - minScore) / (maxScore - minScore);
     }
 }

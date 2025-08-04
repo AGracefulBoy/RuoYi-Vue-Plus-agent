@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
+import cn.hutool.json.JSONUtil;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.core.validate.AddGroup;
 import org.dromara.common.core.validate.EditGroup;
@@ -16,12 +17,18 @@ import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.common.web.core.BaseController;
 import org.dromara.system.domain.bo.SysKnowledgeBaseBo;
+import org.dromara.system.domain.dto.HitSourceDTO;
+import org.dromara.system.domain.dto.KnowledgeSearchRequest;
 import org.dromara.system.domain.vo.SysKnowledgeBaseVo;
+import org.dromara.system.service.IElasticsearchDocumentService;
 import org.dromara.system.service.ISysKnowledgeBaseService;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 知识库管理
@@ -35,6 +42,7 @@ import java.util.List;
 public class SysKnowledgeBaseController extends BaseController {
 
     private final ISysKnowledgeBaseService knowledgeBaseService;
+    private final IElasticsearchDocumentService elasticsearchDocumentService;
 
     /**
      * 查询知识库管理列表
@@ -132,5 +140,23 @@ public class SysKnowledgeBaseController extends BaseController {
         return R.ok(knowledgeBaseService.checkNameUnique(bo));
     }
 
+    /**
+     * 知识库检索
+     *
+     * @param request 搜索请求参数
+     * @return 搜索结果列表
+     */
+    @SaCheckPermission("system:knowledgeBase:search")
+    @Log(title = "知识库检索", businessType = BusinessType.OTHER)
+    @PostMapping("/search")
+    public R<List<HitSourceDTO>> search(@Validated @RequestBody KnowledgeSearchRequest request) {
+        List<HitSourceDTO> results = elasticsearchDocumentService.hybridSearch(
+            request.getKnowledgeBaseId(),
+            request.getQuestion(),
+            request.getMetadata(),
+            request.getIsKnowledge()
+        );
+        return R.ok(results);
+    }
 
 }
