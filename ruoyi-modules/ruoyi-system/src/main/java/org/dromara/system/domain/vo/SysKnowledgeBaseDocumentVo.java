@@ -171,4 +171,18 @@ public class SysKnowledgeBaseDocumentVo implements Serializable {
     @ExcelProperty(value = "解析完成后的URL")
     private String parseCompletedUrl;
 
+    /**
+     * 是否开启图片识别
+     */
+    @ExcelProperty(value = "是否开启图片识别", converter = ExcelDictConvert.class)
+    @ExcelDictFormat(dictType = "sys_yes_no")
+    private Integer enableImageRecognition;
+
+    /**
+     * 文档提取模式，1为AI提取，0为代码提取
+     */
+    @ExcelProperty(value = "文档提取模式", converter = ExcelDictConvert.class)
+    @ExcelDictFormat(dictType = "sys_document_extract_mode")
+    private Integer mode;
+
 }

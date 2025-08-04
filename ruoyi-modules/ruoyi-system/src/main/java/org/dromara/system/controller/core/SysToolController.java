@@ -46,17 +46,6 @@ public class SysToolController extends BaseController {
     }
 
     /**
-     * 导出工具管理列表
-     */
-    @SaCheckPermission("system:tool:export")
-    @Log(title = "工具管理", businessType = BusinessType.EXPORT)
-    @PostMapping("/export")
-    public void export(SysToolBo bo, HttpServletResponse response) {
-        List<SysToolListVo> list = toolService.queryList(bo);
-        ExcelUtil.exportExcel(list, "工具管理", SysToolListVo.class, response);
-    }
-
-    /**
      * 获取工具管理详细信息（包含脚本代码）
      *
      * @param toolId 工具ID

@@ -17,6 +17,8 @@ import org.dromara.system.domain.SysAgent;
 import org.dromara.system.domain.SysAgentChat;
 import org.dromara.system.domain.SysAgentChatMessage;
 import org.dromara.system.domain.bo.PythonDebugRequestBo;
+import org.dromara.system.domain.dto.HitDocumentDTO;
+import org.dromara.system.domain.dto.HitSourceDTO;
 import org.dromara.system.domain.dto.StreamMessageResponseDto;
 import org.dromara.system.domain.dto.TokenUsageDto;
 import org.dromara.system.domain.dto.ToolDto;
@@ -123,6 +125,9 @@ public class TaskAgentServiceImpl implements TaskAgentService {
 
     @Autowired
     private PythonProperties pythonProperties;
+
+    @Autowired
+    private IElasticsearchDocumentService elasticsearchDocumentService;
 
     @Override
     public Flux<StreamMessageResponseDto> executeReActStream(SysAgent agent, List<ToolDto> availableTools, String userInput) {
@@ -352,8 +357,46 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                     return "未找到支持的执行器: " + tool.getToolType();
                 }
             } else if ("knowledge".equals(type)) {
-                // 符合YAGNI原则，暂时返回占位信息
-                return "知识库查询功能待实现";
+                // 实现知识库查询功能
+                try {
+                    // 解析参数，获取查询问题
+                    String parameters = toolCall.getParameters();
+                    String question = parameters;
+                    String metadata = null;
+                    
+                    // 如果参数是JSON格式，尝试解析
+                    if (parameters != null && parameters.trim().startsWith("{")) {
+                        Map<String, Object> params = JSONUtil.toBean(parameters, Map.class);
+                        question = (String) params.getOrDefault("question", parameters);
+                        metadata = params.containsKey("metadata") ? JSONUtil.toJsonStr(params.get("metadata")) : null;
+                    }
+                    
+                    // 调用ElasticsearchDocumentService进行混合搜索
+                    List<HitSourceDTO> hitSourceDTOS = elasticsearchDocumentService.hybridSearch(
+                        toolCall.getId(), question, metadata, true);
+                    
+                    // 格式化搜索结果
+                    if (hitSourceDTOS == null || hitSourceDTOS.isEmpty()) {
+                        return "未找到相关文档";
+                    }
+                    
+                    List<HashMap<String, String>> resultHit = new ArrayList<>();
+                    for (HitSourceDTO hitSourceDTO : hitSourceDTOS) {
+                        HitDocumentDTO doc = hitSourceDTO.getHitDocument();
+                        if (doc != null) {
+                            HashMap<String, String> hitSourceMap = new HashMap<>();
+                            hitSourceMap.put("content", doc.getContent());
+                            hitSourceMap.put("metadata", doc.getMetadata());
+                            hitSourceMap.put("embeddingContent", doc.getEmbeddingContent());
+                            resultHit.add(hitSourceMap);
+                        }
+                    }
+                    
+                    return JSONUtil.toJsonStr(resultHit);
+                } catch (Exception e) {
+                    log.error("执行知识库查询失败", e);
+                    return "知识库查询失败: " + e.getMessage();
+                }
             } else if ("datasource".equals(type)) {
                 // 符合YAGNI原则，暂时返回占位信息
                 return "数据源查询功能待实现";

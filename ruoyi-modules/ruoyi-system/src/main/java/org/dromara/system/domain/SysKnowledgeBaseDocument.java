@@ -119,4 +119,14 @@ public class SysKnowledgeBaseDocument extends TenantEntity {
      */
     private String parseCompletedUrl;
 
+    /**
+     * 是否开启图片识别
+     */
+    private Integer enableImageRecognition;
+
+    /**
+     * 文档提取模式，1为AI提取，0为代码提取
+     */
+    private Integer mode;
+
 } 

@@ -46,17 +46,6 @@ public class SysDatasourceColumnMetadataController extends BaseController {
     }
 
     /**
-     * 导出字段元数据管理列表
-     */
-    @SaCheckPermission("system:column:metadata:export")
-    @Log(title = "字段元数据管理", businessType = BusinessType.EXPORT)
-    @PostMapping("/export")
-    public void export(SysColumnMetadataBo bo, HttpServletResponse response) {
-        List<SysColumnMetadataVo> list = columnMetadataService.queryList(bo);
-        ExcelUtil.exportExcel(list, "字段元数据管理", SysColumnMetadataVo.class, response);
-    }
-
-    /**
      * 获取字段元数据管理详细信息
      *
      * @param columnMetaId 字段元数据ID

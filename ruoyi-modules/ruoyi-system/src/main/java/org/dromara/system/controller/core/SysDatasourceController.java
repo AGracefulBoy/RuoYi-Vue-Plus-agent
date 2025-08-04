@@ -46,16 +46,6 @@ public class SysDatasourceController extends BaseController {
         return datasourceService.queryPageListForList(bo, pageQuery);
     }
 
-    /**
-     * 导出数据源管理列表
-     */
-    @SaCheckPermission("system:datasource:export")
-    @Log(title = "数据源管理", businessType = BusinessType.EXPORT)
-    @PostMapping("/export")
-    public void export(SysDatasourceBo bo, HttpServletResponse response) {
-        List<SysDatasourceVo> list = datasourceService.queryList(bo);
-        ExcelUtil.exportExcel(list, "数据源管理", SysDatasourceVo.class, response);
-    }
 
     /**
      * 获取数据源管理详细信息

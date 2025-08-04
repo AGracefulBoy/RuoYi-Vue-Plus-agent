@@ -43,17 +43,6 @@ public class SysModelConfigController extends BaseController {
     }
 
     /**
-     * 导出模型配置列表
-     */
-    @SaCheckPermission("system:modelConfig:export")
-    @Log(title = "模型配置", businessType = BusinessType.EXPORT)
-    @PostMapping("/export")
-    public void export(SysModelConfigBo bo, HttpServletResponse response) {
-        List<SysModelConfigVo> list = modelConfigService.queryList(bo);
-        ExcelUtil.exportExcel(list, "模型配置", SysModelConfigVo.class, response);
-    }
-
-    /**
      * 获取模型配置详细信息
      *
      * @param id 主键

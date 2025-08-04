@@ -283,7 +283,7 @@ public class SysKnowledgeBaseDocumentServiceImpl implements ISysKnowledgeBaseDoc
         }
 
         // 如果文档没有配置 model，则从知识库获取
-        if (document.getModel() != null && knowledgeBaseVo.getModel() != null) {
+        if (document.getModel() == null && knowledgeBaseVo.getModel() != null) {
             document.setModel(knowledgeBaseVo.getModel());
         }
 

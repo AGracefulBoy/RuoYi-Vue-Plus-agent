@@ -43,16 +43,6 @@ public class SysPythonPackageController extends BaseController {
         return pythonPackageService.queryPageList(bo, pageQuery);
     }
 
-    /**
-     * 导出Python包管理列表
-     */
-    @SaCheckPermission("system:pythonPackage:export")
-    @Log(title = "Python包管理", businessType = BusinessType.EXPORT)
-    @PostMapping("/export")
-    public void export(SysPythonPackageBo bo, HttpServletResponse response) {
-        List<SysPythonPackageVo> list = pythonPackageService.queryList(bo);
-        ExcelUtil.exportExcel(list, "Python包管理", SysPythonPackageVo.class, response);
-    }
 
     /**
      * 获取Python包管理详细信息

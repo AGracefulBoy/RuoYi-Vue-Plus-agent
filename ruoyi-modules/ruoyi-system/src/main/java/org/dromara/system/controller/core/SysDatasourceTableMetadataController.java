@@ -46,17 +46,6 @@ public class SysDatasourceTableMetadataController extends BaseController {
     }
 
     /**
-     * 导出表元数据管理列表
-     */
-    @SaCheckPermission("system:table:metadata:export")
-    @Log(title = "表元数据管理", businessType = BusinessType.EXPORT)
-    @PostMapping("/export")
-    public void export(SysTableMetadataBo bo, HttpServletResponse response) {
-        List<SysTableMetadataVo> list = tableMetadataService.queryList(bo);
-        ExcelUtil.exportExcel(list, "表元数据管理", SysTableMetadataVo.class, response);
-    }
-
-    /**
      * 获取表元数据管理详细信息
      *
      * @param tableMetaId 表元数据ID

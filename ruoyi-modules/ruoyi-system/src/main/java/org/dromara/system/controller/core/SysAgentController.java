@@ -45,16 +45,6 @@ public class SysAgentController extends BaseController {
         return agentService.querySimplePageList(bo, pageQuery);
     }
 
-    /**
-     * 导出智能体管理列表
-     */
-    @SaCheckPermission("system:agent:export")
-    @Log(title = "智能体管理", businessType = BusinessType.EXPORT)
-    @PostMapping("/export")
-    public void export(SysAgentBo bo, HttpServletResponse response) {
-        List<SysAgentVo> list = agentService.queryList(bo);
-        ExcelUtil.exportExcel(list, "智能体管理", SysAgentVo.class, response);
-    }
 
     /**
      * 获取智能体详细信息

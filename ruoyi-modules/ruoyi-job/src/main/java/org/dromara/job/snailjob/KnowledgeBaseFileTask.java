@@ -48,7 +48,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
@@ -117,9 +116,9 @@ public class KnowledgeBaseFileTask {
             for (SysKnowledgeBaseDocument doc : documentsToProcess) {
                 DocumentParseRequest request = DocumentParseRequest.builder()
                     .fileType(doc.getType())
-                    .mode(1)
+                    .mode(doc.getMode() != null ? doc.getMode() : 1)
                     .fileUrl(doc.getUrl())
-                    .enableImageRecognition(StrUtil.isNotBlank(doc.getImagePrompt()))
+                    .enableImageRecognition(doc.getEnableImageRecognition() != null && doc.getEnableImageRecognition() == 1)
                     .prompt(doc.getImagePrompt())
                     .build();
                 requests.add(request);

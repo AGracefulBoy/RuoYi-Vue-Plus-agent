@@ -46,17 +46,6 @@ public class SysKnowledgeBaseConfigController extends BaseController {
     }
 
     /**
-     * 导出知识库默认配置列表
-     */
-    @SaCheckPermission("system:knowledgeBaseConfig:export")
-    @Log(title = "知识库默认配置", businessType = BusinessType.EXPORT)
-    @PostMapping("/export")
-    public void export(SysKnowledgeBaseConfigBo bo, HttpServletResponse response) {
-        List<SysKnowledgeBaseConfigVo> list = knowledgeBaseConfigService.queryList(bo);
-        ExcelUtil.exportExcel(list, "知识库默认配置", SysKnowledgeBaseConfigVo.class, response);
-    }
-
-    /**
      * 获取知识库默认配置详细信息
      *
      * @param knowledgeBaseConfigId 主键

@@ -63,17 +63,6 @@ public class SysKnowledgeBaseDocumentController extends BaseController {
     }
 
     /**
-     * 导出知识库文档管理列表
-     */
-    @SaCheckPermission("system:knowledgeBaseDocument:export")
-    @Log(title = "知识库文档管理", businessType = BusinessType.EXPORT)
-    @PostMapping("/export")
-    public void export(SysKnowledgeBaseDocumentBo bo, HttpServletResponse response) {
-        List<SysKnowledgeBaseDocumentVo> list = knowledgeBaseDocumentService.queryList(bo);
-        ExcelUtil.exportExcel(list, "知识库文档管理", SysKnowledgeBaseDocumentVo.class, response);
-    }
-
-    /**
      * 获取知识库文档管理详细信息
      */
     @SaCheckPermission("system:knowledgeBaseDocument:query")
