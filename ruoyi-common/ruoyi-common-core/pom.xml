@@ -94,6 +94,13 @@
             <artifactId>ip2region</artifactId>
         </dependency>
 
+        <!-- OkHttp 客户端 -->
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+            <version>4.12.0</version>
+        </dependency>
+
     </dependencies>
 
 </project>
