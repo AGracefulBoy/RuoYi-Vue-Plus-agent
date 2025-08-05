@@ -26,6 +26,7 @@ public class SysKnowledgeBaseDocumentConstants {
         STATUS_DOCUMENT_PARSING,
         STATUS_DOCUMENT_EMBEDDING,
         STATUS_DOCUMENT_FINISHED,
+        STATUS_DOCUMENT_CHUNK,
         STATUS_DOCUMENT_FAIL
     };
 

@@ -25,7 +25,7 @@ public class PythonDebugRequestBo {
     /**
      * 要调用的函数名
      */
-    private String funcName;
+    private String functionName;
 
     /**
      * 函数参数（Map对象）

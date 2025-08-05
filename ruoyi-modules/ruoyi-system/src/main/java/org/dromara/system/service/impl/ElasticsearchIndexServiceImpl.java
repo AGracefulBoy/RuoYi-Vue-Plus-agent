@@ -71,8 +71,7 @@ public class ElasticsearchIndexServiceImpl implements IElasticsearchIndexService
                             .format("yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis"))))
                     .properties("embedding", Property.of(p -> p
                         .denseVector(v -> v
-                            .dims(768)
-                            .similarity("cosine"))))
+                            .dims(768))))
                 )
             );
 

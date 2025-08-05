@@ -661,8 +661,8 @@ public class SysPythonPackageServiceImpl implements ISysPythonPackageService {
             }
 
             // 使用单独的funcName字段，默认为"main"
-            String functionName = request.getFuncName() != null && !request.getFuncName().trim().isEmpty()
-                ? request.getFuncName().trim() : "main";
+            String functionName = request.getFunctionName() != null && !request.getFunctionName().trim().isEmpty()
+                ? request.getFunctionName().trim() : "main";
 
             // 处理参数，转换为JSON格式
             String paramsJson = buildParamsJson(request.getParams());
@@ -710,8 +710,7 @@ public class SysPythonPackageServiceImpl implements ISysPythonPackageService {
         response.setCharacterEncoding("UTF-8");
 
         // 构建标准响应格式
-        R<String> responseResult = R.ok(result);
-        response.getWriter().write(JSONUtil.toJsonStr(responseResult));
+        response.getWriter().write(JSONUtil.toJsonStr(result)+"111");
         response.getWriter().flush();
     }
 

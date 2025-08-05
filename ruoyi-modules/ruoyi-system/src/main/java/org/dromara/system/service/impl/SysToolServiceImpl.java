@@ -8,7 +8,6 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.dromara.common.core.constant.SystemConstants;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.MapstructUtils;
 import org.dromara.common.core.utils.StringUtils;
@@ -192,7 +191,7 @@ public class SysToolServiceImpl implements ISysToolService {
 
         // 手动创建新的业务对象并复制属性
         SysToolBo copyToolBo = new SysToolBo();
-        
+
         // 复制基本属性
         copyToolBo.setToolName(originalTool.getToolName());
         copyToolBo.setToolDesc(originalTool.getToolDesc());
@@ -248,12 +247,12 @@ public class SysToolServiceImpl implements ISysToolService {
         // 5. 构建Python调试请求对象
         PythonDebugRequestBo pythonRequest = new PythonDebugRequestBo();
         pythonRequest.setCode(tool.getScriptCode());
-        pythonRequest.setFuncName(tool.getFunctionName());
+        pythonRequest.setFunctionName(tool.getFunctionName());
         pythonRequest.setParams(request.getParams());
         pythonRequest.setStream(request.getStream());
 
         // 6. 记录调试信息
-        log.info("开始调试工具：{}, 工具ID：{}, 函数名：{}, 流式：{}", 
+        log.info("开始调试工具：{}, 工具ID：{}, 函数名：{}, 流式：{}",
             tool.getToolName(), tool.getToolId(), tool.getFunctionName(), request.getStream());
 
         // 7. 调用Python调试服务

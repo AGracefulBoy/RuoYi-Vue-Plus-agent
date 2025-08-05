@@ -363,23 +363,23 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                     String parameters = toolCall.getParameters();
                     String question = parameters;
                     String metadata = null;
-                    
+
                     // 如果参数是JSON格式，尝试解析
                     if (parameters != null && parameters.trim().startsWith("{")) {
                         Map<String, Object> params = JSONUtil.toBean(parameters, Map.class);
                         question = (String) params.getOrDefault("question", parameters);
                         metadata = params.containsKey("metadata") ? JSONUtil.toJsonStr(params.get("metadata")) : null;
                     }
-                    
+
                     // 调用ElasticsearchDocumentService进行混合搜索
                     List<HitSourceDTO> hitSourceDTOS = elasticsearchDocumentService.hybridSearch(
                         toolCall.getId(), question, metadata, true);
-                    
+
                     // 格式化搜索结果
                     if (hitSourceDTOS == null || hitSourceDTOS.isEmpty()) {
                         return "未找到相关文档";
                     }
-                    
+
                     List<HashMap<String, String>> resultHit = new ArrayList<>();
                     for (HitSourceDTO hitSourceDTO : hitSourceDTOS) {
                         HitDocumentDTO doc = hitSourceDTO.getHitDocument();
@@ -391,7 +391,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                             resultHit.add(hitSourceMap);
                         }
                     }
-                    
+
                     return JSONUtil.toJsonStr(resultHit);
                 } catch (Exception e) {
                     log.error("执行知识库查询失败", e);
@@ -421,7 +421,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
             // 构建Python调试请求
             PythonDebugRequestBo request = new PythonDebugRequestBo();
             request.setCode(tool.getScriptCode());
-            request.setFuncName(tool.getFunctionName());
+            request.setFunctionName(tool.getFunctionName());
             request.setStream(false); // ReAct模式不需要流式响应
 
             // 解析参数
@@ -433,7 +433,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
             // 构建请求数据
             Map<String, String> data = new HashMap<>();
             data.put("code", request.getCode());
-            data.put("func_name", request.getFuncName());
+            data.put("func_name", request.getFunctionName());
             data.put("params", parameters != null ? parameters : "{}");
 
             String requestJson = JSONUtil.toJsonStr(data);

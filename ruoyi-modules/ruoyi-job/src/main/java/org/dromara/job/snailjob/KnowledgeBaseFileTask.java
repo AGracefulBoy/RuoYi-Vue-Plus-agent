@@ -359,7 +359,6 @@ public class KnowledgeBaseFileTask {
 
 
     @JobExecutor(name = "documentChunkEmbeddingJob")
-    @Transactional(rollbackFor = Exception.class)
     public ExecuteResult documentChunkEmbeddingJob(JobArgs jobArgs) {
         try {
             SnailJobLog.REMOTE.info("开始执行文档向量化任务");

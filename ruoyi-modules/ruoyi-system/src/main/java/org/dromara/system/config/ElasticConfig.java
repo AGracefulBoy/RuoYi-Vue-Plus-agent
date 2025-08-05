@@ -35,7 +35,7 @@ public class ElasticConfig {
         // 解析URI，支持单节点
         String[] uriArray = uris.split(",");
         HttpHost[] hosts = new HttpHost[uriArray.length];
-        
+
         for (int i = 0; i < uriArray.length; i++) {
             String uri = uriArray[i].trim();
             if (uri.startsWith("https://")) {
@@ -63,18 +63,18 @@ public class ElasticConfig {
                     .create()
                     .loadTrustMaterial(null, (chain, authType) -> true)
                     .build();
-                
+
                 httpClientBuilder.setSSLContext(sslContext);
                 httpClientBuilder.setSSLHostnameVerifier((hostname, session) -> true);
-                
+
                 // 配置用户名密码认证
                 if (StringUtils.hasText(username) && StringUtils.hasText(password)) {
                     CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
-                    credentialsProvider.setCredentials(AuthScope.ANY, 
+                    credentialsProvider.setCredentials(AuthScope.ANY,
                         new UsernamePasswordCredentials(username, password));
                     httpClientBuilder.setDefaultCredentialsProvider(credentialsProvider);
                 }
-                
+
             } catch (Exception e) {
                 throw new RuntimeException("Failed to configure SSL context", e);
             }
@@ -87,7 +87,7 @@ public class ElasticConfig {
     @Bean
     public ElasticsearchClient elasticsearchClient() {
         RestClientTransport transport = new RestClientTransport(
-            restClient(), 
+            restClient(),
             new JacksonJsonpMapper()
         );
         return new ElasticsearchClient(transport);
