@@ -97,15 +97,14 @@ public class HttpUtils {
             log.info("POST流式请求响应状态: {}", responseCode);
             
             if (responseCode == HttpURLConnection.HTTP_OK) {
-                // 流式读取响应
-                try (InputStream inputStream = connection.getInputStream();
-                     BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
-                    
-                    char[] buffer = new char[1024];
+                // 流式读取响应 - 将字节流转换为UTF-8字符串
+                try (InputStream inputStream = connection.getInputStream()) {
+                    byte[] buffer = new byte[1024];
                     int bytesRead;
-                    while ((bytesRead = reader.read(buffer)) != -1) {
-                        String chunk = new String(buffer, 0, bytesRead);
-                        outputStream.write(chunk.getBytes(StandardCharsets.UTF_8));
+                    while ((bytesRead = inputStream.read(buffer)) != -1) {
+                        // 将字节数组转换为UTF-8编码的字符串
+                        String content = new String(buffer, 0, bytesRead, StandardCharsets.UTF_8);
+                        outputStream.write(content.getBytes(StandardCharsets.UTF_8));
                         outputStream.flush();
                     }
                 }

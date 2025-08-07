@@ -2,6 +2,8 @@ package org.dromara.system.domain.vo;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
+import org.dromara.common.translation.annotation.Translation;
+import org.dromara.common.translation.constant.TransConstant;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -54,10 +56,6 @@ public class SysAgentListVo implements Serializable {
      */
     private Long createBy;
 
-    /**
-     * 创建者名称
-     */
-    private String createByName;
 
     /**
      * 更新者
@@ -65,8 +63,17 @@ public class SysAgentListVo implements Serializable {
     private Long updateBy;
 
     /**
+     * 创建者名称
+     */
+    @Translation(type = TransConstant.USER_ID_TO_NICKNAME, mapper = "createBy")
+    private String createByName;
+
+
+
+    /**
      * 更新者名称
      */
+    @Translation(type = TransConstant.USER_ID_TO_NICKNAME, mapper = "updateBy")
     private String updateByName;
 
     /**

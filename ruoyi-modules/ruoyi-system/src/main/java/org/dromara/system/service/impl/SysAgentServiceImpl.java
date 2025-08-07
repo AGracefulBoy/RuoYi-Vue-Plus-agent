@@ -55,7 +55,7 @@ public class SysAgentServiceImpl implements ISysAgentService {
         if (agentVo == null) {
             return null;
         }
-        
+
         // 设置模型名称（用于前端展示）
         if (agentVo.getModel() != null) {
             SysModelConfigVo modelConfig = modelConfigMapper.selectVoById(agentVo.getModel());
@@ -63,14 +63,14 @@ public class SysAgentServiceImpl implements ISysAgentService {
                 agentVo.setModelName(modelConfig.getModelCode());
             }
         }
-        
+
         if (agentVo.getEnhanceModel() != null) {
             SysModelConfigVo enhanceModelConfig = modelConfigMapper.selectVoById(agentVo.getEnhanceModel());
             if (enhanceModelConfig != null) {
                 agentVo.setEnhanceModelName(enhanceModelConfig.getModelCode());
             }
         }
-        
+
         // 转换工具列表
         if (CollUtil.isNotEmpty(agentVo.getToolList())) {
             List<SysToolSimpleVo> toolDetailList = new ArrayList<>();
@@ -89,7 +89,7 @@ public class SysAgentServiceImpl implements ISysAgentService {
             }
             agentVo.setToolDetailList(toolDetailList);
         }
-        
+
         // 转换知识库列表
         if (CollUtil.isNotEmpty(agentVo.getKnowledgeBaseList())) {
             List<SysKnowledgeBaseSimpleVo> knowledgeBaseDetailList = new ArrayList<>();
@@ -107,7 +107,7 @@ public class SysAgentServiceImpl implements ISysAgentService {
             }
             agentVo.setKnowledgeBaseDetailList(knowledgeBaseDetailList);
         }
-        
+
         // 转换数据库列表
         if (CollUtil.isNotEmpty(agentVo.getDatabaseList())) {
             List<SysDatasourceSimpleVo> databaseDetailList = new ArrayList<>();
@@ -126,20 +126,20 @@ public class SysAgentServiceImpl implements ISysAgentService {
             }
             agentVo.setDatabaseDetailList(databaseDetailList);
         }
-        
+
         return agentVo;
     }
 
     /**
      * 查询智能体管理列表
      */
-    @Override
-    public TableDataInfo<SysAgentVo> queryPageList(SysAgentBo bo, PageQuery pageQuery) {
-        LambdaQueryWrapper<SysAgent> lqw = buildQueryWrapper(bo);
-        Page<SysAgent> page = pageQuery.build();
-        IPage<SysAgentVo> result = baseMapper.selectAgentListVoPage(page, lqw);
-        return TableDataInfo.build(result);
-    }
+//    @Override
+//    public TableDataInfo<SysAgentVo> queryPageList(SysAgentBo bo, PageQuery pageQuery) {
+//        LambdaQueryWrapper<SysAgent> lqw = buildQueryWrapper(bo);
+//        Page<SysAgent> page = pageQuery.build();
+//        IPage<SysAgentVo> result = baseMapper.selectAgentListVoPage(page, lqw);
+//        return TableDataInfo.build(result);
+//    }
 
     /**
      * 查询智能体管理列表（仅返回关键字段）
@@ -152,15 +152,6 @@ public class SysAgentServiceImpl implements ISysAgentService {
         return TableDataInfo.build(result);
     }
 
-    /**
-     * 查询智能体管理列表
-     */
-    @Override
-    public List<SysAgentVo> queryList(SysAgentBo bo) {
-        LambdaQueryWrapper<SysAgent> lqw = buildQueryWrapper(bo);
-        return baseMapper.selectAgentListVo(lqw);
-    }
-
     private LambdaQueryWrapper<SysAgent> buildQueryWrapper(SysAgentBo bo) {
         LambdaQueryWrapper<SysAgent> lqw = Wrappers.lambdaQuery();
         lqw.like(StringUtils.isNotBlank(bo.getAgentName()), SysAgent::getAgentName, bo.getAgentName());
@@ -170,7 +161,8 @@ public class SysAgentServiceImpl implements ISysAgentService {
         lqw.eq(StringUtils.isNotBlank(bo.getConversationMode()), SysAgent::getConversationMode, bo.getConversationMode());
         lqw.eq(ObjectUtil.isNotNull(bo.getModel()), SysAgent::getModel, bo.getModel());
         lqw.eq(ObjectUtil.isNotNull(bo.getEnhanceModel()), SysAgent::getEnhanceModel, bo.getEnhanceModel());
-        // 注意：del_flag 的过滤已经在 Mapper 的 SQL 中处理，这里不再添加
+        // 添加 del_flag 过滤条件
+        lqw.eq(SysAgent::getDelFlag, "0");
         lqw.orderByDesc(SysAgent::getCreateTime);
         return lqw;
     }
@@ -244,7 +236,7 @@ public class SysAgentServiceImpl implements ISysAgentService {
 
         // 校验对话模式
         if (StringUtils.isNotEmpty(entity.getConversationMode())) {
-            String[] validModes = {"single", "multi", "context"};
+            String[] validModes = {"free_chat", "self_planning"};
             boolean isValid = false;
             for (String mode : validModes) {
                 if (mode.equals(entity.getConversationMode())) {
@@ -253,7 +245,7 @@ public class SysAgentServiceImpl implements ISysAgentService {
                 }
             }
             if (!isValid) {
-                throw new ServiceException("对话模式不正确，支持的模式：single、multi、context");
+                throw new ServiceException("对话模式不正确，支持的模式：free_chat、self_planning");
             }
         }
 
@@ -292,29 +284,4 @@ public class SysAgentServiceImpl implements ISysAgentService {
         long count = baseMapper.selectCount(wrapper);
         return count == 0;
     }
-
-    /**
-     * 根据智能体类型查询智能体列表
-     */
-    @Override
-    public List<SysAgentVo> queryByAgentType(String agentType) {
-        LambdaQueryWrapper<SysAgent> wrapper = Wrappers.lambdaQuery();
-        wrapper.eq(SysAgent::getAgentType, agentType);
-        wrapper.eq(SysAgent::getStatus, "0"); // 只查询正常状态的智能体
-        // 注意：del_flag 的过滤已经在 Mapper 的 SQL 中处理，这里不再添加
-        wrapper.orderByDesc(SysAgent::getCreateTime);
-        return baseMapper.selectAgentListVo(wrapper);
-    }
-
-    /**
-     * 根据状态查询智能体列表
-     */
-    @Override
-    public List<SysAgentVo> queryByStatus(String status) {
-        LambdaQueryWrapper<SysAgent> wrapper = Wrappers.lambdaQuery();
-        wrapper.eq(SysAgent::getStatus, status);
-        // 注意：del_flag 的过滤已经在 Mapper 的 SQL 中处理，这里不再添加
-        wrapper.orderByDesc(SysAgent::getCreateTime);
-        return baseMapper.selectAgentListVo(wrapper);
-    }
-} 
+}

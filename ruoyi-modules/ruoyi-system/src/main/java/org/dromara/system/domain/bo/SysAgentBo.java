@@ -26,13 +26,13 @@ public class SysAgentBo extends BaseEntity {
     /**
      * 智能体ID
      */
-    @NotNull(message = "智能体ID不能为空", groups = { EditGroup.class })
+    @NotNull(message = "智能体ID不能为空", groups = {EditGroup.class})
     private Long agentId;
 
     /**
      * 智能体名称
      */
-    @NotBlank(message = "智能体名称不能为空", groups = { AddGroup.class, EditGroup.class })
+    @NotBlank(message = "智能体名称不能为空", groups = {AddGroup.class, EditGroup.class})
     @Size(min = 0, max = 100, message = "智能体名称长度不能超过{max}个字符")
     private String agentName;
 
@@ -45,7 +45,7 @@ public class SysAgentBo extends BaseEntity {
     /**
      * 智能体类型（chat对话型、task任务型、workflow工作流型）
      */
-    @NotBlank(message = "智能体类型不能为空", groups = { AddGroup.class, EditGroup.class })
+    @NotBlank(message = "智能体类型不能为空", groups = {AddGroup.class, EditGroup.class})
     @Size(min = 0, max = 50, message = "智能体类型长度不能超过{max}个字符")
     private String agentType;
 
@@ -76,7 +76,7 @@ public class SysAgentBo extends BaseEntity {
     private String status;
 
     /**
-     * 对话模式（single单轮、multi多轮、context上下文）
+     * 对话模式（free_chat 自由对话、self_planning自主规划）
      */
     private String conversationMode;
 
@@ -110,4 +110,4 @@ public class SysAgentBo extends BaseEntity {
      */
     @Size(min = 0, max = 500, message = "备注长度不能超过{max}个字符")
     private String remark;
-} 
+}

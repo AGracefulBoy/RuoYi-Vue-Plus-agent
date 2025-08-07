@@ -116,12 +116,4 @@ public class SysAgent extends TenantEntity {
      * 备注
      */
     private String remark;
-
-    /**
-     * 设置默认值
-     */
-    public SysAgent() {
-        this.status = "0"; // 默认正常状态
-        this.conversationMode = "free_chat"; // 默认自由对话模式
-    }
 }

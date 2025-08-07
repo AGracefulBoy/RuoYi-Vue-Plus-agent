@@ -1,13 +1,11 @@
 package org.dromara.system.controller.core;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
-import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.core.validate.AddGroup;
 import org.dromara.common.core.validate.EditGroup;
-import org.dromara.common.excel.utils.ExcelUtil;
 import org.dromara.common.idempotent.annotation.RepeatSubmit;
 import org.dromara.common.log.annotation.Log;
 import org.dromara.common.log.enums.BusinessType;
@@ -15,8 +13,8 @@ import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.common.web.core.BaseController;
 import org.dromara.system.domain.bo.SysAgentBo;
-import org.dromara.system.domain.vo.SysAgentVo;
 import org.dromara.system.domain.vo.SysAgentListVo;
+import org.dromara.system.domain.vo.SysAgentVo;
 import org.dromara.system.service.ISysAgentService;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -109,36 +107,5 @@ public class SysAgentController extends BaseController {
     @GetMapping("/checkAgentNameUnique")
     public R<Boolean> checkAgentNameUnique(SysAgentBo bo) {
         return R.ok(agentService.checkAgentNameUnique(bo));
-    }
-
-    /**
-     * 根据智能体类型查询智能体列表
-     *
-     * @param agentType 智能体类型
-     */
-    @SaCheckPermission("system:agent:query")
-    @GetMapping("/type/{agentType}")
-    public R<List<SysAgentVo>> getByAgentType(@PathVariable String agentType) {
-        return R.ok(agentService.queryByAgentType(agentType));
-    }
-
-    /**
-     * 根据状态查询智能体列表
-     *
-     * @param status 状态
-     */
-    @SaCheckPermission("system:agent:query")
-    @GetMapping("/status/{status}")
-    public R<List<SysAgentVo>> getByStatus(@PathVariable String status) {
-        return R.ok(agentService.queryByStatus(status));
-    }
-
-    /**
-     * 获取可用的智能体列表（状态为正常的）
-     */
-    @SaCheckPermission("system:agent:query")
-    @GetMapping("/available")
-    public R<List<SysAgentVo>> getAvailableAgents() {
-        return R.ok(agentService.queryByStatus("0"));
     }
 }

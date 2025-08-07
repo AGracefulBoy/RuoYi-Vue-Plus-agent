@@ -25,15 +25,6 @@ public interface ISysAgentService {
     SysAgentVo queryById(Long agentId);
 
     /**
-     * 查询智能体管理列表
-     *
-     * @param bo        智能体管理业务对象
-     * @param pageQuery 分页查询参数
-     * @return 智能体管理集合
-     */
-    TableDataInfo<SysAgentVo> queryPageList(SysAgentBo bo, PageQuery pageQuery);
-
-    /**
      * 查询智能体管理列表（仅返回关键字段）
      *
      * @param bo        智能体管理业务对象
@@ -48,7 +39,7 @@ public interface ISysAgentService {
      * @param bo 智能体管理业务对象
      * @return 智能体管理集合
      */
-    List<SysAgentVo> queryList(SysAgentBo bo);
+//    List<SysAgentVo> queryList(SysAgentBo bo);
 
     /**
      * 新增智能体管理
@@ -91,20 +82,4 @@ public interface ISysAgentService {
      * @return 是否唯一
      */
     Boolean checkAgentNameUnique(SysAgentBo bo);
-
-    /**
-     * 根据智能体类型查询智能体列表
-     *
-     * @param agentType 智能体类型
-     * @return 智能体列表
-     */
-    List<SysAgentVo> queryByAgentType(String agentType);
-
-    /**
-     * 根据状态查询智能体列表
-     *
-     * @param status 状态
-     * @return 智能体列表
-     */
-    List<SysAgentVo> queryByStatus(String status);
-} 
+}

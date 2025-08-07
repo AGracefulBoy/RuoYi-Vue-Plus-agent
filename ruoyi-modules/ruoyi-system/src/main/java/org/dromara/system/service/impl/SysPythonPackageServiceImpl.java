@@ -710,7 +710,7 @@ public class SysPythonPackageServiceImpl implements ISysPythonPackageService {
         response.setCharacterEncoding("UTF-8");
 
         // 构建标准响应格式
-        response.getWriter().write(JSONUtil.toJsonStr(result)+"111");
+        response.getWriter().write(JSONUtil.toJsonStr(result));
         response.getWriter().flush();
     }
 
@@ -718,11 +718,12 @@ public class SysPythonPackageServiceImpl implements ISysPythonPackageService {
      * 处理流式响应
      */
     private void handleStreamResponse(String requestJson, HttpServletResponse response) throws IOException {
-        // 设置流式响应头
-        response.setContentType(MediaType.TEXT_PLAIN_VALUE);
+        // 设置SSE流式响应头
+        response.setContentType("text/event-stream");
         response.setCharacterEncoding("UTF-8");
         response.setHeader("Cache-Control", "no-cache");
         response.setHeader("Connection", "keep-alive");
+        response.setHeader("X-Accel-Buffering", "no"); // 禁用Nginx缓冲
 
         // 流式调用
         String url = pythonProperties.getApi().getStreamUrl();
