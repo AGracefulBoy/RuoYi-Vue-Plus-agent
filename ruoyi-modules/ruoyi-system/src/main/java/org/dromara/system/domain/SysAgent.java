@@ -69,7 +69,7 @@ public class SysAgent extends TenantEntity {
     private List<String> commonQuestions;
 
     /**
-     * 状态（0正常 1停用）
+     * 状态（0上架 1下架）
      */
     private String status;
 

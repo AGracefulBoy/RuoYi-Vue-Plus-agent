@@ -263,8 +263,15 @@ public class SysAgentServiceImpl implements ISysAgentService {
     @Override
     public Boolean deleteWithValidByIds(Collection<Long> ids, Boolean isValid) {
         if (isValid) {
-            // 删除前校验逻辑（如需要）
-            // 例如：校验是否有关联的对话记录等
+            // 删除前校验逻辑
+            // 检查是否有status=0（上架状态）的智能体
+            LambdaQueryWrapper<SysAgent> wrapper = Wrappers.lambdaQuery();
+            wrapper.in(SysAgent::getAgentId, ids)
+                   .eq(SysAgent::getStatus, "0");
+            Long count = baseMapper.selectCount(wrapper);
+            if (count > 0) {
+                throw new ServiceException("不能删除已上架的智能体，请先下架后再删除");
+            }
         }
         return baseMapper.deleteBatchIds(ids) > 0;
     }

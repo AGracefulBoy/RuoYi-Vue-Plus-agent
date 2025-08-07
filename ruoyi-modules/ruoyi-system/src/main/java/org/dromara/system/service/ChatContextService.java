@@ -88,13 +88,6 @@ public interface ChatContextService {
      */
     void updateMessage(SysAgentChatMessage message);
 
-    /**
-     * 构建上下文消息列表（用于发送给模型）
-     *
-     * @param chatRequest 聊天请求
-     * @return 包含历史消息的列表
-     */
-    List<ChatRequestDto.ChatMessage> buildContextMessages(ChatRequestDto chatRequest);
 
     /**
      * 清理会话上下文（根据token限制或消息数量）
