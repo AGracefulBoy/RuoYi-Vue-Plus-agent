@@ -307,30 +307,6 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
     private List<ToolDto.Parameter> buildToolParameters(SysTool tool) {
         List<ToolDto.Parameter> parameters = new ArrayList<>();
 
-        // 基础参数
-        parameters.add(ToolDto.Parameter.builder()
-            .name("toolType")
-            .desc("工具类型")
-            .type("string")
-            .required(true)
-            .build());
-
-        parameters.add(ToolDto.Parameter.builder()
-            .name("functionName")
-            .desc("函数名称")
-            .type("string")
-            .required(true)
-            .build());
-
-        if ("1".equals(tool.getIsStream())) {
-            parameters.add(ToolDto.Parameter.builder()
-                .name("stream")
-                .desc("是否支持流式处理")
-                .type("boolean")
-                .required(false)
-                .build());
-        }
-
         return parameters;
     }
 
