@@ -82,11 +82,11 @@ public class SysAgentChatController {
                     String messageType = data.getMessage().getType();
                     if ("thought".equals(messageType)) {
                         eventType = "thought";
-                    } else if ("action".equals(messageType)) {
+                    } else if ("action".equals(messageType) || "enhanced_reason".equals(messageType) || "enhancing".equals(messageType)) {
                         eventType = "action";
                     } else if ("observation".equals(messageType)) {
                         eventType = "observation";
-                    } else if ("answer".equals(messageType)) {
+                    } else if ("answer".equals(messageType) || "enhanced".equals(messageType)) {
                         eventType = "answer";
                     } else if ("error".equals(messageType)) {
                         eventType = "error";

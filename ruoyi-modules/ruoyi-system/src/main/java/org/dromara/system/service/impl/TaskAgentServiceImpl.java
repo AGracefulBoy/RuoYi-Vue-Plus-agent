@@ -1399,11 +1399,163 @@ public class TaskAgentServiceImpl implements TaskAgentService {
 
         fullResponseCallback.accept(finalResponse); // 调用回调函数
 
-        // 如果配置了增强模型，使用增强模型优化回复
-        if (modelContext.getEnhanceModel() != null && StringUtils.hasText(finalResponse)) {
+        // 如果配置了增强模型，且增强模型与主模型不同，使用增强模型优化回复
+        if (modelContext.getEnhanceModel() != null && StringUtils.hasText(finalResponse)
+            && !modelContext.getMainModel().getModelId().equals(modelContext.getEnhanceModel().getModelId())) {
+            // 发送增强开始事件
+            sink.next(createStreamMessage("\n\n🎯 **增强回复...**\n", "enhancing", false, ctx));
 
+            // 执行增强模型的流式调用
+            executeEnhanceStreamingCall(finalResponse, modelContext, sink, ctx);
+            return; // 增强调用会负责完成流
         }
 
+        // 报告Token使用情况
+        reportTotalTokenUsage(sink, ctx);
+
+        // 创建带有token使用信息的完成消息
+        StreamMessageResponseDto finishMessage = StreamMessageResponseDto.createFinishMessage(
+            ctx.getCurrentChatId(),
+            generateMessageId(),
+            ctx.getAndIncrementMessageIndex()
+        );
+
+        // 将token使用信息添加到extraInfo
+        TokenUsageDto tokenUsage = getTokenUsageObject(ctx);
+        if (tokenUsage != null && tokenUsage.getTotalTokens() > 0) {
+            finishMessage.getMessage().getExtraInfo().put("tokenUsage", tokenUsage);
+        }
+
+        // 发送完成消息
+        sink.next(finishMessage);
+        sink.complete();
+    }
+
+    /**
+     * 执行增强模型的流式调用
+     */
+    private void executeEnhanceStreamingCall(String finalAnswer, ModelConfigContext modelContext,
+                                             reactor.core.publisher.FluxSink<StreamMessageResponseDto> sink,
+                                             StreamingContext ctx) {
+        try {
+            // 获取增强模型的聊天服务
+            IChatService enhanceChatService = aiService.getChatService(
+                modelContext.getEnhanceModel().getModelProvider());
+
+            if (enhanceChatService == null) {
+                log.warn("无法获取增强模型的聊天服务: {}", modelContext.getEnhanceModel().getModelProvider());
+                // 无法获取服务，直接完成
+                completeWithTokenUsage(sink, ctx);
+                return;
+            }
+
+            // 构建增强提示词，包含完整的推理过程
+            String enhancePrompt = buildEnhancePrompt(finalAnswer, ctx);
+
+            // 构建增强模型请求
+            IChatRequest enhanceRequest = buildChatRequest(enhancePrompt, modelContext.getEnhanceModel());
+
+            // 执行流式调用
+            Flux<IChatResponse> enhanceStream = enhanceChatService.stream(enhanceRequest);
+
+            // 处理增强模型的流式响应
+            processEnhanceStream(enhanceStream, sink, ctx);
+
+        } catch (Exception e) {
+            log.error("增强模型调用失败", e);
+            sink.next(createStreamMessage("\n⚠️ 增强失败，使用原始回复\n", "error", false, ctx));
+            completeWithTokenUsage(sink, ctx);
+        }
+    }
+
+    /**
+     * 构建增强提示词
+     */
+    private String buildEnhancePrompt(String finalAnswer, StreamingContext ctx) {
+        StringBuilder prompt = new StringBuilder();
+        prompt.append("你是一个智能助手，需要基于以下的推理过程提供一个综合、准确的回答。\n\n");
+
+        // 添加完整的推理历史
+        String history = ctx.getConversationHistory().toString();
+        if (StringUtils.hasText(history)) {
+            prompt.append("=== 推理过程 ===\n");
+            prompt.append(history);
+            prompt.append("\n\n");
+        }
+
+        prompt.append("=== 初步答案 ===\n");
+        prompt.append(finalAnswer);
+        prompt.append("\n\n");
+
+        prompt.append("请基于上述推理过程和初步答案，提供一个：\n");
+        prompt.append("1. 综合所有信息的完整回答\n");
+        prompt.append("2. 结构清晰、逻辑严谨\n");
+        prompt.append("3. 包含关键细节和观察结果\n");
+        prompt.append("4. 对用户友好且易于理解\n\n");
+        prompt.append("直接给出优化后的回答，不需要解释优化过程：");
+
+        return prompt.toString();
+    }
+
+    /**
+     * 处理增强模型的流式响应
+     */
+    private void processEnhanceStream(Flux<IChatResponse> enhanceStream,
+                                      reactor.core.publisher.FluxSink<StreamMessageResponseDto> sink,
+                                      StreamingContext ctx) {
+        StringBuilder enhancedResponse = new StringBuilder();
+        AtomicReference<IChatResponse> lastChunk = new AtomicReference<>();
+
+        enhanceStream
+            .doOnNext(chunk -> {
+                lastChunk.set(chunk);
+                if (chunk.getResult() != null && chunk.getResult().getOutput() != null) {
+                    String text = chunk.getResult().getOutput().getText();
+                    Object reasoningContent = chunk.getResult().getOutput().getReasoningContent();
+
+                    // 如果有推理内容，先发送推理内容
+                    if (reasoningContent != null) {
+                        String reasoningText = reasoningContent.toString();
+                        if (StringUtils.hasText(reasoningText)) {
+                            enhancedResponse.append(reasoningText);
+                            // 发送推理内容作为增强事件
+                            sink.next(createStreamMessage(reasoningText, "enhanced_reason", false, ctx));
+                        }
+                    }
+
+                    // 然后发送正常的文本内容
+                    if (StringUtils.hasText(text)) {
+                        enhancedResponse.append(text);
+                        // 发送增强内容
+                        sink.next(createStreamMessage(text, "enhanced", false, ctx));
+                    }
+                }
+            })
+            .doOnComplete(() -> {
+                // 累计增强模型的token使用量
+                accumulateTokenUsage(lastChunk.get(), ctx);
+
+                // 保存增强后的回复到数据库
+                if (enhancedResponse.length() > 0) {
+                    log.info("增强模型优化完成，响应长度: {}", enhancedResponse.length());
+                }
+
+                // 完成整个流
+                completeWithTokenUsage(sink, ctx);
+            })
+            .doOnError(error -> {
+                log.error("增强模型流式调用失败", error);
+                sink.next(createStreamMessage("\n⚠️ 增强失败: " + error.getMessage(), "error", false, ctx));
+                completeWithTokenUsage(sink, ctx);
+            })
+            .subscribe();
+    }
+
+    /**
+     * 完成流并报告Token使用情况
+     */
+    private void completeWithTokenUsage(reactor.core.publisher.FluxSink<StreamMessageResponseDto> sink,
+                                        StreamingContext ctx) {
         // 报告Token使用情况
         reportTotalTokenUsage(sink, ctx);
 

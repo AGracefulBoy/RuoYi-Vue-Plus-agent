@@ -20,8 +20,11 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
 
+import cn.hutool.json.JSONUtil;
+
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -338,28 +341,32 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
         List<ToolDto.Parameter> parameters = new ArrayList<>();
 
         parameters.add(ToolDto.Parameter.builder()
-            .name("query")
+            .name("question")
             .desc("查询内容")
             .type("string")
             .required(true)
             .build());
 
-        if (kb.getTopK() != null) {
-            parameters.add(ToolDto.Parameter.builder()
-                .name("topK")
-                .desc("检索返回条数")
-                .type("integer")
-                .required(false)
-                .build());
-        }
+        if (kb.getMetadata() != null && !kb.getMetadata().isEmpty()) {
+            try {
+                // Parse metadata JSON string to Map
+                @SuppressWarnings("unchecked")
+                Map<String, Object> metadataMap = JSONUtil.toBean(kb.getMetadata(), Map.class);
 
-        if (kb.getVectorWeight() != null) {
-            parameters.add(ToolDto.Parameter.builder()
-                .name("vectorWeight")
-                .desc("向量检索权重")
-                .type("number")
-                .required(false)
-                .build());
+                // Create parameters for each metadata key
+                if (metadataMap != null) {
+                    for (Map.Entry<String, Object> entry : metadataMap.entrySet()) {
+                        parameters.add(ToolDto.Parameter.builder()
+                            .name(entry.getKey())
+                            .desc(entry.getValue() != null ? entry.getValue().toString() : entry.getKey())
+                            .type("string")
+                            .required(true)
+                            .build());
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Failed to parse knowledge base metadata: {}", kb.getMetadata(), e);
+            }
         }
 
         return parameters;
