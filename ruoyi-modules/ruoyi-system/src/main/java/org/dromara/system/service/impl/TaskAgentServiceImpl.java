@@ -264,11 +264,24 @@ public class TaskAgentServiceImpl implements TaskAgentService {
         try {
 
             if (containsFinalAnswer(aiResponse)) {
-                sink.next(createStreamMessage("\n✨ **推理完成**\n", "answer", false, ctx));
-                // 使用handleFinalStepCompleteForMessage确保增强处理逻辑能执行
+                // 将包含Final Answer的完整响应添加到历史记录
+                appendToConversationHistory("Assistant", aiResponse, ctx);
+                
+                // 提取最终答案
                 String finalAnswer = extractFinalAnswer(aiResponse);
-                handleFinalStepCompleteForMessage(finalAnswer, modelContext, sink, response -> {
-                }, ctx);
+                
+                // 判断是否需要增强回复
+                if (modelContext.getEnhanceModel() != null && StringUtils.hasText(finalAnswer)
+                    && !modelContext.getMainModel().getModelId().equals(modelContext.getEnhanceModel().getModelId())) {
+                    // 需要增强回复
+                    sink.next(createStreamMessage("\n\n🎯 **增强回复...**\n", "enhancing", false, ctx));
+                    executeEnhanceStreamingCall(finalAnswer, modelContext, sink, ctx);
+                } else {
+                    // 不需要增强，直接输出最终答案
+                    sink.next(createStreamMessage("\n✨ **推理完成**\n", "answer", false, ctx));
+                    handleFinalStepCompleteForMessage(finalAnswer, modelContext, sink, response -> {
+                    }, ctx);
+                }
                 // 重要：检测到Final Answer后终止循环
                 return;
             }
@@ -297,11 +310,24 @@ public class TaskAgentServiceImpl implements TaskAgentService {
             } else {
                 // 没有工具调用，检查是否包含最终答案
                 if (containsFinalAnswer(aiResponse)) {
-                    sink.next(createStreamMessage("\n✨ **推理完成**\n", "answer", false, ctx));
-                    // 使用handleFinalStepCompleteForMessage确保增强处理逻辑能执行
+                    // 将包含Final Answer的完整响应添加到历史记录
+                    appendToConversationHistory("Assistant", aiResponse, ctx);
+                    
+                    // 提取最终答案
                     String finalAnswer = extractFinalAnswer(aiResponse);
-                    handleFinalStepCompleteForMessage(finalAnswer, modelContext, sink, response -> {
-                    }, ctx);
+                    
+                    // 判断是否需要增强回复
+                    if (modelContext.getEnhanceModel() != null && StringUtils.hasText(finalAnswer)
+                        && !modelContext.getMainModel().getModelId().equals(modelContext.getEnhanceModel().getModelId())) {
+                        // 需要增强回复
+                        sink.next(createStreamMessage("\n\n🎯 **增强回复...**\n", "enhancing", false, ctx));
+                        executeEnhanceStreamingCall(finalAnswer, modelContext, sink, ctx);
+                    } else {
+                        // 不需要增强，直接输出最终答案
+                        sink.next(createStreamMessage("\n✨ **推理完成**\n", "answer", false, ctx));
+                        handleFinalStepCompleteForMessage(finalAnswer, modelContext, sink, response -> {
+                        }, ctx);
+                    }
                 } else {
                     // 保存思考步骤
                     saveThoughtStep(chatId, aiResponse, "action", currentStep);
@@ -1096,13 +1122,25 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                                               boolean isFinalStep, String initialStreamType, StreamingContext ctx) {
         StringBuilder fullResponse = new StringBuilder();
         AtomicReference<IChatResponse> lastChunk = new AtomicReference<>();
+        
+        // 设置modelContext和sink到StreamingContext中
+        ctx.setModelContext(modelContext);
+        ctx.setCurrentSink(sink);
 
         modelStream
+            .takeWhile(chunk -> !ctx.isShouldStopCurrentStream())  // 如果检测到应该停止，则停止处理流
             .doOnNext(chunk -> {
                 lastChunk.set(chunk);
                 handleStreamChunkForMessage(chunk, sink, fullResponse, initialStreamType, ctx);
             })
             .doOnComplete(() -> {
+                // 检查是否因为增强回复而停止
+                if (ctx.isShouldStopCurrentStream()) {
+                    log.info("流式处理因增强回复而提前停止");
+                    // 增强回复已经在processBufferedContent中启动，这里不需要额外处理
+                    return;
+                }
+                
                 // 在完成时累计token使用量
                 accumulateTokenUsage(lastChunk.get(), ctx);
 
@@ -1153,7 +1191,12 @@ public class TaskAgentServiceImpl implements TaskAgentService {
 
         // 如果缓冲区中还有内容，全部发送出去
         if (buffer.length() > 0) {
-            sink.next(createStreamMessage(buffer.toString(), currentType, false, ctx));
+            String bufferContent = buffer.toString();
+            sink.next(createStreamMessage(bufferContent, currentType, false, ctx));
+            // 保存到思维过程中（除了answer类型的内容）
+            if (!currentType.equals("answer")) {
+                ctx.getThoughtProcess().append(bufferContent);
+            }
             buffer.setLength(0);
         }
     }
@@ -1235,10 +1278,45 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                     if (finalAnswerIndex > 0) {
                         String beforeFinal = bufferContent.substring(0, finalAnswerIndex);
                         sink.next(createStreamMessage(beforeFinal, currentType, false, ctx));
+                        // 保存到思维过程中
+                        ctx.getThoughtProcess().append(beforeFinal);
                     }
 
-                    // 标记已找到 Final Answer，切换类型为 answer
+                    // 标记已找到 Final Answer
                     ctx.setFinalAnswerDetected(true);
+                    
+                    // 检查是否需要增强回复
+                    ModelConfigContext modelContext = ctx.getModelContext();
+                    if (modelContext != null && modelContext.getEnhanceModel() != null 
+                        && !modelContext.getMainModel().getModelId().equals(modelContext.getEnhanceModel().getModelId())) {
+                        
+                        // 需要增强回复，停止当前流
+                        log.info("检测到Final Answer，准备使用增强模型进行回复增强");
+                        
+                        // 保存当前已有的思维过程（包括"Final Answer"之前的内容）
+                        String thoughtContent = ctx.getThoughtProcess().toString();
+                        
+                        // 发送增强开始事件
+                        sink.next(createStreamMessage("\n\n🎯 **增强回复...**\n", "enhancing", false, ctx));
+                        
+                        // 设置标志停止当前流
+                        ctx.setShouldStopCurrentStream(true);
+                        
+                        // 清空缓冲区
+                        buffer.setLength(0);
+                        
+                        // 提取Final Answer后的内容作为原始答案
+                        String remainingContent = bufferContent.substring(finalAnswerIndex);
+                        // 将剩余内容拼接到思维过程中，用于增强回复
+                        String fullThoughtProcess = thoughtContent + remainingContent;
+                        
+                        // 立即调用增强模型（需要异步处理）
+                        executeEnhanceStreamingCall(fullThoughtProcess, modelContext, sink, ctx);
+                        
+                        return;
+                    }
+                    
+                    // 不需要增强回复，按原逻辑处理
                     ctx.setCurrentStreamType("answer");
                     currentType = "answer";
 
@@ -1267,6 +1345,8 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                     if (actionIndex > 0) {
                         String beforeAction = bufferContent.substring(0, actionIndex);
                         sink.next(createStreamMessage(beforeAction, "thought", false, ctx));
+                        // 保存到思维过程中
+                        ctx.getThoughtProcess().append(beforeAction);
                     }
 
                     // 标记已找到 Action，切换类型为 action
@@ -1284,6 +1364,10 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                 // 发送超出20字符的部分
                 String toSendNow = bufferContent.substring(0, bufferContent.length() - 20);
                 sink.next(createStreamMessage(toSendNow, currentType, false, ctx));
+                // 保存到思维过程中（除了answer类型的内容）
+                if (!currentType.equals("answer")) {
+                    ctx.getThoughtProcess().append(toSendNow);
+                }
                 bufferContent = bufferContent.substring(bufferContent.length() - 20);
             }
 
@@ -1452,6 +1536,12 @@ public class TaskAgentServiceImpl implements TaskAgentService {
             // 构建增强提示词，包含完整的推理过程
             String enhancePrompt = buildEnhancePrompt(finalAnswer, ctx);
 
+            // 打印增强模型的提示词
+            log.info("=== 增强模型提示词开始 ===");
+            log.info("增强模型: {}", modelContext.getEnhanceModel().getModelId());
+            log.info("提示词内容:\n{}", enhancePrompt);
+            log.info("=== 增强模型提示词结束 ===");
+
             // 构建增强模型请求
             IChatRequest enhanceRequest = buildChatRequest(enhancePrompt, modelContext.getEnhanceModel());
 
@@ -1486,12 +1576,6 @@ public class TaskAgentServiceImpl implements TaskAgentService {
         prompt.append("=== 初步答案 ===\n");
         prompt.append(finalAnswer);
         prompt.append("\n\n");
-
-        prompt.append("请基于上述推理过程和初步答案，提供一个：\n");
-        prompt.append("1. 综合所有信息的完整回答\n");
-        prompt.append("2. 结构清晰、逻辑严谨\n");
-        prompt.append("3. 包含关键细节和观察结果\n");
-        prompt.append("4. 对用户友好且易于理解\n\n");
         prompt.append("直接给出优化后的回答，不需要解释优化过程：");
 
         return prompt.toString();
@@ -1882,6 +1966,10 @@ public class TaskAgentServiceImpl implements TaskAgentService {
         private boolean finalAnswerDetected = false;
         private List<ToolDto> currentAvailableTools;
         private IChatResponse.Usage totalTokenUsage;
+        private ModelConfigContext modelContext;
+        private StringBuilder thoughtProcess = new StringBuilder();
+        private boolean shouldStopCurrentStream = false;
+        private reactor.core.publisher.FluxSink<StreamMessageResponseDto> currentSink;
 
         public StreamingContext() {
             this.totalTokenUsage = new IChatResponse.Usage();
@@ -1960,6 +2048,34 @@ public class TaskAgentServiceImpl implements TaskAgentService {
 
         public IChatResponse.Usage getTotalTokenUsage() {
             return totalTokenUsage;
+        }
+
+        public ModelConfigContext getModelContext() {
+            return modelContext;
+        }
+
+        public void setModelContext(ModelConfigContext modelContext) {
+            this.modelContext = modelContext;
+        }
+
+        public StringBuilder getThoughtProcess() {
+            return thoughtProcess;
+        }
+
+        public boolean isShouldStopCurrentStream() {
+            return shouldStopCurrentStream;
+        }
+
+        public void setShouldStopCurrentStream(boolean shouldStopCurrentStream) {
+            this.shouldStopCurrentStream = shouldStopCurrentStream;
+        }
+
+        public reactor.core.publisher.FluxSink<StreamMessageResponseDto> getCurrentSink() {
+            return currentSink;
+        }
+
+        public void setCurrentSink(reactor.core.publisher.FluxSink<StreamMessageResponseDto> currentSink) {
+            this.currentSink = currentSink;
         }
     }
 }
