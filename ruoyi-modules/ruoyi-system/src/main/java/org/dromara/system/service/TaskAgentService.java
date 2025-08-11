@@ -21,9 +21,10 @@ public interface TaskAgentService {
      * @param agent 智能体信息
      * @param availableTools 可用工具列表
      * @param userInput 用户输入
+     * @param chatId 会话ID
      * @return 流式响应
      */
-    Flux<StreamMessageResponseDto> executeReActStream(SysAgent agent,List<ToolDto> availableTools, String userInput);
+    Flux<StreamMessageResponseDto> executeReActStream(SysAgent agent,List<ToolDto> availableTools, String userInput, Long chatId);
 
     /**
      * 检查退出条件
@@ -38,16 +39,18 @@ public interface TaskAgentService {
      *
      * @param agent 智能体信息
      * @param userInput 用户输入
+     * @param chatId 会话ID
      * @return 流式响应
      */
-    Flux<StreamMessageResponseDto> executeFreeChatStream(SysAgent agent, String userInput);
+    Flux<StreamMessageResponseDto> executeFreeChatStream(SysAgent agent, String userInput, Long chatId);
 
     /**
      * 执行自由对话模式的流式处理（带完整响应）
      *
      * @param agent 智能体信息
      * @param userInput 用户输入
+     * @param chatId 会话ID
      * @return 包含流式响应和完整响应的结果对象
      */
-    TaskAgentServiceImpl.StreamResult executeFreeChatStreamWithFullResponse(SysAgent agent, String userInput);
+    TaskAgentServiceImpl.StreamResult executeFreeChatStreamWithFullResponse(SysAgent agent, String userInput, Long chatId);
 }

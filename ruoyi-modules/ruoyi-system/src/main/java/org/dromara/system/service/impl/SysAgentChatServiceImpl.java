@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.common.satoken.utils.LoginHelper;
 import org.dromara.system.domain.SysAgent;
+import org.dromara.system.domain.SysAgentChat;
 import org.dromara.system.domain.SysDatasource;
 import org.dromara.system.domain.SysKnowledgeBase;
 import org.dromara.system.domain.SysTool;
@@ -15,6 +16,7 @@ import org.dromara.system.mapper.SysDatasourceMapper;
 import org.dromara.system.mapper.SysKnowledgeBaseMapper;
 import org.dromara.system.mapper.SysToolMapper;
 import org.dromara.system.service.SysAgentChatService;
+import org.dromara.system.service.ChatContextService;
 import org.dromara.system.service.TaskAgentService;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
@@ -37,6 +39,7 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
     private final SysKnowledgeBaseMapper knowledgeBaseMapper;
     private final SysDatasourceMapper datasourceMapper;
     private final TaskAgentService taskAgentService;
+    private final ChatContextService chatContextService;
 
     @Override
     public Flux<StreamMessageResponseDto> completions(ChatRequestDto chatRequest) {
@@ -76,16 +79,34 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
      * @return 流式响应
      */
     private Flux<StreamMessageResponseDto> handleTaskAgent(SysAgent agent, List<ToolDto> availableTools, ChatRequestDto chatRequest) {
-        // 创建或获取任务记忆
-        String chatId = StringUtils.hasText(chatRequest.getChatId()) ?
-            chatRequest.getChatId() :
-            "chat_" + agent.getAgentId() + "_" + System.currentTimeMillis();
+        // 获取当前用户ID
+        Long userId = LoginHelper.getUserId();
+
+        // 创建或获取会话
+        SysAgentChat chat;
+        String chatUuid = chatRequest.getChatUuid();
+        String chatModel = chatRequest.getChatModel();
+
+        if (StringUtils.hasText(chatUuid)) {
+            // 如果提供了chatId，尝试获取已有会话
+            chat = chatContextService.getChatByUuid(chatUuid);
+            if (chat == null) {
+                // 如果找不到会话，创建新会话
+                chat = chatContextService.createChat(agent.getAgentId(), userId,  agent.getAgentName(), null, chatModel);
+                // 更新UUID为请求中的chatId
+                chat.setChatUuid(chatUuid);
+                chatContextService.updateChat(chat);
+            }
+        } else {
+            // 创建新会话
+            chat = chatContextService.createChat(agent.getAgentId(), userId, agent.getAgentName(), null, chatModel);
+        }
 
         // 检查退出条件
         if (taskAgentService.checkExitCondition(chatRequest.getMessage())) {
             StreamMessageResponseDto exitResponse = StreamMessageResponseDto.createAnswerMessage(
                 "检测到退出指令，对话结束！感谢您的使用。",
-                chatId,
+                chat.getChatUuid(),
                 "exit_" + System.currentTimeMillis(),
                 null,
                 0,
@@ -94,9 +115,8 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
             return Flux.just(exitResponse);
         }
 
-        // 执行ReAct思维链 - 直接返回，不添加额外的操作符以避免上下文丢失
-        // 日志记录已经在 TaskAgentServiceImpl 内部处理
-        return taskAgentService.executeReActStream(agent, availableTools, chatRequest.getMessage());
+        // 执行ReAct思维链 - 传递会话ID
+        return taskAgentService.executeReActStream(agent, availableTools, chatRequest.getMessage(), chat.getChatId());
     }
 
     /**
@@ -107,16 +127,34 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
      * @return 流式响应
      */
     private Flux<StreamMessageResponseDto> handleFreeChatAgent(SysAgent agent, ChatRequestDto chatRequest) {
-        // 创建或获取会话ID
-        String chatId = StringUtils.hasText(chatRequest.getChatId()) ?
-            chatRequest.getChatId() :
-            "chat_" + agent.getAgentId() + "_" + System.currentTimeMillis();
+        // 获取当前用户ID
+        Long userId = LoginHelper.getUserId();
+
+        // 创建或获取会话
+        SysAgentChat chat;
+        String chatUuid = chatRequest.getChatUuid();
+        String chatModel = chatRequest.getChatModel();
+
+        if (StringUtils.hasText(chatUuid)) {
+            // 如果提供了chatId，尝试获取已有会话
+            chat = chatContextService.getChatByUuid(chatUuid);
+            if (chat == null) {
+                // 如果找不到会话，创建新会话
+                chat = chatContextService.createChat(agent.getAgentId(), userId, "自由对话 - " + agent.getAgentName(), null, chatModel);
+                // 更新UUID为请求中的chatId
+                chat.setChatUuid(chatUuid);
+                chatContextService.updateChat(chat);
+            }
+        } else {
+            // 创建新会话
+            chat = chatContextService.createChat(agent.getAgentId(), userId, "自由对话 - " + agent.getAgentName(), null, chatModel);
+        }
 
         // 检查退出条件
         if (taskAgentService.checkExitCondition(chatRequest.getMessage())) {
             StreamMessageResponseDto exitResponse = StreamMessageResponseDto.createAnswerMessage(
                 "检测到退出指令，对话结束！感谢您的使用。",
-                chatId,
+                chat.getChatUuid(),
                 "exit_" + System.currentTimeMillis(),
                 null,
                 0,
@@ -125,9 +163,8 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
             return Flux.just(exitResponse);
         }
 
-        // 执行自由对话处理 - 直接返回，不添加额外的操作符以避免上下文丢失
-        // 日志记录已经在 TaskAgentServiceImpl 内部处理
-        return taskAgentService.executeFreeChatStream(agent, chatRequest.getMessage());
+        // 执行自由对话处理 - 传递会话ID
+        return taskAgentService.executeFreeChatStream(agent, chatRequest.getMessage(), chat.getChatId());
     }
 
     /**

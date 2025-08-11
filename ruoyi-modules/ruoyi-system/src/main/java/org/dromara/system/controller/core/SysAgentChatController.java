@@ -2,27 +2,15 @@ package org.dromara.system.controller.core;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
 import cn.dev33.satoken.annotation.SaCheckPermission;
-import cn.dev33.satoken.context.SaHolder;
-import cn.dev33.satoken.context.SaTokenContext;
-
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
-import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.dromara.common.core.domain.R;
-
 import org.dromara.common.ratelimiter.annotation.RateLimiter;
 import org.dromara.common.ratelimiter.enums.LimitType;
 import org.dromara.common.satoken.utils.LoginHelper;
-import org.dromara.system.domain.SysAgentChat;
 import org.dromara.system.domain.dto.ChatRequestDto;
-import org.dromara.system.domain.dto.ChatResponseDto;
 import org.dromara.system.domain.dto.StreamMessageResponseDto;
-import org.dromara.system.domain.dto.StreamingChatResponseDto;
-import org.dromara.system.domain.vo.ChatHistoryVo;
-import org.dromara.system.domain.vo.ChatSessionVo;
-import org.dromara.system.service.ChatContextService;
 import org.dromara.system.service.SysAgentChatService;
 import org.dromara.system.service.helper.MessageTypeMapper;
 import org.dromara.system.service.helper.SaTokenReactiveHelper;
@@ -32,14 +20,9 @@ import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 import javax.validation.Valid;
-
-import javax.validation.constraints.NotNull;
 import java.time.Duration;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 /**
  * 核心对话接口
@@ -56,9 +39,6 @@ public class SysAgentChatController {
     @Autowired
     private SysAgentChatService sysAgentChatService;
 
-    @Autowired
-    private ChatContextService chatContextService;
-    
     @Autowired
     private MessageTypeMapper messageTypeMapper;
 
@@ -80,13 +60,13 @@ public class SysAgentChatController {
 
         // 调用服务层处理流式对话，并使用 SaTokenReactiveHelper 包装整个响应式链
         Flux<StreamMessageResponseDto> responseFlux = sysAgentChatService.completions(chatRequest);
-        
+
         // 包装响应式流以确保上下文在整个链路中传递
         return SaTokenReactiveHelper.wrapFlux(responseFlux
             .map(data -> {
                 // 使用MessageTypeMapper统一处理消息类型映射
                 String eventType = messageTypeMapper.mapToEventType(data);
-                
+
                 return ServerSentEvent.<StreamMessageResponseDto>builder()
                     .id(IdUtil.fastSimpleUUID())
                     .event(eventType)
@@ -103,130 +83,6 @@ public class SysAgentChatController {
                     0
                 ))
                 .build())));
-    }
-
-    /**
-     * 创建新会话
-     */
-    @SaCheckPermission("system:agent:list")
-    @SaCheckLogin
-    @PostMapping("/sessions")
-    public R<ChatSessionVo> createSession(@RequestParam @NotNull(message = "智能体ID不能为空") Long agentId,
-                                          @RequestParam(required = false) String title) {
-        Long userId = LoginHelper.getUserId();
-        SysAgentChat chat = chatContextService.createChat(agentId, userId, title);
-
-        ChatSessionVo vo = new ChatSessionVo();
-        vo.setChatId(chat.getChatId());
-        vo.setChatUuid(chat.getChatUuid());
-        vo.setAgentId(chat.getAgentId());
-        vo.setTitle(chat.getChatTitle());
-        vo.setStatus(chat.getStatus());
-        vo.setCreatedTime(chat.getCreateTime());
-
-        return R.ok(vo);
-    }
-
-    /**
-     * 获取会话列表
-     */
-    @SaCheckPermission("system:agent:list")
-    @SaCheckLogin
-    @GetMapping("/sessions")
-    public R<List<ChatSessionVo>> getSessions(@RequestParam(required = false) Long agentId,
-                                              @RequestParam(required = false) String status,
-                                              @RequestParam(defaultValue = "20") int limit) {
-        Long userId = LoginHelper.getUserId();
-        List<SysAgentChat> chats = chatContextService.getUserChats(userId, agentId, status, limit);
-
-        List<ChatSessionVo> vos = chats.stream().map(chat -> {
-            ChatSessionVo vo = new ChatSessionVo();
-            vo.setChatId(chat.getChatId());
-            vo.setChatUuid(chat.getChatUuid());
-            vo.setAgentId(chat.getAgentId());
-            vo.setTitle(chat.getChatTitle());
-            vo.setStatus(chat.getStatus());
-            vo.setMessageCount(chat.getMessageCount());
-            vo.setLastActiveTime(chat.getLastActiveTime());
-            vo.setCreatedTime(chat.getCreateTime());
-            return vo;
-        }).toList();
-
-        return R.ok(vos);
-    }
-
-    /**
-     * 获取会话历史
-     */
-    @SaCheckPermission("system:agent:list")
-    @SaCheckLogin
-    @GetMapping("/sessions/{chatUuid}/history")
-    public R<ChatHistoryVo> getChatHistory(@PathVariable @NotBlank(message = "会话UUID不能为空") String chatUuid,
-                                           @RequestParam(defaultValue = "50") int limit) {
-        SysAgentChat chat = chatContextService.getChatByUuid(chatUuid);
-        if (chat == null) {
-            return R.fail("会话不存在");
-        }
-
-        // 验证权限
-        if (chat.getUserId() == null || !chat.getUserId().equals(LoginHelper.getUserId())) {
-            return R.fail("无权访问该会话");
-        }
-
-        ChatHistoryVo historyVo = new ChatHistoryVo();
-        historyVo.setChatId(chat.getChatId());
-        historyVo.setChatUuid(chat.getChatUuid());
-        historyVo.setTitle(chat.getChatTitle());
-        historyVo.setMessages(chatContextService.getChatHistory(chat.getChatId(), limit, false));
-        historyVo.setTokenUsage(new ChatHistoryVo.TokenUsage(
-            chat.getInputTokens(),
-            chat.getOutputTokens(),
-            chat.getTotalTokens()
-        ));
-
-        return R.ok(historyVo);
-    }
-
-    /**
-     * 归档会话
-     */
-    @SaCheckPermission("system:agent:list")
-    @SaCheckLogin
-    @PutMapping("/sessions/{chatUuid}/archive")
-    public R<Void> archiveSession(@PathVariable @NotBlank(message = "会话UUID不能为空") String chatUuid) {
-        SysAgentChat chat = chatContextService.getChatByUuid(chatUuid);
-        if (chat == null) {
-            return R.fail("会话不存在");
-        }
-
-        // 验证权限
-        if (!chat.getUserId().equals(LoginHelper.getUserId())) {
-            return R.fail("无权操作该会话");
-        }
-
-        chatContextService.archiveChat(chat.getChatId());
-        return R.ok();
-    }
-
-    /**
-     * 删除会话
-     */
-    @SaCheckPermission("system:agent:list")
-    @SaCheckLogin
-    @DeleteMapping("/sessions/{chatUuid}")
-    public R<Void> deleteSession(@PathVariable @NotBlank(message = "会话UUID不能为空") String chatUuid) {
-        SysAgentChat chat = chatContextService.getChatByUuid(chatUuid);
-        if (chat == null) {
-            return R.fail("会话不存在");
-        }
-
-        // 验证权限
-        if (!chat.getUserId().equals(LoginHelper.getUserId())) {
-            return R.fail("无权操作该会话");
-        }
-
-        chatContextService.deleteChat(chat.getChatId());
-        return R.ok();
     }
 
     /**

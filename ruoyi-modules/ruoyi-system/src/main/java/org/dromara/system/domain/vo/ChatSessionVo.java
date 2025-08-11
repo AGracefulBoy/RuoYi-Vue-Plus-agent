@@ -28,6 +28,16 @@ public class ChatSessionVo {
     private Long agentId;
 
     /**
+     * 分组ID
+     */
+    private Long groupId;
+
+    /**
+     * 分组名称
+     */
+    private String groupName;
+
+    /**
      * 会话标题
      */
     private String title;
@@ -51,4 +61,9 @@ public class ChatSessionVo {
      * 创建时间
      */
     private Date createdTime;
+
+    /**
+     * 对话模式 debug 表示调试模式，chat 表示正常对话
+     */
+    private String chatModel;
 }

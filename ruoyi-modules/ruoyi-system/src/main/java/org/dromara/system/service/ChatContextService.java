@@ -24,6 +24,29 @@ public interface ChatContextService {
     SysAgentChat createChat(Long agentId, Long userId, String title);
 
     /**
+     * 创建新会话（指定分组）
+     *
+     * @param agentId 智能体ID
+     * @param userId  用户ID
+     * @param title   会话标题
+     * @param groupId 分组ID
+     * @return 会话信息
+     */
+    SysAgentChat createChat(Long agentId, Long userId, String title, Long groupId);
+
+    /**
+     * 创建新会话（指定分组和对话模式）
+     *
+     * @param agentId   智能体ID
+     * @param userId    用户ID
+     * @param title     会话标题
+     * @param groupId   分组ID
+     * @param chatModel 对话模式（debug 表示调试模式，chat 表示正常对话）
+     * @return 会话信息
+     */
+    SysAgentChat createChat(Long agentId, Long userId, String title, Long groupId, String chatModel);
+
+    /**
      * 获取会话信息
      *
      * @param chatId 会话ID
@@ -56,15 +79,6 @@ public interface ChatContextService {
      */
     List<SysAgentChatMessage> getChatHistory(Long chatId, int limit, boolean includeSystem);
 
-    /**
-     * 获取会话上下文窗口内的消息
-     *
-     * @param chatId         会话ID
-     * @param contextWindow  上下文窗口大小（token数）
-     * @param includeSystem  是否包含系统消息
-     * @return 消息列表
-     */
-    List<SysAgentChatMessage> getChatContextWindow(Long chatId, int contextWindow, boolean includeSystem);
 
     /**
      * 添加消息到会话
@@ -74,29 +88,7 @@ public interface ChatContextService {
      */
     SysAgentChatMessage addMessage(SysAgentChatMessage message);
 
-    /**
-     * 批量添加消息
-     *
-     * @param messages 消息列表
-     */
-    void addMessages(List<SysAgentChatMessage> messages);
 
-    /**
-     * 更新消息
-     *
-     * @param message 消息信息
-     */
-    void updateMessage(SysAgentChatMessage message);
-
-
-    /**
-     * 清理会话上下文（根据token限制或消息数量）
-     *
-     * @param chatId     会话ID
-     * @param maxTokens  最大token数
-     * @param maxMessages 最大消息数
-     */
-    void cleanupContext(Long chatId, int maxTokens, int maxMessages);
 
     /**
      * 计算消息的token数
@@ -106,27 +98,6 @@ public interface ChatContextService {
      */
     int calculateTokens(String content);
 
-    /**
-     * 计算消息列表的总token数
-     *
-     * @param messages 消息列表
-     * @return 总token数
-     */
-    int calculateTotalTokens(List<SysAgentChatMessage> messages);
-
-    /**
-     * 归档会话
-     *
-     * @param chatId 会话ID
-     */
-    void archiveChat(Long chatId);
-
-    /**
-     * 删除会话（逻辑删除）
-     *
-     * @param chatId 会话ID
-     */
-    void deleteChat(Long chatId);
 
     /**
      * 获取用户的会话列表
@@ -146,21 +117,4 @@ public interface ChatContextService {
      * @return 更新后的会话信息
      */
     SysAgentChat statisticsChat(Long chatId);
-
-    /**
-     * 创建会话快照（用于保存重要节点）
-     *
-     * @param chatId      会话ID
-     * @param description 快照描述
-     * @return 快照ID
-     */
-    Long createChatSnapshot(Long chatId, String description);
-
-    /**
-     * 恢复会话快照
-     *
-     * @param snapshotId 快照ID
-     * @return 新的会话ID
-     */
-    Long restoreChatSnapshot(Long snapshotId);
 }

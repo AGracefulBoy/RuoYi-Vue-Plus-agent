@@ -149,7 +149,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
     private StreamMessageBuilder streamMessageBuilder;
 
     @Override
-    public Flux<StreamMessageResponseDto> executeReActStream(SysAgent agent, List<ToolDto> availableTools, String userInput) {
+    public Flux<StreamMessageResponseDto> executeReActStream(SysAgent agent, List<ToolDto> availableTools, String userInput, Long chatId) {
         // 捕获当前线程的Sa-Token上下文
         Map<String, Object> contextMap = SaTokenReactiveHelper.captureContext();
 
@@ -160,7 +160,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                     // 创建StreamingContext
                     StreamingContext ctx = new StreamingContext();
                     // 执行流式推理
-                    performStreamingReasoningChain(agent, availableTools, userInput, sink, ctx);
+                    performStreamingReasoningChain(agent, availableTools, userInput, chatId, sink, ctx);
                 });
 
             } catch (Exception e) {
@@ -185,7 +185,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
      * 执行流式推理链
      */
     private void performStreamingReasoningChain(SysAgent agent, List<ToolDto> availableTools,
-                                                String userInput, reactor.core.publisher.FluxSink<StreamMessageResponseDto> sink,
+                                                String userInput, Long chatId, reactor.core.publisher.FluxSink<StreamMessageResponseDto> sink,
                                                 StreamingContext ctx) {
         try {
             // 捕获用户上下文信息到StreamingContext，以便在响应式流中使用
@@ -199,9 +199,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
             ModelConfigContext modelContext = getAndValidateModelConfigsForStreamMessage(agent, sink, ctx);
             if (modelContext == null) return;
 
-            // 2. 创建或获取会话
-            SysAgentChat chat = createOrGetChat(agent.getAgentId(), userInput);
-            Long chatId = chat.getChatId();
+            // 2. 使用传入的会话ID
             String chatIdStr = String.valueOf(chatId);
 
             // 设置会话信息和用户消息ID
@@ -687,16 +685,6 @@ public class TaskAgentServiceImpl implements TaskAgentService {
         return String.valueOf(System.currentTimeMillis() + (int) (Math.random() * 1000));
     }
 
-
-    /**
-     * 创建或获取会话
-     */
-    private SysAgentChat createOrGetChat(Long agentId, String userInput) {
-        Long userId = LoginHelper.getUserId();
-        // 为每个新的ReAct流创建新会话
-        String title = userInput.length() > 50 ? userInput.substring(0, 50) + "..." : userInput;
-        return chatContextService.createChat(agentId, userId, title);
-    }
 
     /**
      * 保存用户消息
@@ -1909,7 +1897,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
      * 执行自由对话模式的流式处理
      */
     @Override
-    public Flux<StreamMessageResponseDto> executeFreeChatStream(SysAgent agent, String userInput) {
+    public Flux<StreamMessageResponseDto> executeFreeChatStream(SysAgent agent, String userInput, Long chatId) {
         // 捕获当前线程的Sa-Token上下文
         Map<String, Object> contextMap = SaTokenReactiveHelper.captureContext();
 
@@ -1921,8 +1909,8 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                     // 创建StreamingContext
                     ctx = new StreamingContext();
 
-                    // 创建简单的自由对话流式处理
-                    String chatIdStr = "chat_" + System.currentTimeMillis();
+                    // 使用传入的会话ID
+                    String chatIdStr = String.valueOf(chatId);
                     String userMsgId = generateMessageId();
                     ctx.setCurrentChatId(chatIdStr);
                     ctx.setUserMessageId(userMsgId);
@@ -1960,7 +1948,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
      * 执行自由对话模式的流式处理（带完整响应）
      */
     @Override
-    public StreamResult executeFreeChatStreamWithFullResponse(SysAgent agent, String userInput) {
+    public StreamResult executeFreeChatStreamWithFullResponse(SysAgent agent, String userInput, Long chatId) {
         CompletableFuture<String> fullResponseFuture = new CompletableFuture<>();
         // 捕获当前线程的Sa-Token上下文
         Map<String, Object> contextMap = SaTokenReactiveHelper.captureContext();
@@ -1970,7 +1958,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                 // 在执行具体操作前恢复上下文
                 SaTokenReactiveHelper.runWithContext(contextMap, () -> {
                     // 执行自由对话的流式处理，并在完成时设置完整响应
-                    performFreeChatStreamingWithFullResponse(agent, userInput, sink, fullResponseFuture);
+                    performFreeChatStreamingWithFullResponse(agent, userInput, chatId, sink, fullResponseFuture);
                 });
             } catch (Exception e) {
                 log.error("自由对话流式执行失败", e);
@@ -1986,7 +1974,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
     /**
      * 执行自由对话的流式处理（带完整响应）
      */
-    private void performFreeChatStreamingWithFullResponse(SysAgent agent, String userInput,
+    private void performFreeChatStreamingWithFullResponse(SysAgent agent, String userInput, Long chatId,
                                                           reactor.core.publisher.FluxSink<String> sink,
                                                           CompletableFuture<String> fullResponseFuture) {
         try {
@@ -1997,9 +1985,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                 return;
             }
 
-            // 2. 创建或获取会话
-            SysAgentChat chat = createOrGetChat(agent.getAgentId(), userInput);
-            Long chatId = chat.getChatId();
+            // 2. 使用传入的会话ID
 
             // 3. 保存用户消息
             saveUserMessage(chatId, userInput);

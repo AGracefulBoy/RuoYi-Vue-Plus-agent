@@ -45,6 +45,11 @@ public class SysAgentChat extends TenantEntity {
     private Long userId;
 
     /**
+     * 分组ID
+     */
+    private Long groupId;
+
+    /**
      * 会话标题
      */
     private String chatTitle;
@@ -100,6 +105,11 @@ public class SysAgentChat extends TenantEntity {
      */
     @TableLogic
     private String delFlag;
+
+    /**
+     * 对话模式 debug 表示调试模式，chat 表示正常对话
+     */
+    private String chatModel;
 
     /**
      * 会话元数据内部类
