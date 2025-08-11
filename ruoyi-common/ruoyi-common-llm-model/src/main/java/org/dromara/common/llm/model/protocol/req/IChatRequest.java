@@ -10,6 +10,8 @@ import org.springframework.ai.deepseek.DeepSeekChatOptions;
 import org.springframework.ai.deepseek.api.ResponseFormat;
 import org.springframework.ai.openai.OpenAiChatOptions;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Setter
@@ -207,14 +209,21 @@ public class IChatRequest {
     }
 
     public DashScopeChatOptions dashScopeChatOptions() {
-        return DashScopeChatOptions.builder()
+        DashScopeChatOptions.DashscopeChatOptionsBuilder builder = DashScopeChatOptions.builder()
             .withStream(true)
             .withModel(this.model)
             .withMaxToken(this.maxTokens)
             .withTemperature(this.temperature)
             .withTopP(this.topP)
-            .withResponseFormat(toDashScopeResponseFormat(this.responseFormat))
-            .build();
+            .withResponseFormat(toDashScopeResponseFormat(this.responseFormat));
+        
+        // Convert List<String> to List<Object> for withStop method
+        if (this.stop != null && !this.stop.isEmpty()) {
+            List<Object> stopObjects = new ArrayList<>(this.stop);
+            builder.withStop(stopObjects);
+        }
+        
+        return builder.build();
     }
 
 

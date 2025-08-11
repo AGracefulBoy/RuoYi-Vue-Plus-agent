@@ -24,6 +24,7 @@ import org.dromara.system.domain.vo.ChatHistoryVo;
 import org.dromara.system.domain.vo.ChatSessionVo;
 import org.dromara.system.service.ChatContextService;
 import org.dromara.system.service.SysAgentChatService;
+import org.dromara.system.service.helper.MessageTypeMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
@@ -56,6 +57,9 @@ public class SysAgentChatController {
 
     @Autowired
     private ChatContextService chatContextService;
+    
+    @Autowired
+    private MessageTypeMapper messageTypeMapper;
 
     /**
      * 流式生成接口 - 支持实时获取生成过程的分块响应
@@ -76,29 +80,9 @@ public class SysAgentChatController {
         // 调用服务层处理流式对话
         return sysAgentChatService.completions(chatRequest)
             .map(data -> {
-                // 根据消息类型决定事件类型
-                String eventType = "message";
-                if (data.getMessage() != null) {
-                    String messageType = data.getMessage().getType();
-                    if ("thought".equals(messageType)) {
-                        eventType = "thought";
-                    } else if ("action".equals(messageType) || "enhanced_reason".equals(messageType) || "enhancing".equals(messageType)) {
-                        eventType = "action";
-                    } else if ("observation".equals(messageType)) {
-                        eventType = "observation";
-                    } else if ("answer".equals(messageType) || "enhanced".equals(messageType)) {
-                        eventType = "answer";
-                    } else if ("error".equals(messageType)) {
-                        eventType = "error";
-                    } else if ("finish".equals(messageType)) {
-                        eventType = "complete";
-                    }
-                }
-
-                if (data.getIsFinish() != null && data.getIsFinish()) {
-                    eventType = "complete";
-                }
-
+                // 使用MessageTypeMapper统一处理消息类型映射
+                String eventType = messageTypeMapper.mapToEventType(data);
+                
                 return ServerSentEvent.<StreamMessageResponseDto>builder()
                     .id(IdUtil.fastSimpleUUID())
                     .event(eventType)

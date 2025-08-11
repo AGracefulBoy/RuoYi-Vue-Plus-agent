@@ -32,8 +32,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 /**
@@ -725,9 +728,65 @@ public class SysPythonPackageServiceImpl implements ISysPythonPackageService {
         response.setHeader("Connection", "keep-alive");
         response.setHeader("X-Accel-Buffering", "no"); // 禁用Nginx缓冲
 
+        // 创建包装的输出流，处理SSE格式
+        OutputStream wrappedOutputStream = new OutputStream() {
+            private final OutputStream target = response.getOutputStream();
+            private final ByteArrayOutputStream lineBuffer = new ByteArrayOutputStream();
+            private boolean isInDataLine = false;
+            
+            @Override
+            public void write(int b) throws IOException {
+                // 当遇到换行符时（字节值为10），发送一行数据
+                if (b == '\n') {
+                    // 将累积的字节转换为UTF-8字符串（不包含换行符）
+                    String line = lineBuffer.toString(StandardCharsets.UTF_8);
+                    
+                    // 检查是否是SSE数据行
+                    if (line.startsWith("data: ")) {
+                        // 写入data行和必要的换行
+                        target.write(line.getBytes(StandardCharsets.UTF_8));
+                        target.write('\n');
+                        isInDataLine = true;
+                    } else if (line.isEmpty() && isInDataLine) {
+                        // SSE格式需要的空行分隔符
+                        target.write('\n');
+                        target.flush();
+                        isInDataLine = false;
+                    } else if (!line.isEmpty()) {
+                        // 其他非空行
+                        target.write(line.getBytes(StandardCharsets.UTF_8));
+                        target.write('\n');
+                    }
+                    
+                    // 清空缓冲区
+                    lineBuffer.reset();
+                } else {
+                    // 非换行符，添加到缓冲区
+                    lineBuffer.write(b);
+                }
+            }
+            
+            @Override
+            public void flush() throws IOException {
+                // 如果缓冲区还有数据，写出去
+                if (lineBuffer.size() > 0) {
+                    String remaining = lineBuffer.toString(StandardCharsets.UTF_8);
+                    target.write(remaining.getBytes(StandardCharsets.UTF_8));
+                    lineBuffer.reset();
+                }
+                target.flush();
+            }
+            
+            @Override
+            public void close() throws IOException {
+                flush();
+                target.close();
+            }
+        };
+
         // 流式调用
         String url = pythonProperties.getApi().getStreamUrl();
-        boolean success = HttpUtils.sendPostStream(url, requestJson, response.getOutputStream());
+        boolean success = HttpUtils.sendPostStream(url, requestJson, wrappedOutputStream);
 
         if (success) {
             log.info("Python代码调试流式请求完成");

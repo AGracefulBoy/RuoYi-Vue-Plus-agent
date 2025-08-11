@@ -25,8 +25,13 @@ import org.dromara.system.domain.dto.ToolDto;
 import org.dromara.system.domain.vo.SysModelConfigVo;
 import org.dromara.system.domain.vo.SysToolVo;
 import org.dromara.system.service.*;
+import org.dromara.system.service.helper.PromptBuilderHelper;
+import org.dromara.system.service.helper.StreamMessageBuilder;
 import org.dromara.system.service.tool.executor.IToolExecutor;
 import org.dromara.system.service.tool.executor.ToolExecutionResult;
+import org.dromara.system.domain.context.ModelConfigContext;
+import org.dromara.system.domain.context.StreamingContext;
+import org.dromara.system.domain.instruction.ToolCallInstruction;
 import org.dromara.system.util.HttpUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -34,6 +39,10 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -128,6 +137,12 @@ public class TaskAgentServiceImpl implements TaskAgentService {
 
     @Autowired
     private IElasticsearchDocumentService elasticsearchDocumentService;
+
+    @Autowired
+    private PromptBuilderHelper promptBuilderHelper;
+
+    @Autowired
+    private StreamMessageBuilder streamMessageBuilder;
 
     @Override
     public Flux<StreamMessageResponseDto> executeReActStream(SysAgent agent, List<ToolDto> availableTools, String userInput) {
@@ -233,6 +248,11 @@ public class TaskAgentServiceImpl implements TaskAgentService {
             // 记录每一步的完整提示词以便调试
             log.info("第{}步 - 构建的完整提示词: {}", currentStep + 1, cotPrompt);
 
+            // 将完整提示词添加到提示词链中
+            ctx.getPromptChain()
+                .append(cotPrompt)
+                .append("\n");
+
             // 执行流式AI调用
             executeStreamingAICallForMessage(cotPrompt, modelContext, sink, fullResponse -> {
                 log.info("第{}步获取到完整响应: {}", currentStep + 1, fullResponse);
@@ -262,14 +282,19 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                                       reactor.core.publisher.FluxSink<StreamMessageResponseDto> sink, int currentStep, Long chatId, StreamingContext ctx) {
 
         try {
+            // 将AI响应添加到提示词链中
+            ctx.getPromptChain()
+                .append(String.format("\n=== Step %d Response ===\n", currentStep + 1))
+                .append(aiResponse)
+                .append("\n");
 
             if (containsFinalAnswer(aiResponse)) {
                 // 将包含Final Answer的完整响应添加到历史记录
                 appendToConversationHistory("Assistant", aiResponse, ctx);
-                
+
                 // 提取最终答案
                 String finalAnswer = extractFinalAnswer(aiResponse);
-                
+
                 // 判断是否需要增强回复
                 if (modelContext.getEnhanceModel() != null && StringUtils.hasText(finalAnswer)
                     && !modelContext.getMainModel().getModelId().equals(modelContext.getEnhanceModel().getModelId())) {
@@ -296,9 +321,12 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                 sink.next(createStreamMessage(String.format("📝 **参数:** %s\n", toolCall.getParameters()), "action", false, ctx));
 
                 // 执行工具调用
-                String toolResult = executeToolCall(toolCall);
+                String toolResult = executeToolCall(toolCall, sink, ctx);
 
-                sink.next(createStreamMessage(String.format("✅ **工具结果:** %s\n", toolResult), "observation", false, ctx));
+                // 如果不是流式输出，显示工具结果
+                if (!isStreamingTool(toolCall)) {
+                    sink.next(createStreamMessage(String.format("✅ **工具结果:** %s\n", toolResult), "observation", false, ctx));
+                }
 
                 // 保存工具执行结果
                 saveToolResult(chatId, toolCall, toolResult, currentStep);
@@ -312,10 +340,10 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                 if (containsFinalAnswer(aiResponse)) {
                     // 将包含Final Answer的完整响应添加到历史记录
                     appendToConversationHistory("Assistant", aiResponse, ctx);
-                    
+
                     // 提取最终答案
                     String finalAnswer = extractFinalAnswer(aiResponse);
-                    
+
                     // 判断是否需要增强回复
                     if (modelContext.getEnhanceModel() != null && StringUtils.hasText(finalAnswer)
                         && !modelContext.getMainModel().getModelId().equals(modelContext.getEnhanceModel().getModelId())) {
@@ -354,9 +382,11 @@ public class TaskAgentServiceImpl implements TaskAgentService {
      * 执行工具调用
      *
      * @param toolCall 工具调用指令
+     * @param sink 流式输出sink
+     * @param ctx 流式上下文
      * @return 执行结果
      */
-    private String executeToolCall(ToolCallInstruction toolCall) {
+    private String executeToolCall(ToolCallInstruction toolCall, reactor.core.publisher.FluxSink<StreamMessageResponseDto> sink, StreamingContext ctx) {
         try {
             String type = toolCall.getType();
             if ("tool".equals(type)) {
@@ -367,9 +397,9 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                 }
 
                 // 根据工具类型执行
-                if ("script".equals(tool.getToolType())) {
+                if ("2".equals(tool.getToolType())) {
                     // Python脚本执行
-                    return executePythonScript(tool, toolCall.getParameters());
+                    return executePythonScript(tool, toolCall.getParameters(), sink, ctx);
                 } else {
                     // API工具或其他类型
                     for (IToolExecutor executor : toolExecutors) {
@@ -440,15 +470,17 @@ public class TaskAgentServiceImpl implements TaskAgentService {
      *
      * @param tool       工具配置
      * @param parameters 参数（JSON格式）
+     * @param sink      流式输出sink（可选，用于流式输出）
+     * @param ctx       流式上下文（可选，用于流式输出）
      * @return 执行结果
      */
-    private String executePythonScript(SysToolVo tool, String parameters) {
+    private String executePythonScript(SysToolVo tool, String parameters, reactor.core.publisher.FluxSink<StreamMessageResponseDto> sink, StreamingContext ctx) {
         try {
             // 构建Python调试请求
             PythonDebugRequestBo request = new PythonDebugRequestBo();
             request.setCode(tool.getScriptCode());
             request.setFunctionName(tool.getFunctionName());
-            request.setStream(false); // ReAct模式不需要流式响应
+            request.setStream("1".equals(tool.getIsStream()));
 
             // 解析参数
             if (StringUtils.hasText(parameters)) {
@@ -464,14 +496,76 @@ public class TaskAgentServiceImpl implements TaskAgentService {
 
             String requestJson = JSONUtil.toJsonStr(data);
 
-            // 发送请求到Python执行服务
-            String url = pythonProperties.getApi().getExecUrl();
-            String result = HttpUtils.sendPost(url, requestJson);
+            // 检查是否需要流式输出
+            if ("1".equals(tool.getIsStream()) && sink != null && ctx != null) {
+                // 流式输出模式
+                log.info("Python脚本流式执行开始，工具：{}", tool.getToolName());
 
-            log.info("Python脚本执行完成，工具：{}，结果：{}", tool.getToolName(), result);
+                // 用于收集所有输出内容
+                StringBuilder fullOutput = new StringBuilder();
 
-            // 直接返回结果（Python服务返回的是执行结果的字符串）
-            return result;
+                // 创建自定义输出流，将数据写入FluxSink
+                OutputStream streamingOutput = new OutputStream() {
+                    private final ByteArrayOutputStream lineBuffer = new ByteArrayOutputStream();
+
+                    @Override
+                    public void write(int b) throws IOException {
+                        // 当遇到换行符时（字节值为10），发送一行数据
+                        if (b == '\n') {
+                            // 将累积的字节转换为UTF-8字符串（不包含换行符）
+                            String line = lineBuffer.toString(StandardCharsets.UTF_8);
+                            // 发送流式消息
+                            sink.next(createStreamMessage(line, "observation", false, ctx));
+                            // 将内容添加到完整输出中，加上换行符以保持原始格式
+                            fullOutput.append(line).append('\n');
+                            // 清空缓冲区
+                            lineBuffer.reset();
+                        } else {
+                            // 非换行符，添加到缓冲区
+                            lineBuffer.write(b);
+                        }
+                    }
+
+                    @Override
+                    public void flush() throws IOException {
+                        // 如果缓冲区还有数据，发送出去
+                        if (lineBuffer.size() > 0) {
+                            // 将累积的字节转换为UTF-8字符串
+                            String remainingData = lineBuffer.toString(StandardCharsets.UTF_8);
+                            sink.next(createStreamMessage(remainingData, "observation", false, ctx));
+                            // 将内容添加到完整输出中
+                            fullOutput.append(remainingData);
+                            lineBuffer.reset();
+                        }
+                    }
+                };
+
+                // 使用流式API
+                String streamUrl = pythonProperties.getApi().getStreamUrl();
+                boolean success = HttpUtils.sendPostStream(streamUrl, requestJson, streamingOutput);
+
+                if (success) {
+                    log.info("Python脚本流式执行完成，工具：{}，完整输出：{}", tool.getToolName(), fullOutput.toString());
+                    // 返回完整的输出内容
+                    return fullOutput.toString();
+                } else {
+                    log.error("Python脚本流式执行失败，工具：{}", tool.getToolName());
+                    // 如果有部分输出，也返回
+                    if (fullOutput.length() > 0) {
+                        return fullOutput.toString();
+                    }
+                    return String.format("Python脚本 %s 执行失败", tool.getToolName());
+                }
+            } else {
+                // 非流式输出模式（原有逻辑）
+                String url = pythonProperties.getApi().getExecUrl();
+                String result = HttpUtils.sendPost(url, requestJson);
+
+                log.info("Python脚本执行完成，工具：{}，结果：{}", tool.getToolName(), result);
+
+                // 直接返回结果（Python服务返回的是执行结果的字符串）
+                return result;
+            }
 
         } catch (Exception e) {
             log.error("执行Python脚本失败，工具：{}", tool.getToolName(), e);
@@ -480,38 +574,32 @@ public class TaskAgentServiceImpl implements TaskAgentService {
     }
 
     /**
+     * 检查工具是否配置为流式输出
+     *
+     * @param toolCall 工具调用指令
+     * @return 是否为流式输出工具
+     */
+    private boolean isStreamingTool(ToolCallInstruction toolCall) {
+        try {
+            if ("tool".equals(toolCall.getType())) {
+                SysToolVo tool = toolService.queryById(toolCall.getId());
+                if (tool != null && "2".equals(tool.getToolType())) {
+                    // Python脚本类型且配置为流式输出
+                    return "1".equals(tool.getIsStream());
+                }
+            }
+        } catch (Exception e) {
+            log.error("检查工具流式配置失败", e);
+        }
+        return false;
+    }
+
+    /**
      * 构建指定步骤的提示词
      */
     private String buildPromptForStep(SysAgent agent, List<ToolDto> availableTools,
                                       String userInput, int step, StreamingContext ctx) {
-
-        if (step == 0) {
-            // 第一步：使用原始提示词
-            return buildPrompt(agent, availableTools, userInput);
-        } else {
-            // 后续步骤：包含完整的ReAct上下文
-            StringBuilder prompt = new StringBuilder();
-
-            // 添加系统提示和工具列表
-            String systemPrompt = agent.getPromptContent();
-            if (!StringUtils.hasText(systemPrompt)) {
-                systemPrompt = buildDefaultReActPrompt();
-            }
-
-            // 替换占位符但保留工具列表和格式说明
-            String basePrompt = systemPrompt
-                .replace("{{agent_personality}}",
-                    StringUtils.hasText(agent.getAgentPersonality()) ? agent.getAgentPersonality() : "")
-                .replace("{{tools}}",
-                    CollectionUtils.isEmpty(availableTools) ? "" : buildToolListDescription(availableTools))
-                .replace("{{input}}", userInput);
-            ;
-
-            prompt.append(basePrompt);
-            prompt.append(getConversationHistory(ctx));
-
-            return prompt.toString();
-        }
+        return promptBuilderHelper.buildPromptForStep(agent, availableTools, userInput, step, getConversationHistory(ctx));
     }
 
     /**
@@ -670,59 +758,15 @@ public class TaskAgentServiceImpl implements TaskAgentService {
     }
 
     /**
-     * 创建流式消息响应（用于将字符串内容转换为结构化消息）
+     * 创建流式消息响应（委托给StreamMessageBuilder）
      */
     private StreamMessageResponseDto createStreamMessage(String content, String type, boolean isFinish, StreamingContext ctx) {
-        return StreamMessageResponseDto.builder()
-            .message(StreamMessageResponseDto.MessageData.builder()
-                .role("assistant")
-                .type(type)
-                .content(content)
-                .contentType("text")
-                .messageId(generateMessageId())
-                .replyId(ctx.getUserMessageId())
-                .contentTime(System.currentTimeMillis())
-                .build())
-            .isFinish(isFinish)
-            .index(ctx.getAndIncrementMessageIndex())
-            .chatId(ctx.getCurrentChatId())
-            .build();
+        return streamMessageBuilder.createStreamMessage(content, type, isFinish, ctx);
     }
 
     /**
      * 工具调用指令类
      */
-    private static class ToolCallInstruction {
-        private String toolName;
-        private Long id;
-        // tool 表示工具, knowledge 表示知识库，datasource 表示数据库
-        private String type;
-        private String parameters;
-
-        public ToolCallInstruction(String toolName, Long id, String type, String parameters) {
-            this.toolName = toolName;
-            this.id = id;
-            this.type = type;
-            this.parameters = parameters;
-        }
-
-
-        public Long getId() {
-            return id;
-        }
-
-        public String getType() {
-            return type;
-        }
-
-        public String getToolName() {
-            return toolName;
-        }
-
-        public String getParameters() {
-            return parameters;
-        }
-    }
 
     /**
      * 从AI响应中解析工具调用指令
@@ -926,100 +970,6 @@ public class TaskAgentServiceImpl implements TaskAgentService {
     }
 
     /**
-     * 构建提示词
-     */
-    private String buildPrompt(SysAgent agent, List<ToolDto> availableTools, String userInput) {
-        String promptContent = agent.getPromptContent();
-        if (!StringUtils.hasText(promptContent)) {
-            // 如果没有自定义提示词，使用默认的ReAct模式提示词
-            promptContent = buildDefaultReActPrompt();
-        }
-
-        String cotPrompt = promptContent
-            .replace("{{agent_personality}}",
-                StringUtils.hasText(agent.getAgentPersonality()) ? agent.getAgentPersonality() : "")
-            .replace("{{tools}}",
-                CollectionUtils.isEmpty(availableTools) ? "" : buildToolListDescription(availableTools))
-            .replace("{{input}}", userInput);
-
-        log.info("构建的提示词: {}", cotPrompt);
-        return cotPrompt;
-    }
-
-    /**
-     * 构建默认的ReAct提示词
-     */
-    private String buildDefaultReActPrompt() {
-        return """
-            你是一个{{agent_personality}}，能够使用工具来回答问题。请按照以下格式进行推理：
-
-            Question: 用户问题
-            Thought: 分析问题，思考需要使用什么工具
-            Action: 工具名称
-            Action Input: 工具参数（JSON格式）
-            Observation: 工具执行结果
-            ... (必要时重复 Thought/Action/Action Input/Observation)
-            Thought: 基于观察结果进行最终分析
-            Final Answer: 最终答案
-
-            可用工具：
-            {{tool_list}}
-
-            用户问题：{{query}}
-
-            请开始推理：
-            """;
-    }
-
-    /**
-     * 构建工具列表描述
-     */
-    private String buildToolListDescription(List<ToolDto> availableTools) {
-        if (CollectionUtils.isEmpty(availableTools)) {
-            return "";
-        }
-
-        List<Map<String, Object>> toolList = new ArrayList<>();
-        for (ToolDto tool : availableTools) {
-            Map<String, Object> toolMap = new LinkedHashMap<>();
-
-            if (StringUtils.hasText(tool.getDesc())) {
-                toolMap.put("desc", tool.getDesc());
-            }
-
-            toolMap.put("name", tool.getName());
-
-            if (!CollectionUtils.isEmpty(tool.getParameters())) {
-                List<Map<String, Object>> paramList = new ArrayList<>();
-                for (ToolDto.Parameter param : tool.getParameters()) {
-                    Map<String, Object> paramMap = new LinkedHashMap<>();
-
-                    if (StringUtils.hasText(param.getDesc())) {
-                        paramMap.put("desc", param.getDesc());
-                    }
-
-                    paramMap.put("name", param.getName());
-
-                    if (param.getRequired() != null) {
-                        paramMap.put("required", param.getRequired());
-                    }
-
-                    if (StringUtils.hasText(param.getType())) {
-                        paramMap.put("type", param.getType());
-                    }
-
-                    paramList.add(paramMap);
-                }
-                toolMap.put("parameters", paramList);
-            }
-
-            toolList.add(toolMap);
-        }
-
-        return JSONUtil.toJsonStr(toolList);
-    }
-
-    /**
      * 执行流式AI调用（带步骤类型参数）
      */
     private void executeStreamingAICall(String cotPrompt, ModelConfigContext modelContext,
@@ -1049,8 +999,13 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                                                   reactor.core.publisher.FluxSink<StreamMessageResponseDto> sink,
                                                   Consumer<String> fullResponseCallback,
                                                   boolean isFinalStep, int currentStep, StreamingContext ctx) {
-        // ReAct模式每一步都从思考开始
+
+        // ReAct模式第一次从思考开始
         String initialType = "thought";
+
+        if (currentStep > 0) {
+            initialType = "action";
+        }
 
         // 重置缓冲区状态
         ctx.resetStreamBufferState(initialType);
@@ -1122,7 +1077,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                                               boolean isFinalStep, String initialStreamType, StreamingContext ctx) {
         StringBuilder fullResponse = new StringBuilder();
         AtomicReference<IChatResponse> lastChunk = new AtomicReference<>();
-        
+
         // 设置modelContext和sink到StreamingContext中
         ctx.setModelContext(modelContext);
         ctx.setCurrentSink(sink);
@@ -1140,7 +1095,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                     // 增强回复已经在processBufferedContent中启动，这里不需要额外处理
                     return;
                 }
-                
+
                 // 在完成时累计token使用量
                 accumulateTokenUsage(lastChunk.get(), ctx);
 
@@ -1284,38 +1239,38 @@ public class TaskAgentServiceImpl implements TaskAgentService {
 
                     // 标记已找到 Final Answer
                     ctx.setFinalAnswerDetected(true);
-                    
+
                     // 检查是否需要增强回复
                     ModelConfigContext modelContext = ctx.getModelContext();
-                    if (modelContext != null && modelContext.getEnhanceModel() != null 
+                    if (modelContext != null && modelContext.getEnhanceModel() != null
                         && !modelContext.getMainModel().getModelId().equals(modelContext.getEnhanceModel().getModelId())) {
-                        
+
                         // 需要增强回复，停止当前流
                         log.info("检测到Final Answer，准备使用增强模型进行回复增强");
-                        
+
                         // 保存当前已有的思维过程（包括"Final Answer"之前的内容）
                         String thoughtContent = ctx.getThoughtProcess().toString();
-                        
+
                         // 发送增强开始事件
                         sink.next(createStreamMessage("\n\n🎯 **增强回复...**\n", "enhancing", false, ctx));
-                        
+
                         // 设置标志停止当前流
                         ctx.setShouldStopCurrentStream(true);
-                        
+
                         // 清空缓冲区
                         buffer.setLength(0);
-                        
+
                         // 提取Final Answer后的内容作为原始答案
-                        String remainingContent = bufferContent.substring(finalAnswerIndex);
+//                        String remainingContent = bufferContent.substring(finalAnswerIndex);
                         // 将剩余内容拼接到思维过程中，用于增强回复
-                        String fullThoughtProcess = thoughtContent + remainingContent;
-                        
+                        String fullThoughtProcess = thoughtContent;
+
                         // 立即调用增强模型（需要异步处理）
                         executeEnhanceStreamingCall(fullThoughtProcess, modelContext, sink, ctx);
-                        
+
                         return;
                     }
-                    
+
                     // 不需要增强回复，按原逻辑处理
                     ctx.setCurrentStreamType("answer");
                     currentType = "answer";
@@ -1563,22 +1518,29 @@ public class TaskAgentServiceImpl implements TaskAgentService {
      */
     private String buildEnhancePrompt(String finalAnswer, StreamingContext ctx) {
         StringBuilder prompt = new StringBuilder();
-        prompt.append("你是一个智能助手，需要基于以下的推理过程提供一个综合、准确的回答。\n\n");
 
-        // 添加完整的推理历史
-        String history = ctx.getConversationHistory().toString();
-        if (StringUtils.hasText(history)) {
-            prompt.append("=== 推理过程 ===\n");
-            prompt.append(history);
-            prompt.append("\n\n");
-        }
+        // 添加完整的提示词链（包含每一步的提示词和响应）
+//        String promptChain = ctx.getPromptChain().toString();
+//        if (StringUtils.hasText(promptChain)) {
+//            prompt.append(promptChain);
+//            prompt.append("\n\n");
+//        }
+//
+//        // 添加对话历史（Thought-Action-Observation格式）
+//        String history = ctx.getConversationHistory().toString();
+//        if (StringUtils.hasText(history)) {
+//            prompt.append(history);
+//            prompt.append("\n\n");
+//        }
 
-        prompt.append("=== 初步答案 ===\n");
         prompt.append(finalAnswer);
-        prompt.append("\n\n");
-        prompt.append("直接给出优化后的回答，不需要解释优化过程：");
 
-        return prompt.toString();
+        return prompt.toString()
+            .replace("Question", "用户问题")
+            .replace("Thought", "思考")
+            .replace("Observation", "工具执行的结果")
+            .replace("Action Input", "工具入参")
+            .replace("Action", "工具");
     }
 
     /**
@@ -1664,23 +1626,6 @@ public class TaskAgentServiceImpl implements TaskAgentService {
     /**
      * 模型配置上下文类
      */
-    private static class ModelConfigContext {
-        private final SysModelConfigVo mainModel;
-        private final SysModelConfigVo enhanceModel;
-
-        public ModelConfigContext(SysModelConfigVo mainModel, SysModelConfigVo enhanceModel) {
-            this.mainModel = mainModel;
-            this.enhanceModel = enhanceModel;
-        }
-
-        public SysModelConfigVo getMainModel() {
-            return mainModel;
-        }
-
-        public SysModelConfigVo getEnhanceModel() {
-            return enhanceModel;
-        }
-    }
 
     @Override
     public boolean checkExitCondition(String input) {
@@ -1955,127 +1900,4 @@ public class TaskAgentServiceImpl implements TaskAgentService {
     /**
      * 流式处理上下文类，用于替代ThreadLocal
      */
-    private static class StreamingContext {
-        private StringBuilder conversationHistory = new StringBuilder();
-        private Integer messageIndexCounter = 0;
-        private String currentChatId;
-        private String userMessageId;
-        private StringBuilder streamBuffer = new StringBuilder();
-        private String currentStreamType = "thought";
-        private boolean actionDetected = false;
-        private boolean finalAnswerDetected = false;
-        private List<ToolDto> currentAvailableTools;
-        private IChatResponse.Usage totalTokenUsage;
-        private ModelConfigContext modelContext;
-        private StringBuilder thoughtProcess = new StringBuilder();
-        private boolean shouldStopCurrentStream = false;
-        private reactor.core.publisher.FluxSink<StreamMessageResponseDto> currentSink;
-
-        public StreamingContext() {
-            this.totalTokenUsage = new IChatResponse.Usage();
-            this.totalTokenUsage.setPromptTokens(0);
-            this.totalTokenUsage.setCompletionTokens(0);
-            this.totalTokenUsage.setTotalTokens(0);
-        }
-
-        public void resetStreamBufferState(String initialType) {
-            streamBuffer.setLength(0);
-            currentStreamType = initialType;
-            actionDetected = false;
-            finalAnswerDetected = false;
-        }
-
-        public int getAndIncrementMessageIndex() {
-            return messageIndexCounter++;
-        }
-
-        // Getters and setters
-        public StringBuilder getConversationHistory() {
-            return conversationHistory;
-        }
-
-        public String getCurrentChatId() {
-            return currentChatId;
-        }
-
-        public void setCurrentChatId(String currentChatId) {
-            this.currentChatId = currentChatId;
-        }
-
-        public String getUserMessageId() {
-            return userMessageId;
-        }
-
-        public void setUserMessageId(String userMessageId) {
-            this.userMessageId = userMessageId;
-        }
-
-        public StringBuilder getStreamBuffer() {
-            return streamBuffer;
-        }
-
-        public String getCurrentStreamType() {
-            return currentStreamType;
-        }
-
-        public void setCurrentStreamType(String currentStreamType) {
-            this.currentStreamType = currentStreamType;
-        }
-
-        public boolean isActionDetected() {
-            return actionDetected;
-        }
-
-        public void setActionDetected(boolean actionDetected) {
-            this.actionDetected = actionDetected;
-        }
-
-        public boolean isFinalAnswerDetected() {
-            return finalAnswerDetected;
-        }
-
-        public void setFinalAnswerDetected(boolean finalAnswerDetected) {
-            this.finalAnswerDetected = finalAnswerDetected;
-        }
-
-        public List<ToolDto> getCurrentAvailableTools() {
-            return currentAvailableTools;
-        }
-
-        public void setCurrentAvailableTools(List<ToolDto> currentAvailableTools) {
-            this.currentAvailableTools = currentAvailableTools;
-        }
-
-        public IChatResponse.Usage getTotalTokenUsage() {
-            return totalTokenUsage;
-        }
-
-        public ModelConfigContext getModelContext() {
-            return modelContext;
-        }
-
-        public void setModelContext(ModelConfigContext modelContext) {
-            this.modelContext = modelContext;
-        }
-
-        public StringBuilder getThoughtProcess() {
-            return thoughtProcess;
-        }
-
-        public boolean isShouldStopCurrentStream() {
-            return shouldStopCurrentStream;
-        }
-
-        public void setShouldStopCurrentStream(boolean shouldStopCurrentStream) {
-            this.shouldStopCurrentStream = shouldStopCurrentStream;
-        }
-
-        public reactor.core.publisher.FluxSink<StreamMessageResponseDto> getCurrentSink() {
-            return currentSink;
-        }
-
-        public void setCurrentSink(reactor.core.publisher.FluxSink<StreamMessageResponseDto> currentSink) {
-            this.currentSink = currentSink;
-        }
-    }
 }
