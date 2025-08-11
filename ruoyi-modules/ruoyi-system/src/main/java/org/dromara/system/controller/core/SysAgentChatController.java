@@ -23,6 +23,7 @@ import reactor.core.publisher.Flux;
 
 import javax.validation.Valid;
 import java.time.Duration;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * 核心对话接口
@@ -55,34 +56,62 @@ public class SysAgentChatController {
             chatRequest.setTraceId(IdUtil.fastSimpleUUID());
         }
 
-        log.info("开始处理聊天请求，追踪ID: {}, 用户ID: {}, 智能体ID: {}",
-            chatRequest.getTraceId(), LoginHelper.getUserId(), chatRequest.getAgentId());
-
-        // 调用服务层处理流式对话，并使用 SaTokenReactiveHelper 包装整个响应式链
+        // 在响应式流处理前保存线程上下文信息
+        Long userId = LoginHelper.getUserId();
+        String tenantId = LoginHelper.getTenantId();
+        
+        long startTime = System.currentTimeMillis();
+        log.info("开始处理聊天请求 - 追踪ID: {}, 用户ID: {}, 租户ID: {}, 智能体ID: {}",
+            chatRequest.getTraceId(), userId, tenantId, chatRequest.getAgentId());
+        
+        // 调用服务层处理流式对话
         Flux<StreamMessageResponseDto> responseFlux = sysAgentChatService.completions(chatRequest);
 
+        // 使用计数器替代UUID生成以提升性能
+        final AtomicLong eventIdCounter = new AtomicLong();
+        
         // 包装响应式流以确保上下文在整个链路中传递
         return SaTokenReactiveHelper.wrapFlux(responseFlux
+            // 传递上下文信息到响应式流中
+            .contextWrite(ctx -> ctx
+                .put("userId", userId)
+                .put("tenantId", tenantId)
+                .put("traceId", chatRequest.getTraceId()))
             .map(data -> {
                 // 使用MessageTypeMapper统一处理消息类型映射
                 String eventType = messageTypeMapper.mapToEventType(data);
 
+                // 使用递增ID替代UUID
+                String eventId = chatRequest.getTraceId() + "_" + eventIdCounter.incrementAndGet();
+                
                 return ServerSentEvent.<StreamMessageResponseDto>builder()
-                    .id(IdUtil.fastSimpleUUID())
+                    .id(eventId)
                     .event(eventType)
                     .data(data)
                     .build();
             })
-            .doOnError(error -> log.error("聊天请求处理失败，追踪ID: {}", chatRequest.getTraceId(), error))
-            .onErrorResume(error -> Flux.just(ServerSentEvent.<StreamMessageResponseDto>builder()
-                .event("error")
-                .data(StreamMessageResponseDto.createErrorMessage(
-                    error.getMessage(),
-                    "error_" + System.currentTimeMillis(),
-                    String.valueOf(System.currentTimeMillis()),
-                    0
-                ))
-                .build())));
+            .doOnComplete(() -> {
+                long duration = System.currentTimeMillis() - startTime;
+                log.info("聊天请求处理完成 - 追踪ID: {}, 耗时: {}ms", chatRequest.getTraceId(), duration);
+            })
+            .doOnError(error -> {
+                long duration = System.currentTimeMillis() - startTime;
+                log.error("聊天请求处理失败 - 追踪ID: {}, 耗时: {}ms, 错误: {}", 
+                    chatRequest.getTraceId(), duration, error.getMessage(), error);
+            })
+            .onErrorResume(error -> {
+                String errorId = chatRequest.getTraceId() + "_error_" + System.currentTimeMillis();
+                return Flux.just(ServerSentEvent.<StreamMessageResponseDto>builder()
+                    .id(errorId)
+                    .event("error")
+                    .data(StreamMessageResponseDto.createErrorMessage(
+                        error.getMessage(),
+                        errorId,
+                        String.valueOf(System.currentTimeMillis()),
+                        0
+                    ))
+                    .build());
+            }));
     }
 
     /**

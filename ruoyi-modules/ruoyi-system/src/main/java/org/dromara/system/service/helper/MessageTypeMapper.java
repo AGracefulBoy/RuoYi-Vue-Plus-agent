@@ -1,33 +1,23 @@
 package org.dromara.system.service.helper;
 
+import lombok.extern.slf4j.Slf4j;
 import org.dromara.system.domain.dto.StreamMessageResponseDto;
 import org.springframework.stereotype.Component;
-
-import java.util.Map;
 
 /**
  * 消息类型映射器
  * 用于将消息类型映射为SSE事件类型
+ * 使用switch表达式优化性能
  *
  * @author system
  */
+@Slf4j
 @Component
 public class MessageTypeMapper {
 
-    private static final Map<String, String> TYPE_TO_EVENT = Map.of(
-        "thought", "thought",
-        "action", "action",
-        "enhanced_reason", "action",
-        "enhancing", "action",
-        "observation", "action",
-        "answer", "answer",
-        "enhanced", "answer",
-        "error", "error",
-        "finish", "complete"
-    );
-
     /**
      * 将消息数据映射为SSE事件类型
+     * 使用switch表达式提升性能
      *
      * @param data 流式消息响应数据
      * @return SSE事件类型
@@ -41,17 +31,21 @@ public class MessageTypeMapper {
         // 根据消息类型映射事件类型
         if (data.getMessage() != null && data.getMessage().getType() != null) {
             String messageType = data.getMessage().getType();
-
-            // 特殊处理一些类型
-            if ("enhanced_reason".equals(messageType) || "enhancing".equals(messageType)) {
-                return "action";
-            }
-            if ("enhanced".equals(messageType)) {
-                return "answer";
-            }
-
-            // 使用映射表
-            return TYPE_TO_EVENT.getOrDefault(messageType, "message");
+            
+            // 使用switch表达式代替Map查找，提升性能
+            String eventType = switch (messageType) {
+                case "thought" -> "thought";
+                case "action", "enhanced_reason", "enhancing", "observation" -> "action";
+                case "answer", "enhanced" -> "answer";
+                case "error" -> "error";
+                case "finish" -> "complete";
+                default -> {
+                    log.debug("未知消息类型: {}, 使用默认事件类型: message", messageType);
+                    yield "message";
+                }
+            };
+            
+            return eventType;
         }
 
         return "message";

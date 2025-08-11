@@ -16,6 +16,7 @@ import org.dromara.system.mapper.SysDatasourceMapper;
 import org.dromara.system.mapper.SysKnowledgeBaseMapper;
 import org.dromara.system.mapper.SysToolMapper;
 import org.dromara.system.service.SysAgentChatService;
+import org.dromara.system.service.AgentLocalCacheService;
 import org.dromara.system.service.ChatContextService;
 import org.dromara.system.service.TaskAgentService;
 import org.springframework.stereotype.Service;
@@ -40,32 +41,42 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
     private final SysDatasourceMapper datasourceMapper;
     private final TaskAgentService taskAgentService;
     private final ChatContextService chatContextService;
+    private final AgentLocalCacheService agentLocalCacheService;
 
     @Override
     public Flux<StreamMessageResponseDto> completions(ChatRequestDto chatRequest) {
         try {
-            log.info("开始处理智能体对话，智能体ID: {}, 用户消息: {}",
+            long startTime = System.currentTimeMillis();
+            log.info("开始处理智能体对话 - 智能体ID: {}, 用户消息: {}",
                 chatRequest.getAgentId(), chatRequest.getMessage());
 
-            // 1. 获取智能体信息
-            SysAgent agent = getAgentById(chatRequest.getAgentId());
+            // 1. 获取智能体信息（使用本地缓存）
+            SysAgent agent = agentLocalCacheService.getAgent(chatRequest.getAgentId());
+            log.debug("智能体信息获取完成 - 名称: {}, 耗时: {}ms", 
+                agent.getAgentName(), System.currentTimeMillis() - startTime);
 
-            // 2. 构建可用工具列表
-            List<ToolDto> availableTools = buildAvailableToolsList(agent);
+            // 2. 构建可用工具列表（使用本地缓存）
+            long toolStartTime = System.currentTimeMillis();
+            List<ToolDto> availableTools = agentLocalCacheService.getAvailableTools(chatRequest.getAgentId());
+            log.info("可用工具加载完成 - 数量: {}, 耗时: {}ms", 
+                availableTools.size(), System.currentTimeMillis() - toolStartTime);
 
             // 3. 根据对话模式选择处理方式
             if ("self_planning".equals(agent.getConversationMode())) {
                 // 自主规划模式：使用ReAct思维链处理
-                log.info("智能体{}使用自主规划模式处理对话", agent.getAgentId());
+                log.info("智能体{}使用自主规划模式处理对话 - 准备耗时: {}ms", 
+                    agent.getAgentId(), System.currentTimeMillis() - startTime);
                 return handleTaskAgent(agent, availableTools, chatRequest);
             } else {
                 // 自由对话模式：直接对话，不使用思维链
-                log.info("智能体{}使用自由对话模式处理对话", agent.getAgentId());
+                log.info("智能体{}使用自由对话模式处理对话 - 准备耗时: {}ms", 
+                    agent.getAgentId(), System.currentTimeMillis() - startTime);
                 return handleFreeChatAgent(agent, chatRequest);
             }
 
         } catch (Exception e) {
-            log.error("处理智能体对话时发生错误", e);
+            log.error("处理智能体对话时发生错误 - 智能体ID: {}, 错误信息: {}", 
+                chatRequest.getAgentId(), e.getMessage(), e);
             return Flux.error(e);
         }
     }
@@ -169,39 +180,20 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
 
     /**
      * 根据ID获取智能体信息
-     *
-     * @param agentId 智能体ID
-     * @return 智能体信息
+     * @deprecated 使用 agentLocalCacheService.getAgent() 代替
      */
+    @Deprecated
     private SysAgent getAgentById(Long agentId) {
-        SysAgent agent = agentMapper.selectById(agentId);
-        if (agent == null) {
-            throw new RuntimeException("智能体不存在，ID: " + agentId);
-        }
-        log.debug("成功获取智能体信息: {}", agent.getAgentName());
-        return agent;
+        return agentLocalCacheService.getAgent(agentId);
     }
 
     /**
      * 构建智能体可用工具列表
-     *
-     * @param agent 智能体信息
-     * @return 可用工具列表
+     * @deprecated 使用 agentLocalCacheService.getAvailableTools() 代替
      */
+    @Deprecated
     private List<ToolDto> buildAvailableToolsList(SysAgent agent) {
-        List<ToolDto> toolDtoList = new ArrayList<>();
-
-        // 添加工具信息
-        toolDtoList.addAll(getToolsFromAgent(agent));
-
-        // 添加知识库信息
-        toolDtoList.addAll(getKnowledgeBasesFromAgent(agent));
-
-        // 添加数据源信息
-        toolDtoList.addAll(getDatasourcesFromAgent(agent));
-
-        log.info("智能体 {} 总计可用资源: {} 个", agent.getAgentName(), toolDtoList.size());
-        return toolDtoList;
+        return agentLocalCacheService.getAvailableTools(agent.getAgentId());
     }
 
     /**

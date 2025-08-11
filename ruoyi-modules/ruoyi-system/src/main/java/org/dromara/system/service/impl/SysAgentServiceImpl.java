@@ -23,6 +23,7 @@ import org.dromara.system.mapper.SysKnowledgeBaseMapper;
 import org.dromara.system.mapper.SysDatasourceMapper;
 import org.dromara.system.mapper.SysModelConfigMapper;
 import org.dromara.system.service.ISysAgentService;
+import org.dromara.system.service.AgentLocalCacheService;
 
 import org.springframework.stereotype.Service;
 
@@ -45,6 +46,7 @@ public class SysAgentServiceImpl implements ISysAgentService {
     private final SysKnowledgeBaseMapper knowledgeBaseMapper;
     private final SysDatasourceMapper datasourceMapper;
     private final SysModelConfigMapper modelConfigMapper;
+    private final AgentLocalCacheService agentLocalCacheService;
 
     /**
      * 查询智能体管理
@@ -188,7 +190,14 @@ public class SysAgentServiceImpl implements ISysAgentService {
     public Boolean updateByBo(SysAgentBo bo) {
         SysAgent update = MapstructUtils.convert(bo, SysAgent.class);
         validEntityBeforeSave(update);
-        return baseMapper.updateById(update) > 0;
+        boolean result = baseMapper.updateById(update) > 0;
+        
+        // 更新成功后清除缓存
+        if (result && update.getAgentId() != null) {
+            agentLocalCacheService.evictAgent(update.getAgentId());
+        }
+        
+        return result;
     }
 
     /**
@@ -199,7 +208,14 @@ public class SysAgentServiceImpl implements ISysAgentService {
         LambdaUpdateWrapper<SysAgent> wrapper = Wrappers.lambdaUpdate();
         wrapper.eq(SysAgent::getAgentId, agentId);
         wrapper.set(SysAgent::getStatus, status);
-        return baseMapper.update(null, wrapper) > 0;
+        boolean result = baseMapper.update(null, wrapper) > 0;
+        
+        // 更新成功后清除缓存
+        if (result) {
+            agentLocalCacheService.evictAgent(agentId);
+        }
+        
+        return result;
     }
 
     /**
@@ -273,7 +289,14 @@ public class SysAgentServiceImpl implements ISysAgentService {
                 throw new ServiceException("不能删除已上架的智能体，请先下架后再删除");
             }
         }
-        return baseMapper.deleteBatchIds(ids) > 0;
+        boolean result = baseMapper.deleteBatchIds(ids) > 0;
+        
+        // 删除成功后清除缓存
+        if (result) {
+            agentLocalCacheService.evictAgents(new ArrayList<>(ids));
+        }
+        
+        return result;
     }
 
     /**

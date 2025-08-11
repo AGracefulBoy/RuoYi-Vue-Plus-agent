@@ -1685,7 +1685,6 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                         if (reasoningContent != null) {
                             String reasoningText = reasoningContent.toString();
                             if (StringUtils.hasText(reasoningText) && !sink.isCancelled()) {
-                                log.info("增强回复模型思考: {}",reasoningText);
                                 enhancedResponse.append(reasoningText);
                                 // 发送推理内容作为增强事件
                                 sink.next(createStreamMessage(reasoningText, "enhanced_reason", false, ctx));
@@ -1694,7 +1693,6 @@ public class TaskAgentServiceImpl implements TaskAgentService {
 
                         // 然后发送正常的文本内容
                         if (StringUtils.hasText(text) && !sink.isCancelled()) {
-                            log.info("增强回复模型答案: {}",text);
                             enhancedResponse.append(text);
                             // 发送增强内容
                             sink.next(createStreamMessage(text, "enhanced", false, ctx));
