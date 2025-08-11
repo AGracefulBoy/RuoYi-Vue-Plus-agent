@@ -3,6 +3,7 @@ package org.dromara.system.domain.context;
 import org.dromara.common.llm.model.protocol.resp.IChatResponse;
 import org.dromara.system.domain.dto.StreamMessageResponseDto;
 import org.dromara.system.domain.dto.ToolDto;
+import reactor.core.Disposable;
 import reactor.core.publisher.FluxSink;
 
 import java.util.List;
@@ -29,6 +30,10 @@ public class StreamingContext {
     private StringBuilder thoughtProcess = new StringBuilder();
     private boolean shouldStopCurrentStream = false;
     private FluxSink<StreamMessageResponseDto> currentSink;
+    
+    // Enhancement stream control
+    private boolean shouldStopEnhanceStream = false;
+    private Disposable enhanceStreamSubscription;
     
     // User context information for maintaining across thread boundaries
     private Long userId;
@@ -179,5 +184,21 @@ public class StreamingContext {
     
     public void setChatId(Long chatId) {
         this.chatId = chatId;
+    }
+    
+    public boolean isShouldStopEnhanceStream() {
+        return shouldStopEnhanceStream;
+    }
+    
+    public void setShouldStopEnhanceStream(boolean shouldStopEnhanceStream) {
+        this.shouldStopEnhanceStream = shouldStopEnhanceStream;
+    }
+    
+    public Disposable getEnhanceStreamSubscription() {
+        return enhanceStreamSubscription;
+    }
+    
+    public void setEnhanceStreamSubscription(Disposable enhanceStreamSubscription) {
+        this.enhanceStreamSubscription = enhanceStreamSubscription;
     }
 }

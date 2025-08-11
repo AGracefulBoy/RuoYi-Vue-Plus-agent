@@ -36,15 +36,20 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
+import reactor.core.Disposable;
+import reactor.core.publisher.BufferOverflowStrategy;
 import reactor.core.publisher.Flux;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
@@ -1665,52 +1670,106 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                                       StreamingContext ctx) {
         StringBuilder enhancedResponse = new StringBuilder();
         AtomicReference<IChatResponse> lastChunk = new AtomicReference<>();
+        AtomicBoolean isCompleted = new AtomicBoolean(false);
 
-        enhanceStream
+        // 添加超时控制（60秒）和背压处理
+        Disposable subscription = enhanceStream
+            .timeout(Duration.ofSeconds(60))
+            .onBackpressureBuffer(1000, // 缓冲区大小
+                dropped -> log.warn("增强流背压：丢弃消息"),
+                BufferOverflowStrategy.DROP_OLDEST) // 缓冲区满时丢弃最旧的
+            .takeWhile(chunk -> !ctx.isShouldStopEnhanceStream()) // 添加流控制
             .doOnNext(chunk -> {
+                // 检查 sink 状态
+                if (sink.isCancelled()) {
+                    log.warn("增强流：Sink 已取消，停止处理");
+                    ctx.setShouldStopEnhanceStream(true);
+                    return;
+                }
+
                 lastChunk.set(chunk);
                 if (chunk.getResult() != null && chunk.getResult().getOutput() != null) {
                     String text = chunk.getResult().getOutput().getText();
                     Object reasoningContent = chunk.getResult().getOutput().getReasoningContent();
 
-                    // 如果有推理内容，先发送推理内容
-                    if (reasoningContent != null) {
-                        String reasoningText = reasoningContent.toString();
-                        if (StringUtils.hasText(reasoningText)) {
-                            enhancedResponse.append(reasoningText);
-                            // 发送推理内容作为增强事件
-                            sink.next(createStreamMessage(reasoningText, "enhanced_reason", false, ctx));
+                    try {
+                        // 如果有推理内容，先发送推理内容
+                        if (reasoningContent != null) {
+                            String reasoningText = reasoningContent.toString();
+                            if (StringUtils.hasText(reasoningText) && !sink.isCancelled()) {
+                                log.info("增强回复模型思考: {}",reasoningText);
+                                enhancedResponse.append(reasoningText);
+                                // 发送推理内容作为增强事件
+                                sink.next(createStreamMessage(reasoningText, "enhanced_reason", false, ctx));
+                            }
                         }
-                    }
 
-                    // 然后发送正常的文本内容
-                    if (StringUtils.hasText(text)) {
-                        enhancedResponse.append(text);
-                        // 发送增强内容
-                        sink.next(createStreamMessage(text, "enhanced", false, ctx));
+                        // 然后发送正常的文本内容
+                        if (StringUtils.hasText(text) && !sink.isCancelled()) {
+                            log.info("增强回复模型答案: {}",text);
+                            enhancedResponse.append(text);
+                            // 发送增强内容
+                            sink.next(createStreamMessage(text, "enhanced", false, ctx));
+                        }
+                    } catch (Exception e) {
+                        log.error("发送增强消息时出错", e);
+                        // 不要在这里中断流，让它继续处理
                     }
                 }
             })
             .doOnComplete(() -> {
-                // 累计增强模型的token使用量
-                accumulateTokenUsage(lastChunk.get(), ctx);
+                if (isCompleted.compareAndSet(false, true)) {
+                    // 累计增强模型的token使用量
+                    accumulateTokenUsage(lastChunk.get(), ctx);
 
-                // 保存增强后的回复到数据库
-                if (enhancedResponse.length() > 0) {
-                    log.info("增强模型优化完成，响应长度: {}", enhancedResponse.length());
-                    // 保存增强回复到数据库
-                    saveEnhancedReply(ctx.getChatId(), enhancedResponse.toString(), ctx, ctx.getTotalTokenUsage());
+                    // 保存增强后的回复到数据库
+                    if (enhancedResponse.length() > 0) {
+                        log.info("增强模型优化完成，响应长度: {}", enhancedResponse.length());
+                        // 保存增强回复到数据库
+                        saveEnhancedReply(ctx.getChatId(), enhancedResponse.toString(), ctx, ctx.getTotalTokenUsage());
+                    }
+
+                    // 完成整个流
+                    if (!sink.isCancelled()) {
+                        completeWithTokenUsage(sink, ctx);
+                    }
                 }
-
-                // 完成整个流
-                completeWithTokenUsage(sink, ctx);
             })
             .doOnError(error -> {
-                log.error("增强模型流式调用失败", error);
-                sink.next(createStreamMessage("\n⚠️ 增强失败: " + error.getMessage(), "error", false, ctx));
-                completeWithTokenUsage(sink, ctx);
+                if (isCompleted.compareAndSet(false, true)) {
+                    if (error instanceof TimeoutException) {
+                        log.error("增强模型流式调用超时", error);
+                        if (!sink.isCancelled()) {
+                            sink.next(createStreamMessage("\n⚠️ 增强超时，使用原始回复\n", "error", false, ctx));
+                        }
+                    } else {
+                        log.error("增强模型流式调用失败", error);
+                        if (!sink.isCancelled()) {
+                            sink.next(createStreamMessage("\n⚠️ 增强失败: " + error.getMessage(), "error", false, ctx));
+                        }
+                    }
+
+                    if (!sink.isCancelled()) {
+                        completeWithTokenUsage(sink, ctx);
+                    }
+                }
             })
-            .subscribe();
+            .doFinally(signal -> {
+                // 确保在任何情况下都清理资源
+                log.debug("增强流结束，信号类型: {}", signal);
+                ctx.setShouldStopEnhanceStream(false); // 重置标志
+            })
+            .subscribe(
+                // onNext - 由 doOnNext 处理
+                chunk -> {},
+                // onError - 由 doOnError 处理
+                error -> {},
+                // onComplete - 由 doOnComplete 处理
+                () -> {}
+            );
+
+        // 保存订阅对象到上下文，以便在需要时取消
+        ctx.setEnhanceStreamSubscription(subscription);
     }
 
     /**
