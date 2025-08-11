@@ -1,9 +1,6 @@
 package org.dromara.system.service.impl;
 
-import cn.dev33.satoken.SaManager;
 import cn.dev33.satoken.context.SaHolder;
-import cn.dev33.satoken.context.SaTokenContext;
-import cn.dev33.satoken.context.mock.SaTokenContextMockUtil;
 import cn.hutool.json.JSONUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,6 +9,7 @@ import org.dromara.common.llm.model.platform.IChatService;
 import org.dromara.common.llm.model.protocol.req.IChatRequest;
 import org.dromara.common.llm.model.protocol.resp.IChatResponse;
 import org.dromara.common.satoken.utils.LoginHelper;
+import org.dromara.common.tenant.helper.TenantHelper;
 import org.dromara.system.config.PythonProperties;
 import org.dromara.system.domain.SysAgent;
 import org.dromara.system.domain.SysAgentChat;
@@ -26,6 +24,7 @@ import org.dromara.system.domain.vo.SysModelConfigVo;
 import org.dromara.system.domain.vo.SysToolVo;
 import org.dromara.system.service.*;
 import org.dromara.system.service.helper.PromptBuilderHelper;
+import org.dromara.system.service.helper.SaTokenReactiveHelper;
 import org.dromara.system.service.helper.StreamMessageBuilder;
 import org.dromara.system.service.tool.executor.IToolExecutor;
 import org.dromara.system.service.tool.executor.ToolExecutionResult;
@@ -146,29 +145,32 @@ public class TaskAgentServiceImpl implements TaskAgentService {
 
     @Override
     public Flux<StreamMessageResponseDto> executeReActStream(SysAgent agent, List<ToolDto> availableTools, String userInput) {
-        SaTokenContext context = SaHolder.getContext();
+        // 捕获当前线程的Sa-Token上下文
+        Map<String, Object> contextMap = SaTokenReactiveHelper.captureContext();
 
         return Flux.<StreamMessageResponseDto>create(sink -> {
             try {
-                SaTokenContextMockUtil.setMockContext(() -> {
-                    SaManager.setSaTokenContext(context);
+                // 在执行具体操作前恢复上下文
+                SaTokenReactiveHelper.runWithContext(contextMap, () -> {
+                    // 创建StreamingContext
+                    StreamingContext ctx = new StreamingContext();
+                    // 执行流式推理
+                    performStreamingReasoningChain(agent, availableTools, userInput, sink, ctx);
                 });
-                // 创建StreamingContext
-                StreamingContext ctx = new StreamingContext();
-                // 执行流式推理
-                performStreamingReasoningChain(agent, availableTools, userInput, sink, ctx);
 
             } catch (Exception e) {
                 log.error("流式ReAct执行失败", e);
-                // 发送错误消息
-                StreamingContext errorCtx = new StreamingContext();
-                sink.next(StreamMessageResponseDto.createErrorMessage(
-                    e.getMessage(),
-                    errorCtx.getCurrentChatId(),
-                    generateMessageId(),
-                    errorCtx.getAndIncrementMessageIndex()
-                ));
-                sink.complete();
+                // 发送错误消息时也恢复上下文
+                SaTokenReactiveHelper.runWithContext(contextMap, () -> {
+                    StreamingContext errorCtx = new StreamingContext();
+                    sink.next(StreamMessageResponseDto.createErrorMessage(
+                        e.getMessage(),
+                        errorCtx.getCurrentChatId(),
+                        generateMessageId(),
+                        errorCtx.getAndIncrementMessageIndex()
+                    ));
+                    sink.complete();
+                });
             }
         });
     }
@@ -181,6 +183,11 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                                                 String userInput, reactor.core.publisher.FluxSink<StreamMessageResponseDto> sink,
                                                 StreamingContext ctx) {
         try {
+            // 捕获用户上下文信息到StreamingContext，以便在响应式流中使用
+            ctx.setUserId(LoginHelper.getUserId());
+            ctx.setDeptId(LoginHelper.getDeptId());
+            ctx.setTenantId(TenantHelper.getTenantId());
+
             // 保存工具列表到上下文
             ctx.setCurrentAvailableTools(availableTools);
             // 1. 获取并验证模型配置
@@ -195,6 +202,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
             // 设置会话信息和用户消息ID
             String userMsgId = generateMessageId();
             ctx.setCurrentChatId(chatIdStr);
+            ctx.setChatId(chatId);  // 设置Long类型的chatId用于数据库操作
             ctx.setUserMessageId(userMsgId);
 
             // 3. 保存用户消息
@@ -314,7 +322,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
             ToolCallInstruction toolCall = parseToolCallFromResponse(aiResponse, availableTools);
             if (toolCall != null) {
                 // 保存思考步骤（包含工具调用决策）
-                saveThoughtStep(chatId, aiResponse, "action", currentStep);
+                saveThoughtStep(chatId, aiResponse, "action", currentStep, ctx);
 
                 // 需要执行工具调用
                 sink.next(createStreamMessage(String.format("\n🔧 **执行工具:** %s\n", toolCall.getToolName()), "action", false, ctx));
@@ -329,7 +337,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                 }
 
                 // 保存工具执行结果
-                saveToolResult(chatId, toolCall, toolResult, currentStep);
+                saveToolResult(chatId, toolCall, toolResult, currentStep, ctx);
 
                 // 将工具执行结果添加到对话历史中，继续下一轮
                 appendToolResultAndContinue(agent, availableTools, userInput, aiResponse,
@@ -358,7 +366,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                     }
                 } else {
                     // 保存思考步骤
-                    saveThoughtStep(chatId, aiResponse, "action", currentStep);
+                    saveThoughtStep(chatId, aiResponse, "action", currentStep, ctx);
 
                     // 继续推理
                     continueReasoning(agent, availableTools, userInput, aiResponse,
@@ -697,13 +705,22 @@ public class TaskAgentServiceImpl implements TaskAgentService {
         userMessage.setStatus("completed");
         userMessage.setProcessingTime(0L);
 
+        // 设置用户信息
+        Long userId = LoginHelper.getUserId();
+        if (userId != null) {
+            userMessage.setCreateBy(userId);
+            userMessage.setUpdateBy(userId);
+            userMessage.setCreateDept(LoginHelper.getDeptId());
+        }
+        userMessage.setTenantId(TenantHelper.getTenantId());
+
         chatContextService.addMessage(userMessage);
     }
 
     /**
      * 保存思考步骤
      */
-    private void saveThoughtStep(Long chatId, String content, String messageType, int stepIndex) {
+    private void saveThoughtStep(Long chatId, String content, String messageType, int stepIndex, StreamingContext ctx) {
         if (chatId == null) return;
 
         SysAgentChatMessage message = new SysAgentChatMessage();
@@ -712,6 +729,15 @@ public class TaskAgentServiceImpl implements TaskAgentService {
         message.setContent(content);
         message.setMessageType(messageType);
         message.setStatus("completed");
+
+        // 从StreamingContext获取用户信息，避免线程切换导致的上下文丢失
+        Long userId = ctx.getUserId();
+        if (userId != null) {
+            message.setCreateBy(userId);
+            message.setUpdateBy(userId);
+            message.setCreateDept(ctx.getDeptId());
+        }
+        message.setTenantId(ctx.getTenantId());
 
         // 创建思维链步骤信息
         List<SysAgentChatMessage.ThoughtStep> thoughtSteps = new ArrayList<>();
@@ -729,7 +755,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
     /**
      * 保存工具执行结果
      */
-    private void saveToolResult(Long chatId, ToolCallInstruction toolCall, String result, int stepIndex) {
+    private void saveToolResult(Long chatId, ToolCallInstruction toolCall, String result, int stepIndex, StreamingContext ctx) {
         if (chatId == null) return;
 
         SysAgentChatMessage message = new SysAgentChatMessage();
@@ -738,6 +764,15 @@ public class TaskAgentServiceImpl implements TaskAgentService {
         message.setContent(result);
         message.setMessageType("observation");
         message.setStatus("completed");
+
+        // 从StreamingContext获取用户信息，避免线程切换导致的上下文丢失
+        Long userId = ctx.getUserId();
+        if (userId != null) {
+            message.setCreateBy(userId);
+            message.setUpdateBy(userId);
+            message.setCreateDept(ctx.getDeptId());
+        }
+        message.setTenantId(ctx.getTenantId());
 
         // 创建工具调用信息
         List<SysAgentChatMessage.ToolCall> toolCalls = new ArrayList<>();
@@ -755,6 +790,82 @@ public class TaskAgentServiceImpl implements TaskAgentService {
         message.setToolCalls(toolCalls);
 
         chatContextService.addMessage(message);
+    }
+
+    /**
+     * 保存最终答案到数据库
+     */
+    private void saveFinalAnswer(Long chatId, String finalAnswer, StreamingContext ctx, IChatResponse.Usage tokenUsage) {
+        if (chatId == null || !StringUtils.hasText(finalAnswer)) return;
+
+        SysAgentChatMessage message = new SysAgentChatMessage();
+        message.setChatId(chatId);
+        message.setRole("assistant");
+        message.setContent(finalAnswer);
+        message.setMessageType("final_answer");
+        message.setStatus("completed");
+
+        // 从StreamingContext获取用户信息，避免线程切换导致的上下文丢失
+        Long userId = ctx.getUserId();
+        if (userId != null) {
+            message.setCreateBy(userId);
+            message.setUpdateBy(userId);
+            message.setCreateDept(ctx.getDeptId());
+        }
+        message.setTenantId(ctx.getTenantId());
+
+        // 如果有token使用信息，添加到元数据
+        if (tokenUsage != null) {
+            SysAgentChatMessage.MessageMetadata metadata = new SysAgentChatMessage.MessageMetadata();
+            Map<String, Object> tokenInfo = new HashMap<>();
+            tokenInfo.put("promptTokens", tokenUsage.getPromptTokens());
+            tokenInfo.put("completionTokens", tokenUsage.getCompletionTokens());
+            tokenInfo.put("totalTokens", tokenUsage.getTotalTokens());
+            metadata.setTokenUsage(tokenInfo);
+            message.setMetadata(metadata);
+            message.setTokenCount(tokenUsage.getTotalTokens());
+        }
+
+        chatContextService.addMessage(message);
+        log.info("保存最终答案到数据库，chatId: {}, 内容长度: {}", chatId, finalAnswer.length());
+    }
+
+    /**
+     * 保存增强回复到数据库
+     */
+    private void saveEnhancedReply(Long chatId, String enhancedContent, StreamingContext ctx, IChatResponse.Usage tokenUsage) {
+        if (chatId == null || !StringUtils.hasText(enhancedContent)) return;
+
+        SysAgentChatMessage message = new SysAgentChatMessage();
+        message.setChatId(chatId);
+        message.setRole("assistant");
+        message.setContent(enhancedContent);
+        message.setMessageType("enhanced");
+        message.setStatus("completed");
+
+        // 从StreamingContext获取用户信息，避免线程切换导致的上下文丢失
+        Long userId = ctx.getUserId();
+        if (userId != null) {
+            message.setCreateBy(userId);
+            message.setUpdateBy(userId);
+            message.setCreateDept(ctx.getDeptId());
+        }
+        message.setTenantId(ctx.getTenantId());
+
+        // 如果有token使用信息，添加到元数据
+        if (tokenUsage != null) {
+            SysAgentChatMessage.MessageMetadata metadata = new SysAgentChatMessage.MessageMetadata();
+            Map<String, Object> tokenInfo = new HashMap<>();
+            tokenInfo.put("promptTokens", tokenUsage.getPromptTokens());
+            tokenInfo.put("completionTokens", tokenUsage.getCompletionTokens());
+            tokenInfo.put("totalTokens", tokenUsage.getTotalTokens());
+            metadata.setTokenUsage(tokenInfo);
+            message.setMetadata(metadata);
+            message.setTokenCount(tokenUsage.getTotalTokens());
+        }
+
+        chatContextService.addMessage(message);
+        log.info("保存增强回复到数据库，chatId: {}, 内容长度: {}", chatId, enhancedContent.length());
     }
 
     /**
@@ -1449,6 +1560,9 @@ public class TaskAgentServiceImpl implements TaskAgentService {
             return; // 增强调用会负责完成流
         }
 
+        // 保存最终答案到数据库
+        saveFinalAnswer(ctx.getChatId(), finalResponse, ctx, ctx.getTotalTokenUsage());
+
         // 报告Token使用情况
         reportTotalTokenUsage(sink, ctx);
 
@@ -1584,6 +1698,8 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                 // 保存增强后的回复到数据库
                 if (enhancedResponse.length() > 0) {
                     log.info("增强模型优化完成，响应长度: {}", enhancedResponse.length());
+                    // 保存增强回复到数据库
+                    saveEnhancedReply(ctx.getChatId(), enhancedResponse.toString(), ctx, ctx.getTotalTokenUsage());
                 }
 
                 // 完成整个流
@@ -1735,46 +1851,49 @@ public class TaskAgentServiceImpl implements TaskAgentService {
      */
     @Override
     public Flux<StreamMessageResponseDto> executeFreeChatStream(SysAgent agent, String userInput) {
+        // 捕获当前线程的Sa-Token上下文
+        Map<String, Object> contextMap = SaTokenReactiveHelper.captureContext();
+
         return Flux.<StreamMessageResponseDto>create(sink -> {
-            StreamingContext ctx = null;
-            try {
-                SaTokenContext context = SaHolder.getContext();
-                SaTokenContextMockUtil.setMockContext(() -> {
-                    SaManager.setSaTokenContext(context);
-                });
-                // 创建StreamingContext
-                ctx = new StreamingContext();
+            // 在执行具体操作前恢复上下文
+            SaTokenReactiveHelper.runWithContext(contextMap, () -> {
+                StreamingContext ctx = null;
+                try {
+                    // 创建StreamingContext
+                    ctx = new StreamingContext();
 
-                // 创建简单的自由对话流式处理
-                String chatIdStr = "chat_" + System.currentTimeMillis();
-                String userMsgId = generateMessageId();
-                ctx.setCurrentChatId(chatIdStr);
-                ctx.setUserMessageId(userMsgId);
+                    // 创建简单的自由对话流式处理
+                    String chatIdStr = "chat_" + System.currentTimeMillis();
+                    String userMsgId = generateMessageId();
+                    ctx.setCurrentChatId(chatIdStr);
+                    ctx.setUserMessageId(userMsgId);
 
-                // 发送开始消息
-                sink.next(createStreamMessage("开始处理您的问题...", "thought", false, ctx));
+                    // 发送开始消息
+                    sink.next(createStreamMessage("开始处理您的问题...", "thought", false, ctx));
 
-                // 构建提示词
-                String prompt = buildFreeChatPrompt(agent, userInput);
+                    // 构建提示词
+                    String prompt = buildFreeChatPrompt(agent, userInput);
 
-                // 发送回答
-                String response = "这是一个模拟的回答。实际实现中应该调用AI模型。";
-                sink.next(createStreamMessage(response, "answer", false, ctx));
+                    // 发送回答
+                    String response = "这是一个模拟的回答。实际实现中应该调用AI模型。";
+                    sink.next(createStreamMessage(response, "answer", false, ctx));
 
-                // 发送完成消息
-                sink.next(StreamMessageResponseDto.createFinishMessage(chatIdStr, generateMessageId(), ctx.getAndIncrementMessageIndex()));
-                sink.complete();
+                    // 发送完成消息
+                    sink.next(StreamMessageResponseDto.createFinishMessage(chatIdStr, generateMessageId(), ctx.getAndIncrementMessageIndex()));
+                    sink.complete();
 
-            } catch (Exception e) {
-                log.error("自由对话流式执行失败", e);
-                sink.next(StreamMessageResponseDto.createErrorMessage(
-                    e.getMessage(),
-                    ctx != null ? ctx.getCurrentChatId() : "unknown",
-                    generateMessageId(),
-                    ctx != null ? ctx.getAndIncrementMessageIndex() : 0
-                ));
-                sink.complete();
-            }
+                } catch (Exception e) {
+                    log.error("自由对话流式执行失败", e);
+                    // 发送错误消息
+                    sink.next(StreamMessageResponseDto.createErrorMessage(
+                        e.getMessage(),
+                        ctx != null ? ctx.getCurrentChatId() : "unknown",
+                        generateMessageId(),
+                        ctx != null ? ctx.getAndIncrementMessageIndex() : 0
+                    ));
+                    sink.complete();
+                }
+            });
         });
     }
 
@@ -1784,15 +1903,16 @@ public class TaskAgentServiceImpl implements TaskAgentService {
     @Override
     public StreamResult executeFreeChatStreamWithFullResponse(SysAgent agent, String userInput) {
         CompletableFuture<String> fullResponseFuture = new CompletableFuture<>();
+        // 捕获当前线程的Sa-Token上下文
+        Map<String, Object> contextMap = SaTokenReactiveHelper.captureContext();
 
         Flux<String> stream = Flux.create(sink -> {
             try {
-                SaTokenContext context = SaHolder.getContext();
-                SaTokenContextMockUtil.setMockContext(() -> {
-                    SaManager.setSaTokenContext(context);
+                // 在执行具体操作前恢复上下文
+                SaTokenReactiveHelper.runWithContext(contextMap, () -> {
+                    // 执行自由对话的流式处理，并在完成时设置完整响应
+                    performFreeChatStreamingWithFullResponse(agent, userInput, sink, fullResponseFuture);
                 });
-                // 执行自由对话的流式处理，并在完成时设置完整响应
-                performFreeChatStreamingWithFullResponse(agent, userInput, sink, fullResponseFuture);
             } catch (Exception e) {
                 log.error("自由对话流式执行失败", e);
                 fullResponseFuture.completeExceptionally(e);

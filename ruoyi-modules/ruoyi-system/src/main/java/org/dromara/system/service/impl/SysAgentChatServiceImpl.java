@@ -2,6 +2,7 @@ package org.dromara.system.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.dromara.common.satoken.utils.LoginHelper;
 import org.dromara.system.domain.SysAgent;
 import org.dromara.system.domain.SysDatasource;
 import org.dromara.system.domain.SysKnowledgeBase;
@@ -80,7 +81,6 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
             chatRequest.getChatId() :
             "chat_" + agent.getAgentId() + "_" + System.currentTimeMillis();
 
-
         // 检查退出条件
         if (taskAgentService.checkExitCondition(chatRequest.getMessage())) {
             StreamMessageResponseDto exitResponse = StreamMessageResponseDto.createAnswerMessage(
@@ -94,15 +94,9 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
             return Flux.just(exitResponse);
         }
 
-        // 执行ReAct思维链
-        return taskAgentService.executeReActStream(agent, availableTools, chatRequest.getMessage())
-            .doOnComplete(() -> {
-                // 保存记忆
-                log.info("任务智能体对话完成，会话ID: {}", chatId);
-            })
-            .doOnError(error -> {
-                log.error("任务智能体处理失败，会话ID: {}", chatId, error);
-            });
+        // 执行ReAct思维链 - 直接返回，不添加额外的操作符以避免上下文丢失
+        // 日志记录已经在 TaskAgentServiceImpl 内部处理
+        return taskAgentService.executeReActStream(agent, availableTools, chatRequest.getMessage());
     }
 
     /**
@@ -131,14 +125,9 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
             return Flux.just(exitResponse);
         }
 
-        // 执行自由对话处理
-        return taskAgentService.executeFreeChatStream(agent, chatRequest.getMessage())
-            .doOnComplete(() -> {
-                log.info("自由对话完成，会话ID: {}", chatId);
-            })
-            .doOnError(error -> {
-                log.error("自由对话处理失败，会话ID: {}", chatId, error);
-            });
+        // 执行自由对话处理 - 直接返回，不添加额外的操作符以避免上下文丢失
+        // 日志记录已经在 TaskAgentServiceImpl 内部处理
+        return taskAgentService.executeFreeChatStream(agent, chatRequest.getMessage());
     }
 
     /**

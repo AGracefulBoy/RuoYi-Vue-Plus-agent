@@ -25,6 +25,7 @@ import org.dromara.system.domain.vo.ChatSessionVo;
 import org.dromara.system.service.ChatContextService;
 import org.dromara.system.service.SysAgentChatService;
 import org.dromara.system.service.helper.MessageTypeMapper;
+import org.dromara.system.service.helper.SaTokenReactiveHelper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
@@ -77,8 +78,11 @@ public class SysAgentChatController {
         log.info("开始处理聊天请求，追踪ID: {}, 用户ID: {}, 智能体ID: {}",
             chatRequest.getTraceId(), LoginHelper.getUserId(), chatRequest.getAgentId());
 
-        // 调用服务层处理流式对话
-        return sysAgentChatService.completions(chatRequest)
+        // 调用服务层处理流式对话，并使用 SaTokenReactiveHelper 包装整个响应式链
+        Flux<StreamMessageResponseDto> responseFlux = sysAgentChatService.completions(chatRequest);
+        
+        // 包装响应式流以确保上下文在整个链路中传递
+        return SaTokenReactiveHelper.wrapFlux(responseFlux
             .map(data -> {
                 // 使用MessageTypeMapper统一处理消息类型映射
                 String eventType = messageTypeMapper.mapToEventType(data);
@@ -98,7 +102,7 @@ public class SysAgentChatController {
                     String.valueOf(System.currentTimeMillis()),
                     0
                 ))
-                .build()));
+                .build())));
     }
 
     /**
@@ -165,7 +169,7 @@ public class SysAgentChatController {
         }
 
         // 验证权限
-        if (!chat.getUserId().equals(LoginHelper.getUserId())) {
+        if (chat.getUserId() == null || !chat.getUserId().equals(LoginHelper.getUserId())) {
             return R.fail("无权访问该会话");
         }
 

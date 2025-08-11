@@ -214,5 +214,10 @@ public class SysAgentChatMessage extends TenantEntity {
          * 其他扩展信息
          */
         private Map<String, Object> extras;
+        
+        /**
+         * Token使用信息
+         */
+        private Map<String, Object> tokenUsage;
     }
 }

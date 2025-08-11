@@ -162,7 +162,7 @@ public class ChatContextServiceImpl implements ChatContextService {
             message.setStatus("completed");
         }
 
-        message.setCreateTime(new Date());
+        // createTime将由MyBatis-Plus的InjectionMetaObjectHandler自动填充
         messageMapper.insert(message);
 
         // 更新会话统计信息
@@ -192,8 +192,8 @@ public class ChatContextServiceImpl implements ChatContextService {
             if (StrUtil.isBlank(message.getStatus())) {
                 message.setStatus("completed");
             }
-
-            message.setCreateTime(new Date());
+            
+            // createTime将由MyBatis-Plus的InjectionMetaObjectHandler自动填充
         }
 
         // 批量插入
@@ -206,7 +206,7 @@ public class ChatContextServiceImpl implements ChatContextService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateMessage(SysAgentChatMessage message) {
-        message.setUpdateTime(new Date());
+        // updateTime将由MyBatis-Plus的InjectionMetaObjectHandler自动填充
         messageMapper.updateById(message);
     }
 

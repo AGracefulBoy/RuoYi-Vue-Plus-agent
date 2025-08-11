@@ -29,6 +29,14 @@ public class StreamingContext {
     private StringBuilder thoughtProcess = new StringBuilder();
     private boolean shouldStopCurrentStream = false;
     private FluxSink<StreamMessageResponseDto> currentSink;
+    
+    // User context information for maintaining across thread boundaries
+    private Long userId;
+    private Long deptId;
+    private String tenantId;
+    
+    // Chat ID for database operations
+    private Long chatId;
 
     public StreamingContext() {
         this.totalTokenUsage = new IChatResponse.Usage();
@@ -139,5 +147,37 @@ public class StreamingContext {
 
     public void setCurrentSink(FluxSink<StreamMessageResponseDto> currentSink) {
         this.currentSink = currentSink;
+    }
+    
+    public Long getUserId() {
+        return userId;
+    }
+    
+    public void setUserId(Long userId) {
+        this.userId = userId;
+    }
+    
+    public Long getDeptId() {
+        return deptId;
+    }
+    
+    public void setDeptId(Long deptId) {
+        this.deptId = deptId;
+    }
+    
+    public String getTenantId() {
+        return tenantId;
+    }
+    
+    public void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
+    }
+    
+    public Long getChatId() {
+        return chatId;
+    }
+    
+    public void setChatId(Long chatId) {
+        this.chatId = chatId;
     }
 }
