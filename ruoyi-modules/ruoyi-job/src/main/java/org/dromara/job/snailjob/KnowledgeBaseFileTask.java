@@ -309,8 +309,7 @@ public class KnowledgeBaseFileTask {
                             documentChunk.setContent(chunk.getContent());
                             documentChunk.setFileName(doc.getName());
                             documentChunk.setVectorStatus("0"); // 待处理
-                            documentChunk.setMetadata(chunk.getMetadata());
-
+                            documentChunk.setMetadata(doc.getMetadata());
                             sysKnowledgeBaseDocumentChunkMapper.insert(documentChunk);
                         }
 
@@ -417,7 +416,7 @@ public class KnowledgeBaseFileTask {
                     iChatRequest.setModel(sysModelConfigVo.getModelCode());
                     iChatRequest.setBaseUrl(sysModelConfigVo.getBaseUrl());
                     iChatRequest.setApiKey(sysModelConfigVo.getApiKey());
-                    iChatRequest.setStream(Boolean.FALSE);
+                    iChatRequest.setStream(Boolean.TRUE);
                     ResponseFormatRequest responseFormat = new ResponseFormatRequest();
                     responseFormat.setType(ResponseFormatRequest.Type.JSON_OBJECT);
                     iChatRequest.setResponseFormat(responseFormat);

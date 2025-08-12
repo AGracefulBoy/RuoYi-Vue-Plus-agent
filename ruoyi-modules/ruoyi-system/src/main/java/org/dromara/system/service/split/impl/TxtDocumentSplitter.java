@@ -73,7 +73,7 @@ public class TxtDocumentSplitter implements DocumentSplitter {
      */
     private List<DocumentChunk> createChunks(String content, Integer chunkSize, Integer overlapSize) {
         List<DocumentChunk> chunks = new ArrayList<>();
-        
+
         if (StrUtil.isBlank(content)) {
             return chunks;
         }
@@ -86,14 +86,9 @@ public class TxtDocumentSplitter implements DocumentSplitter {
             int endPos = Math.min(startPos + chunkSize, contentLength);
             String chunkContent = content.substring(startPos, endPos);
 
-            Map<String, Object> metadata = new HashMap<>();
-            metadata.put("startPosition", startPos);
-            metadata.put("endPosition", endPos);
-
             DocumentChunk chunk = DocumentChunk.builder()
                 .content(chunkContent.trim())
                 .chunkIndex(chunkIndex++)
-                .metadata(metadata)
                 .characterCount(chunkContent.trim().length())
                 .sourceLocation("txt")
                 .build();
