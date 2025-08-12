@@ -28,12 +28,17 @@ public class ChatRequestDto {
     private String message;
 
     /**
-     * 聊天ID（可选，用于多轮对话）
+     * 会话ID（可选，继续会话时必填；若为空则创建新会话）
      */
-    private String chatUuid;
+    private String conversationId;
 
     /**
-     * 对话模式，debug 代表提示，chat 表示正常对话
+     * 分组ID（可选）
+     */
+    private Long groupId;
+
+    /**
+     * 对话模式（debug表示调试，chat表示正常对话）
      */
     private String chatModel;
 

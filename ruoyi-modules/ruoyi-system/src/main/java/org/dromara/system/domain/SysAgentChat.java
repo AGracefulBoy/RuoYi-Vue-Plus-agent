@@ -30,9 +30,9 @@ public class SysAgentChat extends TenantEntity {
     private Long chatId;
 
     /**
-     * 会话UUID（用于前端标识）
+     * 会话ID（用于前端标识，继续会话时必填）
      */
-    private String chatUuid;
+    private String conversationId;
 
     /**
      * 智能体ID
@@ -101,7 +101,7 @@ public class SysAgentChat extends TenantEntity {
     private Date endTime;
 
     /**
-     * 删除标志（0存在 2删除）
+     * 删除标志（0存在 1删除）
      */
     @TableLogic
     private String delFlag;

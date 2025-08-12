@@ -5,6 +5,7 @@ import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.system.domain.bo.SysTableMetadataBo;
 import org.dromara.system.domain.vo.SysTableMetadataVo;
 import org.dromara.system.domain.bo.SysTableDescUpdateBo;
+import org.dromara.system.domain.bo.SysTableDescBatchUpdateBo;
 
 import java.util.Collection;
 import java.util.List;
@@ -73,6 +74,14 @@ public interface ISysTableMetadataService {
      * @return 更新结果
      */
     Boolean updateTableAndColumnDesc(SysTableDescUpdateBo bo);
+
+    /**
+     * 批量更新表描述和字段描述（仅允许智能体修改这些字段）
+     *
+     * @param bo 批量表和字段描述更新信息
+     * @return 更新结果
+     */
+    Boolean updateBatchTableAndColumnDesc(SysTableDescBatchUpdateBo bo);
 
     /**
      * 校验并批量删除表元数据管理信息

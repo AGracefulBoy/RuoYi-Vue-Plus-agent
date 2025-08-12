@@ -1,16 +1,26 @@
 package org.dromara.system.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.dromara.common.core.utils.StringUtils;
+import org.dromara.common.mybatis.core.page.PageQuery;
+import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.common.satoken.utils.LoginHelper;
 import org.dromara.system.domain.SysAgent;
 import org.dromara.system.domain.SysAgentChat;
+import org.dromara.system.domain.SysAgentChatMessage;
 import org.dromara.system.domain.SysDatasource;
 import org.dromara.system.domain.SysKnowledgeBase;
 import org.dromara.system.domain.SysTool;
 import org.dromara.system.domain.dto.ChatRequestDto;
 import org.dromara.system.domain.dto.StreamMessageResponseDto;
 import org.dromara.system.domain.dto.ToolDto;
+import org.dromara.system.domain.vo.SysAgentChatDetailVo;
+import org.dromara.system.mapper.SysAgentChatMapper;
+import org.dromara.system.mapper.SysAgentChatMessageMapper;
 import org.dromara.system.mapper.SysAgentMapper;
 import org.dromara.system.mapper.SysDatasourceMapper;
 import org.dromara.system.mapper.SysKnowledgeBaseMapper;
@@ -21,7 +31,6 @@ import org.dromara.system.service.ChatContextService;
 import org.dromara.system.service.TaskAgentService;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
-import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
 
 import cn.hutool.json.JSONUtil;
@@ -36,6 +45,8 @@ import java.util.Map;
 public class SysAgentChatServiceImpl implements SysAgentChatService {
 
     private final SysAgentMapper agentMapper;
+    private final SysAgentChatMapper agentChatMapper;
+    private final SysAgentChatMessageMapper agentChatMessageMapper;
     private final SysToolMapper toolMapper;
     private final SysKnowledgeBaseMapper knowledgeBaseMapper;
     private final SysDatasourceMapper datasourceMapper;
@@ -95,29 +106,30 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
 
         // 创建或获取会话
         SysAgentChat chat;
-        String chatUuid = chatRequest.getChatUuid();
+        String conversationId = chatRequest.getConversationId();
         String chatModel = chatRequest.getChatModel();
+        Long groupId = chatRequest.getGroupId();
 
-        if (StringUtils.hasText(chatUuid)) {
-            // 如果提供了chatId，尝试获取已有会话
-            chat = chatContextService.getChatByUuid(chatUuid);
+        if (StringUtils.isNotBlank(conversationId)) {
+            // 如果提供了conversationId，尝试获取已有会话
+            chat = chatContextService.getChatByConversationId(conversationId);
             if (chat == null) {
                 // 如果找不到会话，创建新会话
-                chat = chatContextService.createChat(agent.getAgentId(), userId,  agent.getAgentName(), null, chatModel);
-                // 更新UUID为请求中的chatId
-                chat.setChatUuid(chatUuid);
+                chat = chatContextService.createChat(agent.getAgentId(), userId,  agent.getAgentName(), groupId, chatModel);
+                // 更新conversationId为请求中的值
+                chat.setConversationId(conversationId);
                 chatContextService.updateChat(chat);
             }
         } else {
             // 创建新会话
-            chat = chatContextService.createChat(agent.getAgentId(), userId, agent.getAgentName(), null, chatModel);
+            chat = chatContextService.createChat(agent.getAgentId(), userId, agent.getAgentName(), groupId, chatModel);
         }
 
         // 检查退出条件
         if (taskAgentService.checkExitCondition(chatRequest.getMessage())) {
             StreamMessageResponseDto exitResponse = StreamMessageResponseDto.createAnswerMessage(
                 "检测到退出指令，对话结束！感谢您的使用。",
-                chat.getChatUuid(),
+                chat.getConversationId(),
                 "exit_" + System.currentTimeMillis(),
                 null,
                 0,
@@ -143,17 +155,17 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
 
         // 创建或获取会话
         SysAgentChat chat;
-        String chatUuid = chatRequest.getChatUuid();
+        String conversationId = chatRequest.getConversationId();
         String chatModel = chatRequest.getChatModel();
 
-        if (StringUtils.hasText(chatUuid)) {
+        if (StringUtils.isNotBlank(conversationId)) {
             // 如果提供了chatId，尝试获取已有会话
-            chat = chatContextService.getChatByUuid(chatUuid);
+            chat = chatContextService.getChatByConversationId(conversationId);
             if (chat == null) {
                 // 如果找不到会话，创建新会话
                 chat = chatContextService.createChat(agent.getAgentId(), userId, "自由对话 - " + agent.getAgentName(), null, chatModel);
                 // 更新UUID为请求中的chatId
-                chat.setChatUuid(chatUuid);
+                chat.setConversationId(conversationId);
                 chatContextService.updateChat(chat);
             }
         } else {
@@ -165,7 +177,7 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
         if (taskAgentService.checkExitCondition(chatRequest.getMessage())) {
             StreamMessageResponseDto exitResponse = StreamMessageResponseDto.createAnswerMessage(
                 "检测到退出指令，对话结束！感谢您的使用。",
-                chat.getChatUuid(),
+                chat.getConversationId(),
                 "exit_" + System.currentTimeMillis(),
                 null,
                 0,
@@ -277,7 +289,7 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
             .id(tool.getToolId())
             .type("tool")
             .name(tool.getToolName())
-            .desc(StringUtils.hasText(tool.getToolDesc()) ? tool.getToolDesc() : "工具: " + tool.getToolName())
+            .desc(StringUtils.isNotBlank(tool.getToolDesc()) ? tool.getToolDesc() : "工具: " + tool.getToolName())
             .parameters(parameters)
             .build();
     }
@@ -294,7 +306,7 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
             .id(knowledgeBase.getKnowledgeBaseId())
             .type("knowledge")
             .name(knowledgeBase.getName())
-            .desc(StringUtils.hasText(knowledgeBase.getDescription()) ?
+            .desc(StringUtils.isNotBlank(knowledgeBase.getDescription()) ?
                 knowledgeBase.getDescription() : "知识库: " + knowledgeBase.getName())
             .parameters(parameters)
             .build();
@@ -312,7 +324,7 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
             .id(datasource.getDatasourceId())
             .type("datasource")
             .name(datasource.getDatasourceName())
-            .desc(StringUtils.hasText(datasource.getDescription()) ?
+            .desc(StringUtils.isNotBlank(datasource.getDescription()) ?
                 datasource.getDescription() : "数据源: " + datasource.getDatasourceName())
             .parameters(parameters)
             .build();
@@ -364,6 +376,49 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
         }
 
         return parameters;
+    }
+
+    @Override
+    public TableDataInfo<SysAgentChatDetailVo> queryPageListByAgent(Long agentId, String chatModel, PageQuery pageQuery) {
+        // 构建查询条件
+        LambdaQueryWrapper<SysAgentChat> wrapper = Wrappers.lambdaQuery();
+        wrapper.eq(SysAgentChat::getAgentId, agentId)
+               .eq(StringUtils.isNotBlank(chatModel), 
+                   SysAgentChat::getChatModel, chatModel)
+               .eq(SysAgentChat::getDelFlag, "0")
+               .orderByDesc(SysAgentChat::getCreateTime);
+        
+        // 执行分页查询
+        Page<SysAgentChatDetailVo> result = agentChatMapper.selectVoPage(
+            pageQuery.build(), wrapper, SysAgentChatDetailVo.class);
+        
+        // 为每个会话查询对应的消息列表
+        if (result.getRecords() != null && !result.getRecords().isEmpty()) {
+            for (SysAgentChatDetailVo vo : result.getRecords()) {
+                // 查询该会话的所有消息
+                LambdaQueryWrapper<SysAgentChatMessage> messageWrapper = Wrappers.lambdaQuery();
+                messageWrapper.eq(SysAgentChatMessage::getChatId, vo.getChatId())
+                             .eq(SysAgentChatMessage::getDelFlag, "0")
+                             .orderByAsc(SysAgentChatMessage::getMessageIndex);
+                
+                List<SysAgentChatMessage> messages = agentChatMessageMapper.selectList(messageWrapper);
+                vo.setMessages(messages);
+            }
+        }
+        
+        return TableDataInfo.build(result);
+    }
+
+    @Override
+    public boolean deleteDebugChatsByAgentId(Long agentId) {
+        // 构建查询条件
+        LambdaQueryWrapper<SysAgentChat> wrapper = Wrappers.lambdaQuery();
+        wrapper.eq(SysAgentChat::getAgentId, agentId)
+               .eq(SysAgentChat::getChatModel, "debug")
+               .eq(SysAgentChat::getDelFlag, "0");
+        
+        // 逻辑删除（MyBatis-Plus会自动将del_flag设置为'1'）
+        return agentChatMapper.delete(wrapper) > 0;
     }
 
     /**

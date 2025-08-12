@@ -20,6 +20,7 @@ import org.dromara.system.domain.SysUser;
 import org.dromara.system.domain.bo.SysTableMetadataBo;
 import org.dromara.system.domain.bo.SysDatasourceBo;
 import org.dromara.system.domain.bo.SysTableDescUpdateBo;
+import org.dromara.system.domain.bo.SysTableDescBatchUpdateBo;
 import org.dromara.system.domain.bo.SysColumnDescUpdateBo;
 import org.dromara.system.domain.vo.SysTableMetadataVo;
 import org.dromara.system.mapper.SysTableMetadataMapper;
@@ -269,6 +270,45 @@ public class SysTableMetadataServiceImpl implements ISysTableMetadataService {
         }
 
         return tableUpdateResult;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Boolean updateBatchTableAndColumnDesc(SysTableDescBatchUpdateBo bo) {
+        if (ObjectUtil.isEmpty(bo.getTableDescUpdateList())) {
+            throw new ServiceException("批量更新列表不能为空");
+        }
+
+        // 批量更新每个表的描述和字段描述
+        for (SysTableDescUpdateBo tableUpdateBo : bo.getTableDescUpdateList()) {
+            // 验证表是否存在
+            SysTableMetadataVo existingTable = queryById(tableUpdateBo.getTableMetaId());
+            if (existingTable == null) {
+                throw new ServiceException("表元数据不存在，表ID：" + tableUpdateBo.getTableMetaId());
+            }
+
+            // 更新表描述
+            Boolean tableUpdateResult = updateTableDesc(tableUpdateBo.getTableMetaId(), tableUpdateBo.getTableDesc());
+            if (!tableUpdateResult) {
+                throw new ServiceException("更新表描述失败，表ID：" + tableUpdateBo.getTableMetaId());
+            }
+
+            // 更新字段描述（如果有提供）
+            if (ObjectUtil.isNotEmpty(tableUpdateBo.getSysColumnDescUpdateBoList())) {
+                for (SysColumnDescUpdateBo columnBo : tableUpdateBo.getSysColumnDescUpdateBoList()) {
+                    Boolean columnUpdateResult = columnMetadataService.updateColumnDesc(
+                        columnBo.getColumnMetaId(),
+                        columnBo.getColumnDesc()
+                    );
+                    if (!columnUpdateResult) {
+                        throw new ServiceException("更新字段描述失败，表ID：" + tableUpdateBo.getTableMetaId() + 
+                            "，字段名称：" + columnBo.getColumnName());
+                    }
+                }
+            }
+        }
+
+        return true;
     }
 
     @Override

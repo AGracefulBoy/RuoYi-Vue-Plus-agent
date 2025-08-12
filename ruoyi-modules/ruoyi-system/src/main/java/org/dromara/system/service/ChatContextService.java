@@ -55,12 +55,12 @@ public interface ChatContextService {
     SysAgentChat getChatById(Long chatId);
 
     /**
-     * 获取会话信息（通过UUID）
+     * 获取会话信息（通过conversationId）
      *
-     * @param chatUuid 会话UUID
+     * @param conversationId 会话ID
      * @return 会话信息
      */
-    SysAgentChat getChatByUuid(String chatUuid);
+    SysAgentChat getChatByConversationId(String conversationId);
 
     /**
      * 更新会话信息

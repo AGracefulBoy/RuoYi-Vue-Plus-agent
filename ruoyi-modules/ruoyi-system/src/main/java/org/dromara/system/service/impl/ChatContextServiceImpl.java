@@ -50,7 +50,7 @@ public class ChatContextServiceImpl implements ChatContextService {
     @Transactional(rollbackFor = Exception.class)
     public SysAgentChat createChat(Long agentId, Long userId, String title, Long groupId, String chatModel) {
         SysAgentChat chat = new SysAgentChat();
-        chat.setChatUuid(IdUtil.fastSimpleUUID());
+        chat.setConversationId(IdUtil.fastSimpleUUID());
         chat.setAgentId(agentId);
         chat.setUserId(userId);
         chat.setGroupId(groupId);
@@ -92,9 +92,9 @@ public class ChatContextServiceImpl implements ChatContextService {
     }
 
     @Override
-    public SysAgentChat getChatByUuid(String chatUuid) {
+    public SysAgentChat getChatByConversationId(String conversationId) {
         LambdaQueryWrapper<SysAgentChat> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(SysAgentChat::getChatUuid, chatUuid);
+        wrapper.eq(SysAgentChat::getConversationId, conversationId);
         return chatMapper.selectOne(wrapper);
     }
 

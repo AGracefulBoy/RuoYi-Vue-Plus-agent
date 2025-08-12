@@ -15,6 +15,7 @@ import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.common.web.core.BaseController;
 import org.dromara.system.domain.bo.SysTableDescUpdateBo;
+import org.dromara.system.domain.bo.SysTableDescBatchUpdateBo;
 import org.dromara.system.domain.bo.SysTableMetadataBo;
 import org.dromara.system.domain.vo.SysTableMetadataVo;
 import org.dromara.system.service.ISysTableMetadataService;
@@ -83,6 +84,18 @@ public class SysDatasourceTableMetadataController extends BaseController {
 
         // 调用服务层的专门方法来更新表描述和字段描述
         return toAjax(tableMetadataService.updateTableAndColumnDesc(bo));
+    }
+
+    /**
+     * 批量修改表元数据管理（仅允许修改表描述字段和字段描述）
+     */
+    @SaCheckPermission("system:table:metadata:edit")
+    @Log(title = "批量表元数据管理", businessType = BusinessType.UPDATE)
+    @RepeatSubmit()
+    @PostMapping("/edit/batch")
+    public R<Void> editBatch(@Validated @RequestBody SysTableDescBatchUpdateBo bo) {
+        // 调用服务层的批量更新方法
+        return toAjax(tableMetadataService.updateBatchTableAndColumnDesc(bo));
     }
 
     /**

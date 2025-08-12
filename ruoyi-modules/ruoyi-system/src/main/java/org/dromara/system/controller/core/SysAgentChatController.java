@@ -6,11 +6,18 @@ import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.dromara.common.core.domain.R;
+import org.dromara.common.log.annotation.Log;
+import org.dromara.common.log.enums.BusinessType;
+import org.dromara.common.mybatis.core.page.PageQuery;
+import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.common.ratelimiter.annotation.RateLimiter;
 import org.dromara.common.ratelimiter.enums.LimitType;
 import org.dromara.common.satoken.utils.LoginHelper;
+import org.dromara.common.web.core.BaseController;
 import org.dromara.system.domain.dto.ChatRequestDto;
 import org.dromara.system.domain.dto.StreamMessageResponseDto;
+import org.dromara.system.domain.vo.SysAgentChatDetailVo;
 import org.dromara.system.service.SysAgentChatService;
 import org.dromara.system.service.helper.MessageTypeMapper;
 import org.dromara.system.service.helper.SaTokenReactiveHelper;
@@ -35,7 +42,7 @@ import java.util.concurrent.atomic.AtomicLong;
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/system/chat/v1")
-public class SysAgentChatController {
+public class SysAgentChatController extends BaseController {
 
     @Autowired
     private SysAgentChatService sysAgentChatService;
@@ -112,6 +119,35 @@ public class SysAgentChatController {
                     ))
                     .build());
             }));
+    }
+
+    /**
+     * 根据智能体ID分页查询会话记录
+     *
+     * @param agentId 智能体ID
+     * @param chatModel 对话模式
+     * @param pageQuery 分页参数
+     * @return 会话记录列表
+     */
+    @GetMapping("/agent/list")
+    @SaCheckPermission("system:agent:list")
+    public TableDataInfo<SysAgentChatDetailVo> listByAgent(@RequestParam Long agentId,
+                                                           @RequestParam(required = false) String chatModel,
+                                                           PageQuery pageQuery) {
+        return sysAgentChatService.queryPageListByAgent(agentId, chatModel, pageQuery);
+    }
+
+    /**
+     * 删除智能体的debug模式对话记录
+     *
+     * @param agentId 智能体ID
+     * @return 删除结果
+     */
+    @PostMapping("/deleteDebugChats")
+    @SaCheckPermission("system:agent:remove")
+    @Log(title = "删除debug对话记录", businessType = BusinessType.DELETE)
+    public R<Void> deleteDebugChats(@RequestParam Long agentId) {
+        return toAjax(sysAgentChatService.deleteDebugChatsByAgentId(agentId));
     }
 
     /**

@@ -256,7 +256,7 @@ public class SysAgentChatGroupServiceImpl implements ISysAgentChatGroupService {
             for (SysAgentChat chat : chats) {
                 ChatSessionVo sessionVo = new ChatSessionVo();
                 sessionVo.setChatId(chat.getChatId());
-                sessionVo.setChatUuid(chat.getChatUuid());
+                sessionVo.setConversationId(chat.getConversationId());
                 sessionVo.setAgentId(chat.getAgentId());
                 sessionVo.setGroupId(chat.getGroupId());
                 sessionVo.setTitle(chat.getChatTitle());
