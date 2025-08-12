@@ -96,7 +96,7 @@ public class ElasticsearchDocumentServiceImpl implements IElasticsearchDocumentS
                 .index(indexName)
                 .query(query -> query
                     .term(term -> term
-                        .field("documentId")
+                        .field("documentId.keyword")
                         .value(documentId.toString())
                     )
                 )
@@ -109,7 +109,7 @@ public class ElasticsearchDocumentServiceImpl implements IElasticsearchDocumentS
                 .size(size)
                 .sort(sort -> sort
                     .field(field -> field
-                        .field("createTime")
+                        .field("createTime.keyword")
                         .order(SortOrder.Desc)
                     )
                 )
@@ -158,7 +158,7 @@ public class ElasticsearchDocumentServiceImpl implements IElasticsearchDocumentS
                 .index(indexName)
                 .query(query -> query
                     .term(term -> term
-                        .field("documentId")
+                        .field("documentId.keyword")
                         .value(documentId.toString())
                     )
                 )
@@ -314,6 +314,7 @@ public class ElasticsearchDocumentServiceImpl implements IElasticsearchDocumentS
 
         esDocument.setId(hitId);
         esDocument.setDocumentId((String) source.get("documentId"));
+        esDocument.setChunkTitle((String) source.get("chunkTitle"));
         esDocument.setContent((String) source.get("content"));
         esDocument.setFileName((String) source.get("fileName"));
         esDocument.setCreateTime((String) source.get("createTime"));
@@ -445,12 +446,12 @@ public class ElasticsearchDocumentServiceImpl implements IElasticsearchDocumentS
     @Override
     public List<HitSourceDTO> hybridSearch(Long knowledgeBaseId, String question, String metadata, Boolean isKnowledge) {
         SysKnowledgeBaseVo knowledgeBase = knowledgeBaseService.queryById(knowledgeBaseId);
-        
+
         if (knowledgeBase == null) {
             log.warn("知识库不存在: {}", knowledgeBaseId);
             return new ArrayList<>();
         }
-        
+
         String indexName = elasticsearchIndexService.generateIndexName(knowledgeBase.getKnowledgeBaseId().toString());
         Integer size = knowledgeBase.getTopK();
         Map<String, Object> paramObject = null;
@@ -466,7 +467,7 @@ public class ElasticsearchDocumentServiceImpl implements IElasticsearchDocumentS
         if (vectorResponse == null || keywordResponse == null) {
             return new ArrayList<>();
         }
-        
+
         // 归一化处理
         List<HitSourceDTO> vectorResults = processSearchResponse(vectorResponse);
         List<HitSourceDTO> keywordResults = processSearchResponse(keywordResponse);
@@ -474,7 +475,7 @@ public class ElasticsearchDocumentServiceImpl implements IElasticsearchDocumentS
         if (vectorResults.isEmpty() && keywordResults.isEmpty()) {
             return new ArrayList<>();
         }
-        
+
         // 获取最大和最小分数用于归一化
         double vectorMaxScore = vectorResults.isEmpty() ? 0.0 : vectorResults.get(0).getScore();
         double vectorMinScore = vectorResults.isEmpty() ? 0.0 : vectorResults.get(vectorResults.size() - 1).getScore();
@@ -483,7 +484,7 @@ public class ElasticsearchDocumentServiceImpl implements IElasticsearchDocumentS
         double keywordMinScore = keywordResults.isEmpty() ? 0.0 : keywordResults.get(keywordResults.size() - 1).getScore();
 
         Map<String, HitSourceDTO> mergedResults = new HashMap<>();
-        
+
         // 归一化处理,融合结果
         for (HitSourceDTO vectorResult : vectorResults) {
             Double score = vectorResult.getScore();
@@ -509,7 +510,7 @@ public class ElasticsearchDocumentServiceImpl implements IElasticsearchDocumentS
                 mergedResults.put(key, keywordResult);
             }
         }
-        
+
         List<HitSourceDTO> sortedResults = mergedResults.values().stream()
                 // 根据 normalizedScore 降序排序
                 .sorted(Comparator.comparingDouble(HitSourceDTO::getNormalizedScore).reversed())
@@ -616,14 +617,14 @@ public class ElasticsearchDocumentServiceImpl implements IElasticsearchDocumentS
             HitDocumentDTO hitDocumentDTO = new HitDocumentDTO();
             if (hit.source() != null) {
                 Map<String, Object> source = hit.source();
-                
+
                 hitDocumentDTO.setFileName(source.getOrDefault("fileName", "").toString());
                 Object createTimeObj = source.get("createTime");
                 if (createTimeObj instanceof Long) {
                     hitDocumentDTO.setCreateTime((Long) createTimeObj);
                 }
                 hitDocumentDTO.setEmbeddingContent(source.getOrDefault("embeddingContent", "").toString());
-                
+
                 Object documentIdObj = source.get("documentId");
                 if (documentIdObj instanceof String) {
                     hitDocumentDTO.setDocumentId(Long.valueOf(documentIdObj.toString()));
@@ -632,10 +633,10 @@ public class ElasticsearchDocumentServiceImpl implements IElasticsearchDocumentS
                 } else if (documentIdObj instanceof Integer) {
                     hitDocumentDTO.setDocumentId(((Integer) documentIdObj).longValue());
                 }
-                
+
                 hitDocumentDTO.setPageContent(source.getOrDefault("pageContent", "").toString());
                 hitDocumentDTO.setContent(source.getOrDefault("content", "").toString());
-                
+
                 Object metadataObj = source.get("metadata");
                 if (metadataObj != null) {
                     hitDocumentDTO.setMetadata(metadataObj.toString());

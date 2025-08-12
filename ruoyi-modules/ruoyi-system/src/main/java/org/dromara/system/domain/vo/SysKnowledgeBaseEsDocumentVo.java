@@ -34,6 +34,12 @@ public class SysKnowledgeBaseEsDocumentVo implements Serializable {
     private String documentId;
 
     /**
+     * chunkTitle of the document chunk
+     */
+    @ExcelProperty(value = "文档标题")
+    private String chunkTitle;
+
+    /**
      * Content of the document chunk
      */
     @ExcelProperty(value = "文档内容")
