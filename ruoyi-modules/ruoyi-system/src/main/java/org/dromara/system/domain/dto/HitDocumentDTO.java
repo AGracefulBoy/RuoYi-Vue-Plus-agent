@@ -7,37 +7,33 @@ import lombok.Data;
  */
 @Data
 public class HitDocumentDTO {
-    
+
     /**
      * 文件名称
      */
     private String fileName;
-    
+
     /**
      * 创建时间
      */
     private Long createTime;
-    
+
     /**
      * 向量化内容
      */
-    private String embeddingContent;
-    
+    private String chunkTitle;
+
     /**
      * 文档ID
      */
     private Long documentId;
-    
-    /**
-     * 页面内容
-     */
-    private String pageContent;
-    
+
+
     /**
      * 内容
      */
     private String content;
-    
+
     /**
      * 元数据
      */

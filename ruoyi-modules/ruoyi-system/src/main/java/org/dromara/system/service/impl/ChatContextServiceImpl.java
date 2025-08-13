@@ -50,7 +50,6 @@ public class ChatContextServiceImpl implements ChatContextService {
     @Transactional(rollbackFor = Exception.class)
     public SysAgentChat createChat(Long agentId, Long userId, String title, Long groupId, String chatModel) {
         SysAgentChat chat = new SysAgentChat();
-        chat.setConversationId(IdUtil.fastSimpleUUID());
         chat.setAgentId(agentId);
         chat.setUserId(userId);
         chat.setGroupId(groupId);
@@ -92,10 +91,29 @@ public class ChatContextServiceImpl implements ChatContextService {
     }
 
     @Override
-    public SysAgentChat getChatByConversationId(String conversationId) {
+    public SysAgentChat getLatestDebugChat(Long agentId, Long userId) {
         LambdaQueryWrapper<SysAgentChat> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(SysAgentChat::getConversationId, conversationId);
+        wrapper.eq(SysAgentChat::getAgentId, agentId)
+               .eq(SysAgentChat::getUserId, userId)
+               .eq(SysAgentChat::getChatModel, "debug")
+               .eq(SysAgentChat::getStatus, "active")
+               .orderByDesc(SysAgentChat::getCreateTime)
+               .last("LIMIT 1");
         return chatMapper.selectOne(wrapper);
+    }
+
+    @Override
+    public List<SysAgentChat> getChatsByGroup(Long groupId, int limit) {
+        LambdaQueryWrapper<SysAgentChat> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(SysAgentChat::getGroupId, groupId)
+               .eq(SysAgentChat::getStatus, "active")
+               .orderByDesc(SysAgentChat::getCreateTime);
+        
+        if (limit > 0) {
+            wrapper.last("LIMIT " + limit);
+        }
+        
+        return chatMapper.selectList(wrapper);
     }
 
     @Override

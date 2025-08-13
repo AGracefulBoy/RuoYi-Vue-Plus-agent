@@ -21,11 +21,6 @@ public class ChatHistoryVo {
     private Long chatId;
 
     /**
-     * 会话ID（用于前端标识）
-     */
-    private String conversationId;
-
-    /**
      * 会话标题
      */
     private String title;

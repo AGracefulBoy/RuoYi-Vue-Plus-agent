@@ -18,11 +18,6 @@ public class ChatSessionVo {
     private Long chatId;
 
     /**
-     * 会话ID（用于前端标识）
-     */
-    private String conversationId;
-
-    /**
      * 智能体ID
      */
     private Long agentId;

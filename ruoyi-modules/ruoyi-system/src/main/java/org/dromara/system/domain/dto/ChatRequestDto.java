@@ -28,11 +28,6 @@ public class ChatRequestDto {
     private String message;
 
     /**
-     * 会话ID（可选，继续会话时必填；若为空则创建新会话）
-     */
-    private String conversationId;
-
-    /**
      * 分组ID（可选）
      */
     private Long groupId;

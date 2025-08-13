@@ -21,7 +21,6 @@ import okhttp3.Response;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
-import org.dromara.system.domain.SysKnowledgeBase;
 import org.dromara.system.domain.SysKnowledgeBaseDocument;
 import org.dromara.system.domain.SysKnowledgeBaseDocumentChunk;
 import org.dromara.system.domain.dto.HitDocumentDTO;
@@ -38,7 +37,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -623,7 +621,7 @@ public class ElasticsearchDocumentServiceImpl implements IElasticsearchDocumentS
                 if (createTimeObj instanceof Long) {
                     hitDocumentDTO.setCreateTime((Long) createTimeObj);
                 }
-                hitDocumentDTO.setEmbeddingContent(source.getOrDefault("embeddingContent", "").toString());
+                hitDocumentDTO.setChunkTitle(source.getOrDefault("chunkTitle", "").toString());
 
                 Object documentIdObj = source.get("documentId");
                 if (documentIdObj instanceof String) {
@@ -634,7 +632,6 @@ public class ElasticsearchDocumentServiceImpl implements IElasticsearchDocumentS
                     hitDocumentDTO.setDocumentId(((Integer) documentIdObj).longValue());
                 }
 
-                hitDocumentDTO.setPageContent(source.getOrDefault("pageContent", "").toString());
                 hitDocumentDTO.setContent(source.getOrDefault("content", "").toString());
 
                 Object metadataObj = source.get("metadata");

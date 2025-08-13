@@ -30,11 +30,6 @@ public class SysAgentChat extends TenantEntity {
     private Long chatId;
 
     /**
-     * 会话ID（用于前端标识，继续会话时必填）
-     */
-    private String conversationId;
-
-    /**
      * 智能体ID
      */
     private Long agentId;

@@ -33,12 +33,6 @@ public class SysAgentChatDetailVo implements Serializable {
     private Long chatId;
 
     /**
-     * 会话ID（用于前端标识，继续会话时必填）
-     */
-    @ExcelProperty(value = "会话标识")
-    private String conversationId;
-
-    /**
      * 智能体ID
      */
     @ExcelProperty(value = "智能体ID")

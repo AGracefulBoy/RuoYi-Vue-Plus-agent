@@ -1,6 +1,5 @@
 package org.dromara.system.service.impl;
 
-import cn.dev33.satoken.context.SaHolder;
 import cn.hutool.json.JSONUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,7 +11,6 @@ import org.dromara.common.satoken.utils.LoginHelper;
 import org.dromara.common.tenant.helper.TenantHelper;
 import org.dromara.system.config.PythonProperties;
 import org.dromara.system.domain.SysAgent;
-import org.dromara.system.domain.SysAgentChat;
 import org.dromara.system.domain.SysAgentChatMessage;
 import org.dromara.system.domain.bo.PythonDebugRequestBo;
 import org.dromara.system.domain.dto.HitDocumentDTO;
@@ -453,8 +451,6 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                         if (doc != null) {
                             HashMap<String, String> hitSourceMap = new HashMap<>();
                             hitSourceMap.put("content", doc.getContent());
-                            hitSourceMap.put("metadata", doc.getMetadata());
-                            hitSourceMap.put("embeddingContent", doc.getEmbeddingContent());
                             resultHit.add(hitSourceMap);
                         }
                     }

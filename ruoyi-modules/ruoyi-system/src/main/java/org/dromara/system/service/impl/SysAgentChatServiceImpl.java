@@ -106,30 +106,29 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
 
         // 创建或获取会话
         SysAgentChat chat;
-        String conversationId = chatRequest.getConversationId();
         String chatModel = chatRequest.getChatModel();
         Long groupId = chatRequest.getGroupId();
 
-        if (StringUtils.isNotBlank(conversationId)) {
-            // 如果提供了conversationId，尝试获取已有会话
-            chat = chatContextService.getChatByConversationId(conversationId);
+        // 根据模式决定会话管理策略
+        if ("debug".equals(chatModel)) {
+            // debug模式：查找或创建最新的debug会话
+            chat = chatContextService.getLatestDebugChat(agent.getAgentId(), userId);
             if (chat == null) {
-                // 如果找不到会话，创建新会话
-                chat = chatContextService.createChat(agent.getAgentId(), userId,  agent.getAgentName(), groupId, chatModel);
-                // 更新conversationId为请求中的值
-                chat.setConversationId(conversationId);
-                chatContextService.updateChat(chat);
+                // 创建新的debug会话
+                chat = chatContextService.createChat(agent.getAgentId(), userId, 
+                    "Debug - " + agent.getAgentName(), groupId, "debug");
             }
         } else {
-            // 创建新会话
-            chat = chatContextService.createChat(agent.getAgentId(), userId, agent.getAgentName(), groupId, chatModel);
+            // chat模式：总是创建新会话，通过groupId关联
+            chat = chatContextService.createChat(agent.getAgentId(), userId, 
+                agent.getAgentName(), groupId, chatModel);
         }
 
         // 检查退出条件
         if (taskAgentService.checkExitCondition(chatRequest.getMessage())) {
             StreamMessageResponseDto exitResponse = StreamMessageResponseDto.createAnswerMessage(
                 "检测到退出指令，对话结束！感谢您的使用。",
-                chat.getConversationId(),
+                String.valueOf(chat.getChatId()),
                 "exit_" + System.currentTimeMillis(),
                 null,
                 0,
@@ -155,29 +154,29 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
 
         // 创建或获取会话
         SysAgentChat chat;
-        String conversationId = chatRequest.getConversationId();
         String chatModel = chatRequest.getChatModel();
+        Long groupId = chatRequest.getGroupId();
 
-        if (StringUtils.isNotBlank(conversationId)) {
-            // 如果提供了chatId，尝试获取已有会话
-            chat = chatContextService.getChatByConversationId(conversationId);
+        // 根据模式决定会话管理策略
+        if ("debug".equals(chatModel)) {
+            // debug模式：查找或创建最新的debug会话
+            chat = chatContextService.getLatestDebugChat(agent.getAgentId(), userId);
             if (chat == null) {
-                // 如果找不到会话，创建新会话
-                chat = chatContextService.createChat(agent.getAgentId(), userId, "自由对话 - " + agent.getAgentName(), null, chatModel);
-                // 更新UUID为请求中的chatId
-                chat.setConversationId(conversationId);
-                chatContextService.updateChat(chat);
+                // 创建新的debug会话
+                chat = chatContextService.createChat(agent.getAgentId(), userId, 
+                    "自由对话 Debug - " + agent.getAgentName(), groupId, "debug");
             }
         } else {
-            // 创建新会话
-            chat = chatContextService.createChat(agent.getAgentId(), userId, "自由对话 - " + agent.getAgentName(), null, chatModel);
+            // chat模式：总是创建新会话，通过groupId关联
+            chat = chatContextService.createChat(agent.getAgentId(), userId, 
+                "自由对话 - " + agent.getAgentName(), groupId, chatModel);
         }
 
         // 检查退出条件
         if (taskAgentService.checkExitCondition(chatRequest.getMessage())) {
             StreamMessageResponseDto exitResponse = StreamMessageResponseDto.createAnswerMessage(
                 "检测到退出指令，对话结束！感谢您的使用。",
-                chat.getConversationId(),
+                String.valueOf(chat.getChatId()),
                 "exit_" + System.currentTimeMillis(),
                 null,
                 0,
