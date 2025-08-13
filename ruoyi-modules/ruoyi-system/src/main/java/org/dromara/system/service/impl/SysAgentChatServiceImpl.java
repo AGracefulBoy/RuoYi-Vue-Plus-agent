@@ -65,30 +65,30 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
             if (agent == null) {
                 throw new RuntimeException("智能体不存在，ID: " + chatRequest.getAgentId());
             }
-            log.debug("智能体信息获取完成 - 名称: {}, 耗时: {}ms", 
+            log.debug("智能体信息获取完成 - 名称: {}, 耗时: {}ms",
                 agent.getAgentName(), System.currentTimeMillis() - startTime);
 
             // 2. 构建可用工具列表（直接从数据库查询）
             long toolStartTime = System.currentTimeMillis();
             List<ToolDto> availableTools = buildAvailableToolsDirectly(agent);
-            log.info("可用工具加载完成 - 数量: {}, 耗时: {}ms", 
+            log.info("可用工具加载完成 - 数量: {}, 耗时: {}ms",
                 availableTools.size(), System.currentTimeMillis() - toolStartTime);
 
             // 3. 根据对话模式选择处理方式
             if ("self_planning".equals(agent.getConversationMode())) {
                 // 自主规划模式：使用ReAct思维链处理
-                log.info("智能体{}使用自主规划模式处理对话 - 准备耗时: {}ms", 
+                log.info("智能体{}使用自主规划模式处理对话 - 准备耗时: {}ms",
                     agent.getAgentId(), System.currentTimeMillis() - startTime);
                 return handleTaskAgent(agent, availableTools, chatRequest);
             } else {
                 // 自由对话模式：直接对话，不使用思维链
-                log.info("智能体{}使用自由对话模式处理对话 - 准备耗时: {}ms", 
+                log.info("智能体{}使用自由对话模式处理对话 - 准备耗时: {}ms",
                     agent.getAgentId(), System.currentTimeMillis() - startTime);
                 return handleFreeChatAgent(agent, chatRequest);
             }
 
         } catch (Exception e) {
-            log.error("处理智能体对话时发生错误 - 智能体ID: {}, 错误信息: {}", 
+            log.error("处理智能体对话时发生错误 - 智能体ID: {}, 错误信息: {}",
                 chatRequest.getAgentId(), e.getMessage(), e);
             return Flux.error(e);
         }
@@ -111,20 +111,8 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
         String chatModel = chatRequest.getChatModel();
         Long groupId = chatRequest.getGroupId();
 
-        // 根据模式决定会话管理策略
-        if ("debug".equals(chatModel)) {
-            // debug模式：查找或创建最新的debug会话
-            chat = chatContextService.getLatestDebugChat(agent.getAgentId(), userId);
-            if (chat == null) {
-                // 创建新的debug会话
-                chat = chatContextService.createChat(agent.getAgentId(), userId, 
-                    "Debug - " + agent.getAgentName(), groupId, "debug");
-            }
-        } else {
-            // chat模式：总是创建新会话，通过groupId关联
-            chat = chatContextService.createChat(agent.getAgentId(), userId, 
-                agent.getAgentName(), groupId, chatModel);
-        }
+        chat = chatContextService.createChat(agent.getAgentId(), userId,
+            agent.getAgentName(), groupId, chatModel);
 
         // 检查退出条件
         if (taskAgentService.checkExitCondition(chatRequest.getMessage())) {
@@ -165,12 +153,12 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
             chat = chatContextService.getLatestDebugChat(agent.getAgentId(), userId);
             if (chat == null) {
                 // 创建新的debug会话
-                chat = chatContextService.createChat(agent.getAgentId(), userId, 
+                chat = chatContextService.createChat(agent.getAgentId(), userId,
                     "自由对话 Debug - " + agent.getAgentName(), groupId, "debug");
             }
         } else {
             // chat模式：总是创建新会话，通过groupId关联
-            chat = chatContextService.createChat(agent.getAgentId(), userId, 
+            chat = chatContextService.createChat(agent.getAgentId(), userId,
                 "自由对话 - " + agent.getAgentName(), groupId, chatModel);
         }
 
@@ -362,7 +350,7 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
                 if (StringUtils.isNotBlank(trimmedItem)) {
                     String paramName;
                     String paramDesc;
-                    
+
                     // 如果包含等号，则分割为键值对
                     if (trimmedItem.contains("=")) {
                         String[] keyValue = trimmedItem.split("=", 2);
@@ -378,7 +366,7 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
                         paramName = trimmedItem;
                         paramDesc = trimmedItem;
                     }
-                    
+
                     parameters.add(ToolDto.Parameter.builder()
                         .name(paramName)
                         .desc(paramDesc)
@@ -397,15 +385,15 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
         // 构建查询条件
         LambdaQueryWrapper<SysAgentChat> wrapper = Wrappers.lambdaQuery();
         wrapper.eq(SysAgentChat::getAgentId, agentId)
-               .eq(StringUtils.isNotBlank(chatModel), 
+               .eq(StringUtils.isNotBlank(chatModel),
                    SysAgentChat::getChatModel, chatModel)
                .eq(SysAgentChat::getDelFlag, "0")
                .orderByDesc(SysAgentChat::getCreateTime);
-        
+
         // 执行分页查询
         Page<SysAgentChatDetailVo> result = agentChatMapper.selectVoPage(
             pageQuery.build(), wrapper, SysAgentChatDetailVo.class);
-        
+
         // 为每个会话查询对应的消息列表
         if (result.getRecords() != null && !result.getRecords().isEmpty()) {
             for (SysAgentChatDetailVo vo : result.getRecords()) {
@@ -414,12 +402,12 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
                 messageWrapper.eq(SysAgentChatMessage::getChatId, vo.getChatId())
                              .eq(SysAgentChatMessage::getDelFlag, "0")
                              .orderByAsc(SysAgentChatMessage::getMessageIndex);
-                
+
                 List<SysAgentChatMessage> messages = agentChatMessageMapper.selectList(messageWrapper);
                 vo.setMessages(messages);
             }
         }
-        
+
         return TableDataInfo.build(result);
     }
 
@@ -430,7 +418,7 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
         wrapper.eq(SysAgentChat::getAgentId, agentId)
                .eq(SysAgentChat::getChatModel, "debug")
                .eq(SysAgentChat::getDelFlag, "0");
-        
+
         // 逻辑删除（MyBatis-Plus会自动将del_flag设置为'1'）
         return agentChatMapper.delete(wrapper) > 0;
     }
@@ -441,22 +429,22 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
      */
     private List<ToolDto> buildAvailableToolsDirectly(SysAgent agent) {
         List<ToolDto> allTools = new ArrayList<>();
-        
+
         // 1. 获取工具列表
         List<ToolDto> tools = getToolsFromAgent(agent);
         allTools.addAll(tools);
-        
+
         // 2. 获取知识库列表
         List<ToolDto> knowledgeBases = getKnowledgeBasesFromAgent(agent);
         allTools.addAll(knowledgeBases);
-        
+
         // 3. 获取数据源列表
         List<ToolDto> datasources = getDatasourcesFromAgent(agent);
         allTools.addAll(datasources);
-        
-        log.debug("构建工具列表完成 - 总数: {}, 工具: {}, 知识库: {}, 数据源: {}", 
+
+        log.debug("构建工具列表完成 - 总数: {}, 工具: {}, 知识库: {}, 数据源: {}",
             allTools.size(), tools.size(), knowledgeBases.size(), datasources.size());
-        
+
         return allTools;
     }
 
