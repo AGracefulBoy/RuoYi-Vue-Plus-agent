@@ -16,6 +16,7 @@ import org.dromara.common.ratelimiter.enums.LimitType;
 import org.dromara.common.satoken.utils.LoginHelper;
 import org.dromara.common.web.core.BaseController;
 import org.dromara.system.domain.dto.ChatRequestDto;
+import org.dromara.system.domain.dto.DeleteDebugChatsDto;
 import org.dromara.system.domain.dto.StreamMessageResponseDto;
 import org.dromara.system.domain.vo.SysAgentChatDetailVo;
 import org.dromara.system.service.SysAgentChatService;
@@ -140,14 +141,14 @@ public class SysAgentChatController extends BaseController {
     /**
      * 删除智能体的debug模式对话记录
      *
-     * @param agentId 智能体ID
+     * @param dto 删除请求参数
      * @return 删除结果
      */
     @PostMapping("/deleteDebugChats")
     @SaCheckPermission("system:agent:remove")
     @Log(title = "删除debug对话记录", businessType = BusinessType.DELETE)
-    public R<Void> deleteDebugChats(@RequestParam Long agentId) {
-        return toAjax(sysAgentChatService.deleteDebugChatsByAgentId(agentId));
+    public R<Void> deleteDebugChats(@Valid @RequestBody DeleteDebugChatsDto dto) {
+        return toAjax(sysAgentChatService.deleteDebugChatsByAgentId(dto.getAgentId()));
     }
 
     /**
