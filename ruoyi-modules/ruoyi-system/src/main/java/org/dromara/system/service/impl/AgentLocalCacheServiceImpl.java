@@ -1,6 +1,5 @@
 package org.dromara.system.service.impl;
 
-import cn.hutool.json.JSONUtil;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.stats.CacheStats;
@@ -18,7 +17,7 @@ import org.dromara.system.mapper.SysToolMapper;
 import org.dromara.system.service.AgentLocalCacheService;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
-import org.springframework.util.StringUtils;
+import org.dromara.common.core.utils.StringUtils;
 
 import jakarta.annotation.PostConstruct;
 import java.util.*;
@@ -307,7 +306,7 @@ public class AgentLocalCacheServiceImpl implements AgentLocalCacheService {
             .id(tool.getToolId())
             .type("tool")
             .name(tool.getToolName())
-            .desc(StringUtils.hasText(tool.getToolDesc()) ? tool.getToolDesc() : "工具: " + tool.getToolName())
+            .desc(StringUtils.isNotBlank(tool.getToolDesc()) ? tool.getToolDesc() : "工具: " + tool.getToolName())
             .parameters(new ArrayList<>())
             .build();
     }
@@ -326,22 +325,37 @@ public class AgentLocalCacheServiceImpl implements AgentLocalCacheService {
             .build());
         
         if (knowledgeBase.getMetadata() != null && !knowledgeBase.getMetadata().isEmpty()) {
-            try {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> metadataMap = JSONUtil.toBean(knowledgeBase.getMetadata(), Map.class);
-                
-                if (metadataMap != null) {
-                    for (Map.Entry<String, Object> entry : metadataMap.entrySet()) {
-                        parameters.add(ToolDto.Parameter.builder()
-                            .name(entry.getKey())
-                            .desc(entry.getValue() != null ? entry.getValue().toString() : entry.getKey())
-                            .type("string")
-                            .required(true)
-                            .build());
+            // 按逗号分割元数据字符串
+            String[] items = knowledgeBase.getMetadata().split(",");
+            for (String item : items) {
+                String trimmedItem = item.trim();
+                if (StringUtils.isNotBlank(trimmedItem)) {
+                    String paramName;
+                    String paramDesc;
+                    
+                    // 如果包含等号，则分割为键值对
+                    if (trimmedItem.contains("=")) {
+                        String[] keyValue = trimmedItem.split("=", 2);
+                        if (keyValue.length == 2) {
+                            paramName = keyValue[0].trim();
+                            paramDesc = keyValue[1].trim();
+                        } else {
+                            paramName = trimmedItem;
+                            paramDesc = trimmedItem;
+                        }
+                    } else {
+                        // 否则将项目作为键和描述
+                        paramName = trimmedItem;
+                        paramDesc = trimmedItem;
                     }
+                    
+                    parameters.add(ToolDto.Parameter.builder()
+                        .name(paramName)
+                        .desc(paramDesc)
+                        .type("string")
+                        .required(true)
+                        .build());
                 }
-            } catch (Exception e) {
-                log.warn("解析知识库元数据失败: {}", knowledgeBase.getMetadata(), e);
             }
         }
         
@@ -349,7 +363,7 @@ public class AgentLocalCacheServiceImpl implements AgentLocalCacheService {
             .id(knowledgeBase.getKnowledgeBaseId())
             .type("knowledge")
             .name(knowledgeBase.getName())
-            .desc(StringUtils.hasText(knowledgeBase.getDescription()) ?
+            .desc(StringUtils.isNotBlank(knowledgeBase.getDescription()) ?
                 knowledgeBase.getDescription() : "知识库: " + knowledgeBase.getName())
             .parameters(parameters)
             .build();
@@ -381,7 +395,7 @@ public class AgentLocalCacheServiceImpl implements AgentLocalCacheService {
             .id(datasource.getDatasourceId())
             .type("datasource")
             .name(datasource.getDatasourceName())
-            .desc(StringUtils.hasText(datasource.getDescription()) ?
+            .desc(StringUtils.isNotBlank(datasource.getDescription()) ?
                 datasource.getDescription() : "数据源: " + datasource.getDatasourceName())
             .parameters(parameters)
             .build();

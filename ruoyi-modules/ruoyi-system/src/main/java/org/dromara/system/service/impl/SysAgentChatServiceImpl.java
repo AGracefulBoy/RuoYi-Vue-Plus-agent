@@ -33,7 +33,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import reactor.core.publisher.Flux;
 
-import cn.hutool.json.JSONUtil;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -353,24 +352,37 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
             .build());
 
         if (kb.getMetadata() != null && !kb.getMetadata().isEmpty()) {
-            try {
-                // Parse metadata JSON string to Map
-                @SuppressWarnings("unchecked")
-                Map<String, Object> metadataMap = JSONUtil.toBean(kb.getMetadata(), Map.class);
-
-                // Create parameters for each metadata key
-                if (metadataMap != null) {
-                    for (Map.Entry<String, Object> entry : metadataMap.entrySet()) {
-                        parameters.add(ToolDto.Parameter.builder()
-                            .name(entry.getKey())
-                            .desc(entry.getValue() != null ? entry.getValue().toString() : entry.getKey())
-                            .type("string")
-                            .required(true)
-                            .build());
+            // 按逗号分割元数据字符串
+            String[] items = kb.getMetadata().split(",");
+            for (String item : items) {
+                String trimmedItem = item.trim();
+                if (StringUtils.isNotBlank(trimmedItem)) {
+                    String paramName;
+                    String paramDesc;
+                    
+                    // 如果包含等号，则分割为键值对
+                    if (trimmedItem.contains("=")) {
+                        String[] keyValue = trimmedItem.split("=", 2);
+                        if (keyValue.length == 2) {
+                            paramName = keyValue[0].trim();
+                            paramDesc = keyValue[1].trim();
+                        } else {
+                            paramName = trimmedItem;
+                            paramDesc = trimmedItem;
+                        }
+                    } else {
+                        // 否则将项目作为键和描述
+                        paramName = trimmedItem;
+                        paramDesc = trimmedItem;
                     }
+                    
+                    parameters.add(ToolDto.Parameter.builder()
+                        .name(paramName)
+                        .desc(paramDesc)
+                        .type("string")
+                        .required(true)
+                        .build());
                 }
-            } catch (Exception e) {
-                log.warn("Failed to parse knowledge base metadata: {}", kb.getMetadata(), e);
             }
         }
 

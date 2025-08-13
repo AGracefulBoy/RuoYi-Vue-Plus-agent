@@ -451,6 +451,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                         if (doc != null) {
                             HashMap<String, String> hitSourceMap = new HashMap<>();
                             hitSourceMap.put("content", doc.getContent());
+                            hitSourceMap.put("metadata", doc.getMetadata());
                             resultHit.add(hitSourceMap);
                         }
                     }
