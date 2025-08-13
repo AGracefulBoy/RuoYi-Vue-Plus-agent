@@ -60,14 +60,17 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
             log.info("开始处理智能体对话 - 智能体ID: {}, 用户消息: {}",
                 chatRequest.getAgentId(), chatRequest.getMessage());
 
-            // 1. 获取智能体信息（使用本地缓存）
-            SysAgent agent = agentLocalCacheService.getAgent(chatRequest.getAgentId());
+            // 1. 获取智能体信息（直接从数据库查询）
+            SysAgent agent = agentMapper.selectById(chatRequest.getAgentId());
+            if (agent == null) {
+                throw new RuntimeException("智能体不存在，ID: " + chatRequest.getAgentId());
+            }
             log.debug("智能体信息获取完成 - 名称: {}, 耗时: {}ms", 
                 agent.getAgentName(), System.currentTimeMillis() - startTime);
 
-            // 2. 构建可用工具列表（使用本地缓存）
+            // 2. 构建可用工具列表（直接从数据库查询）
             long toolStartTime = System.currentTimeMillis();
-            List<ToolDto> availableTools = agentLocalCacheService.getAvailableTools(chatRequest.getAgentId());
+            List<ToolDto> availableTools = buildAvailableToolsDirectly(agent);
             log.info("可用工具加载完成 - 数量: {}, 耗时: {}ms", 
                 availableTools.size(), System.currentTimeMillis() - toolStartTime);
 
@@ -430,6 +433,31 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
         
         // 逻辑删除（MyBatis-Plus会自动将del_flag设置为'1'）
         return agentChatMapper.delete(wrapper) > 0;
+    }
+
+    /**
+     * 直接从数据库构建可用工具列表
+     * 整合工具、知识库和数据源的查询
+     */
+    private List<ToolDto> buildAvailableToolsDirectly(SysAgent agent) {
+        List<ToolDto> allTools = new ArrayList<>();
+        
+        // 1. 获取工具列表
+        List<ToolDto> tools = getToolsFromAgent(agent);
+        allTools.addAll(tools);
+        
+        // 2. 获取知识库列表
+        List<ToolDto> knowledgeBases = getKnowledgeBasesFromAgent(agent);
+        allTools.addAll(knowledgeBases);
+        
+        // 3. 获取数据源列表
+        List<ToolDto> datasources = getDatasourcesFromAgent(agent);
+        allTools.addAll(datasources);
+        
+        log.debug("构建工具列表完成 - 总数: {}, 工具: {}, 知识库: {}, 数据源: {}", 
+            allTools.size(), tools.size(), knowledgeBases.size(), datasources.size());
+        
+        return allTools;
     }
 
     /**
