@@ -717,10 +717,21 @@ public class TaskAgentServiceImpl implements TaskAgentService {
     private void saveThoughtStep(Long chatId, String content, String messageType, int stepIndex, StreamingContext ctx) {
         if (chatId == null) return;
 
+        // 当stepIndex==0且messageType为action时，剔除Action之前的内容
+        String processedContent = content;
+        if (stepIndex == 0 && "action".equals(messageType)) {
+            // 查找"Action"关键字的位置
+            int actionIndex = content.indexOf("Action");
+            if (actionIndex >= 0) {
+                // 只保留Action及之后的内容
+                processedContent = content.substring(actionIndex);
+            }
+        }
+
         SysAgentChatMessage message = new SysAgentChatMessage();
         message.setChatId(chatId);
         message.setRole("assistant");
-        message.setContent(content);
+        message.setContent(processedContent);
         message.setMessageType(messageType);
         message.setStatus("completed");
 
@@ -737,7 +748,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
         List<SysAgentChatMessage.ThoughtStep> thoughtSteps = new ArrayList<>();
         SysAgentChatMessage.ThoughtStep step = new SysAgentChatMessage.ThoughtStep();
         step.setStepType(messageType);
-        step.setContent(content);
+        step.setContent(processedContent);  // 使用处理后的内容
         step.setStepIndex(stepIndex);
         step.setSuccess(true);
         thoughtSteps.add(step);
@@ -756,7 +767,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
         message.setChatId(chatId);
         message.setRole("tool");
         message.setContent(result);
-        message.setMessageType("observation");
+        message.setMessageType("action");
         message.setStatus("completed");
 
         // 从StreamingContext获取用户信息，避免线程切换导致的上下文丢失
@@ -796,7 +807,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
         message.setChatId(chatId);
         message.setRole("assistant");
         message.setContent(finalAnswer);
-        message.setMessageType("final_answer");
+        message.setMessageType("answer");
         message.setStatus("completed");
 
         // 从StreamingContext获取用户信息，避免线程切换导致的上下文丢失
@@ -1418,14 +1429,14 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                         thoughtMessage.setMessageType("thought");
                         thoughtMessage.setStatus("completed");
                         thoughtMessage.setMessageIndex(ctx.getAndIncrementMessageIndex());
-                        
+
                         // 设置用户上下文信息
                         thoughtMessage.setCreateBy(ctx.getUserId());
                         thoughtMessage.setUpdateBy(ctx.getUserId());
                         thoughtMessage.setTenantId(ctx.getTenantId());
-                        
+
                         agentChatMessageMapper.insert(thoughtMessage);
-                        log.debug("保存thought内容到数据库 - chatId: {}, content length: {}", 
+                        log.debug("保存thought内容到数据库 - chatId: {}, content length: {}",
                             ctx.getChatId(), ctx.getThoughtProcess().length());
                     }
 
