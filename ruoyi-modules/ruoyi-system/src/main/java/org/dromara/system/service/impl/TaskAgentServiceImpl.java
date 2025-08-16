@@ -13,6 +13,7 @@ import org.dromara.system.config.PythonProperties;
 import org.dromara.system.domain.SysAgent;
 import org.dromara.system.domain.SysAgentChatMessage;
 import org.dromara.system.domain.bo.PythonDebugRequestBo;
+import org.dromara.system.mapper.SysAgentChatMessageMapper;
 import org.dromara.system.domain.dto.HitDocumentDTO;
 import org.dromara.system.domain.dto.HitSourceDTO;
 import org.dromara.system.domain.dto.StreamMessageResponseDto;
@@ -145,6 +146,9 @@ public class TaskAgentServiceImpl implements TaskAgentService {
 
     @Autowired
     private StreamMessageBuilder streamMessageBuilder;
+
+    @Autowired
+    private SysAgentChatMessageMapper agentChatMessageMapper;
 
     @Override
     public Flux<StreamMessageResponseDto> executeReActStream(SysAgent agent, List<ToolDto> availableTools, String userInput, Long chatId) {
@@ -1403,6 +1407,26 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                         sink.next(createStreamMessage(beforeAction, "thought", false, ctx));
                         // 保存到思维过程中
                         ctx.getThoughtProcess().append(beforeAction);
+                    }
+
+                    // 当出现Action时，保存之前的thought内容到数据库
+                    if (ctx.getChatId() != null && ctx.getThoughtProcess().length() > 0) {
+                        SysAgentChatMessage thoughtMessage = new SysAgentChatMessage();
+                        thoughtMessage.setChatId(ctx.getChatId());
+                        thoughtMessage.setRole("assistant");
+                        thoughtMessage.setContent(ctx.getThoughtProcess().toString());
+                        thoughtMessage.setMessageType("thought");
+                        thoughtMessage.setStatus("completed");
+                        thoughtMessage.setMessageIndex(ctx.getAndIncrementMessageIndex());
+                        
+                        // 设置用户上下文信息
+                        thoughtMessage.setCreateBy(ctx.getUserId());
+                        thoughtMessage.setUpdateBy(ctx.getUserId());
+                        thoughtMessage.setTenantId(ctx.getTenantId());
+                        
+                        agentChatMessageMapper.insert(thoughtMessage);
+                        log.debug("保存thought内容到数据库 - chatId: {}, content length: {}", 
+                            ctx.getChatId(), ctx.getThoughtProcess().length());
                     }
 
                     // 标记已找到 Action，切换类型为 action
