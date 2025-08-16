@@ -112,7 +112,7 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
         Long groupId = chatRequest.getGroupId();
 
         chat = chatContextService.createChat(agent.getAgentId(), userId,
-            agent.getAgentName(), groupId, chatModel);
+            chatRequest.getMessage(), groupId, chatModel);
 
         // 检查退出条件
         if (taskAgentService.checkExitCondition(chatRequest.getMessage())) {
@@ -154,12 +154,13 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
             if (chat == null) {
                 // 创建新的debug会话
                 chat = chatContextService.createChat(agent.getAgentId(), userId,
-                    "自由对话 Debug - " + agent.getAgentName(), groupId, "debug");
+                    chatRequest.getMessage(), groupId, chatModel);
+
             }
         } else {
             // chat模式：总是创建新会话，通过groupId关联
             chat = chatContextService.createChat(agent.getAgentId(), userId,
-                "自由对话 - " + agent.getAgentName(), groupId, chatModel);
+                chatRequest.getMessage(), groupId, chatModel);
         }
 
         // 检查退出条件
@@ -181,6 +182,7 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
 
     /**
      * 根据ID获取智能体信息
+     *
      * @deprecated 使用 agentLocalCacheService.getAgent() 代替
      */
     @Deprecated
@@ -190,6 +192,7 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
 
     /**
      * 构建智能体可用工具列表
+     *
      * @deprecated 使用 agentLocalCacheService.getAvailableTools() 代替
      */
     @Deprecated
@@ -385,10 +388,10 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
         // 构建查询条件
         LambdaQueryWrapper<SysAgentChat> wrapper = Wrappers.lambdaQuery();
         wrapper.eq(SysAgentChat::getAgentId, agentId)
-               .eq(StringUtils.isNotBlank(chatModel),
-                   SysAgentChat::getChatModel, chatModel)
-               .eq(SysAgentChat::getDelFlag, "0")
-               .orderByDesc(SysAgentChat::getCreateTime);
+            .eq(StringUtils.isNotBlank(chatModel),
+                SysAgentChat::getChatModel, chatModel)
+            .eq(SysAgentChat::getDelFlag, "0")
+            .orderByDesc(SysAgentChat::getCreateTime);
 
         // 执行分页查询
         Page<SysAgentChatDetailVo> result = agentChatMapper.selectVoPage(
@@ -400,8 +403,8 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
                 // 查询该会话的所有消息
                 LambdaQueryWrapper<SysAgentChatMessage> messageWrapper = Wrappers.lambdaQuery();
                 messageWrapper.eq(SysAgentChatMessage::getChatId, vo.getChatId())
-                             .eq(SysAgentChatMessage::getDelFlag, "0")
-                             .orderByAsc(SysAgentChatMessage::getMessageIndex);
+                    .eq(SysAgentChatMessage::getDelFlag, "0")
+                    .orderByAsc(SysAgentChatMessage::getMessageIndex);
 
                 List<SysAgentChatMessage> messages = agentChatMessageMapper.selectList(messageWrapper);
                 vo.setMessages(messages);
@@ -416,8 +419,8 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
         // 构建查询条件
         LambdaQueryWrapper<SysAgentChat> wrapper = Wrappers.lambdaQuery();
         wrapper.eq(SysAgentChat::getAgentId, agentId)
-               .eq(SysAgentChat::getChatModel, "debug")
-               .eq(SysAgentChat::getDelFlag, "0");
+            .eq(SysAgentChat::getChatModel, "debug")
+            .eq(SysAgentChat::getDelFlag, "0");
 
         // 逻辑删除（MyBatis-Plus会自动将del_flag设置为'1'）
         return agentChatMapper.delete(wrapper) > 0;

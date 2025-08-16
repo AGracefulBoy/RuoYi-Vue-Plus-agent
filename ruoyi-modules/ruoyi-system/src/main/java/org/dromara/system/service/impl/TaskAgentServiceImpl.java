@@ -395,8 +395,8 @@ public class TaskAgentServiceImpl implements TaskAgentService {
      * 执行工具调用
      *
      * @param toolCall 工具调用指令
-     * @param sink 流式输出sink
-     * @param ctx 流式上下文
+     * @param sink     流式输出sink
+     * @param ctx      流式上下文
      * @return 执行结果
      */
     private String executeToolCall(ToolCallInstruction toolCall, reactor.core.publisher.FluxSink<StreamMessageResponseDto> sink, StreamingContext ctx) {
@@ -482,8 +482,8 @@ public class TaskAgentServiceImpl implements TaskAgentService {
      *
      * @param tool       工具配置
      * @param parameters 参数（JSON格式）
-     * @param sink      流式输出sink（可选，用于流式输出）
-     * @param ctx       流式上下文（可选，用于流式输出）
+     * @param sink       流式输出sink（可选，用于流式输出）
+     * @param ctx        流式上下文（可选，用于流式输出）
      * @return 执行结果
      */
     private String executePythonScript(SysToolVo tool, String parameters, reactor.core.publisher.FluxSink<StreamMessageResponseDto> sink, StreamingContext ctx) {
@@ -1779,11 +1779,14 @@ public class TaskAgentServiceImpl implements TaskAgentService {
             })
             .subscribe(
                 // onNext - 由 doOnNext 处理
-                chunk -> {},
+                chunk -> {
+                },
                 // onError - 由 doOnError 处理
-                error -> {},
+                error -> {
+                },
                 // onComplete - 由 doOnComplete 处理
-                () -> {}
+                () -> {
+                }
             );
 
         // 保存订阅对象到上下文，以便在需要时取消
@@ -1939,6 +1942,12 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                     // 创建StreamingContext
                     ctx = new StreamingContext();
 
+                    // 设置用户上下文信息
+                    ctx.setUserId(LoginHelper.getUserId());
+                    ctx.setDeptId(LoginHelper.getDeptId());
+                    ctx.setTenantId(TenantHelper.getTenantId());
+                    ctx.setChatId(chatId);
+
                     // 使用传入的会话ID
                     String chatIdStr = String.valueOf(chatId);
                     String userMsgId = generateMessageId();
@@ -1948,16 +1957,89 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                     // 发送开始消息
                     sink.next(createStreamMessage("开始处理您的问题...", "thought", false, ctx));
 
+                    SysModelConfigVo mainModelConfig = getModelConfig(agent.getModel(), "主要模型");
+                    assert mainModelConfig != null;
+                    IChatService chatService = AiService.getChatService(mainModelConfig.getModelProvider());
                     // 构建提示词
                     String prompt = buildFreeChatPrompt(agent, userInput);
 
-                    // 发送回答
-                    String response = "这是一个模拟的回答。实际实现中应该调用AI模型。";
-                    sink.next(createStreamMessage(response, "answer", false, ctx));
+                    IChatRequest chatRequest = buildChatRequest(prompt, mainModelConfig);
 
-                    // 发送完成消息
-                    sink.next(StreamMessageResponseDto.createFinishMessage(chatIdStr, generateMessageId(), ctx.getAndIncrementMessageIndex()));
-                    sink.complete();
+                    // 执行流式调用
+                    Flux<IChatResponse> modelStream = chatService.stream(chatRequest);
+                    StringBuilder fullResponse = new StringBuilder();
+                    StringBuilder reasonResponse = new StringBuilder();
+
+                    // 创建final变量供lambda使用
+                    final StreamingContext finalCtx = ctx;
+                    final Long finalChatId = chatId;
+
+                    modelStream
+                        .doOnNext(chunk -> {
+                            String content = chunk.getResult().getOutput().getText();
+                            Object reasoningContent = chunk.getResult().getOutput().getReasoningContent();
+
+                            if (reasoningContent != null) {
+                                String reasoningText = reasoningContent.toString();
+                                if (StringUtils.hasText(reasoningText) && !sink.isCancelled()) {
+                                    reasonResponse.append(reasoningText);
+                                    // 发送推理内容作为增强事件
+                                    sink.next(createStreamMessage(reasoningText, "thought", false, finalCtx));
+                                }
+                            }else if (content != null) {
+                                fullResponse.append(content);
+                                sink.next(createStreamMessage(content, "answer", false, finalCtx));
+                            }
+                        })
+                        .doOnComplete(() -> {
+                            // 保存推理过程到数据库
+                            if (finalChatId != null && reasonResponse.length() > 0) {
+                                SysAgentChatMessage thoughtMessage = new SysAgentChatMessage();
+                                thoughtMessage.setChatId(finalChatId);
+                                thoughtMessage.setRole("assistant");
+                                thoughtMessage.setContent(reasonResponse.toString());
+                                thoughtMessage.setMessageType("thought");
+                                thoughtMessage.setStatus("completed");
+                                thoughtMessage.setMessageIndex(finalCtx.getAndIncrementMessageIndex());
+                                thoughtMessage.setCreateBy(finalCtx.getUserId());
+                                thoughtMessage.setUpdateBy(finalCtx.getUserId());
+                                thoughtMessage.setTenantId(finalCtx.getTenantId());
+                                agentChatMessageMapper.insert(thoughtMessage);
+                            }
+                            
+                            // 保存完整回答到数据库
+                            if (finalChatId != null && fullResponse.length() > 0) {
+                                SysAgentChatMessage answerMessage = new SysAgentChatMessage();
+                                answerMessage.setChatId(finalChatId);
+                                answerMessage.setRole("assistant");
+                                answerMessage.setContent(fullResponse.toString());
+                                answerMessage.setMessageType("answer");
+                                answerMessage.setStatus("completed");
+                                answerMessage.setMessageIndex(finalCtx.getAndIncrementMessageIndex());
+                                answerMessage.setCreateBy(finalCtx.getUserId());
+                                answerMessage.setUpdateBy(finalCtx.getUserId());
+                                answerMessage.setTenantId(finalCtx.getTenantId());
+                                agentChatMessageMapper.insert(answerMessage);
+                            }
+                            // 发送完成消息
+                            sink.next(StreamMessageResponseDto.createFinishMessage(
+                                finalCtx.getCurrentChatId(),
+                                generateMessageId(),
+                                finalCtx.getAndIncrementMessageIndex()
+                            ));
+                            sink.complete();
+                        })
+                        .doOnError(error -> {
+                            log.error("流式调用失败", error);
+                            sink.next(StreamMessageResponseDto.createErrorMessage(
+                                "AI服务调用失败: " + error.getMessage(),
+                                finalCtx.getCurrentChatId(),
+                                generateMessageId(),
+                                finalCtx.getAndIncrementMessageIndex()
+                            ));
+                            sink.complete();
+                        })
+                        .subscribe();
 
                 } catch (Exception e) {
                     log.error("自由对话流式执行失败", e);
