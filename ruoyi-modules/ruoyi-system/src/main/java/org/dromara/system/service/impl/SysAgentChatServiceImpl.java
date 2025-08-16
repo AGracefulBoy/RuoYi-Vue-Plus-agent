@@ -142,27 +142,13 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
         // 获取当前用户ID
         Long userId = LoginHelper.getUserId();
 
-        // 创建或获取会话
-        SysAgentChat chat;
+
+
         String chatModel = chatRequest.getChatModel();
         Long groupId = chatRequest.getGroupId();
-
-        // 根据模式决定会话管理策略
-        if ("debug".equals(chatModel)) {
-            // debug模式：查找或创建最新的debug会话
-            chat = chatContextService.getLatestDebugChat(agent.getAgentId(), userId);
-            if (chat == null) {
-                // 创建新的debug会话
-                chat = chatContextService.createChat(agent.getAgentId(), userId,
-                    chatRequest.getMessage(), groupId, chatModel);
-
-            }
-        } else {
-            // chat模式：总是创建新会话，通过groupId关联
-            chat = chatContextService.createChat(agent.getAgentId(), userId,
-                chatRequest.getMessage(), groupId, chatModel);
-        }
-
+        // 创建或获取会话
+        SysAgentChat chat = chatContextService.createChat(agent.getAgentId(), userId,
+            chatRequest.getMessage(), groupId, chatModel);
         // 检查退出条件
         if (taskAgentService.checkExitCondition(chatRequest.getMessage())) {
             StreamMessageResponseDto exitResponse = StreamMessageResponseDto.createAnswerMessage(

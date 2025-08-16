@@ -1954,6 +1954,21 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                     ctx.setCurrentChatId(chatIdStr);
                     ctx.setUserMessageId(userMsgId);
 
+                    // 保存用户问题到数据库
+                    if (chatId != null) {
+                        SysAgentChatMessage userMessage = new SysAgentChatMessage();
+                        userMessage.setChatId(chatId);
+                        userMessage.setRole("user");
+                        userMessage.setContent(userInput);
+                        userMessage.setMessageType("text");
+                        userMessage.setStatus("completed");
+                        userMessage.setMessageIndex(ctx.getAndIncrementMessageIndex());
+                        userMessage.setCreateBy(ctx.getUserId());
+                        userMessage.setUpdateBy(ctx.getUserId());
+                        userMessage.setTenantId(ctx.getTenantId());
+                        agentChatMessageMapper.insert(userMessage);
+                    }
+
                     // 发送开始消息
                     sink.next(createStreamMessage("开始处理您的问题...", "thought", false, ctx));
 
