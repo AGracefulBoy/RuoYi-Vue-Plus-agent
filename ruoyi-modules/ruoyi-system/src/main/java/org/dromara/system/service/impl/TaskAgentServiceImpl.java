@@ -13,23 +13,19 @@ import org.dromara.system.config.PythonProperties;
 import org.dromara.system.domain.SysAgent;
 import org.dromara.system.domain.SysAgentChatMessage;
 import org.dromara.system.domain.bo.PythonDebugRequestBo;
-import org.dromara.system.mapper.SysAgentChatMessageMapper;
-import org.dromara.system.domain.dto.HitDocumentDTO;
-import org.dromara.system.domain.dto.HitSourceDTO;
-import org.dromara.system.domain.dto.StreamMessageResponseDto;
-import org.dromara.system.domain.dto.TokenUsageDto;
-import org.dromara.system.domain.dto.ToolDto;
+import org.dromara.system.domain.context.ModelConfigContext;
+import org.dromara.system.domain.context.StreamingContext;
+import org.dromara.system.domain.dto.*;
+import org.dromara.system.domain.instruction.ToolCallInstruction;
 import org.dromara.system.domain.vo.SysModelConfigVo;
 import org.dromara.system.domain.vo.SysToolVo;
+import org.dromara.system.mapper.SysAgentChatMessageMapper;
 import org.dromara.system.service.*;
 import org.dromara.system.service.helper.PromptBuilderHelper;
 import org.dromara.system.service.helper.SaTokenReactiveHelper;
 import org.dromara.system.service.helper.StreamMessageBuilder;
 import org.dromara.system.service.tool.executor.IToolExecutor;
 import org.dromara.system.service.tool.executor.ToolExecutionResult;
-import org.dromara.system.domain.context.ModelConfigContext;
-import org.dromara.system.domain.context.StreamingContext;
-import org.dromara.system.domain.instruction.ToolCallInstruction;
 import org.dromara.system.util.HttpUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -2021,7 +2017,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                                 thoughtMessage.setTenantId(finalCtx.getTenantId());
                                 agentChatMessageMapper.insert(thoughtMessage);
                             }
-                            
+
                             // 保存完整回答到数据库
                             if (finalChatId != null && fullResponse.length() > 0) {
                                 SysAgentChatMessage answerMessage = new SysAgentChatMessage();

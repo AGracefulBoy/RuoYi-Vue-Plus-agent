@@ -9,34 +9,22 @@ import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.common.satoken.utils.LoginHelper;
-import org.dromara.system.domain.SysAgent;
-import org.dromara.system.domain.SysAgentChat;
-import org.dromara.system.domain.SysAgentChatMessage;
-import org.dromara.system.domain.SysDatasource;
-import org.dromara.system.domain.SysKnowledgeBase;
-import org.dromara.system.domain.SysTool;
+import org.dromara.system.domain.*;
 import org.dromara.system.domain.dto.ChatRequestDto;
 import org.dromara.system.domain.dto.StreamMessageResponseDto;
 import org.dromara.system.domain.dto.ToolDto;
 import org.dromara.system.domain.vo.SysAgentChatDetailVo;
-import org.dromara.system.mapper.SysAgentChatMapper;
-import org.dromara.system.mapper.SysAgentChatMessageMapper;
-import org.dromara.system.mapper.SysAgentMapper;
-import org.dromara.system.mapper.SysDatasourceMapper;
-import org.dromara.system.mapper.SysKnowledgeBaseMapper;
-import org.dromara.system.mapper.SysToolMapper;
-import org.dromara.system.service.SysAgentChatService;
+import org.dromara.system.mapper.*;
 import org.dromara.system.service.AgentLocalCacheService;
 import org.dromara.system.service.ChatContextService;
+import org.dromara.system.service.SysAgentChatService;
 import org.dromara.system.service.TaskAgentService;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import reactor.core.publisher.Flux;
 
-
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 @Slf4j
 @Service

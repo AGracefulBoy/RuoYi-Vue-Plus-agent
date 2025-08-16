@@ -3,11 +3,9 @@ package org.dromara.system.service;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.system.domain.dto.ChatRequestDto;
-import org.dromara.system.domain.dto.ChatResponseDto;
 import org.dromara.system.domain.dto.StreamMessageResponseDto;
 import org.dromara.system.domain.vo.SysAgentChatDetailVo;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 public interface SysAgentChatService {
 
