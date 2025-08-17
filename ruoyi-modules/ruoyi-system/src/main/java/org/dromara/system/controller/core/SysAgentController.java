@@ -71,7 +71,6 @@ public class SysAgentController extends BaseController {
      */
     @SaCheckPermission("system:agent:edit")
     @Log(title = "智能体管理", businessType = BusinessType.UPDATE)
-    @RepeatSubmit()
     @PostMapping("/edit")
     public R<Void> edit(@Validated(EditGroup.class) @RequestBody SysAgentBo bo) {
         return toAjax(agentService.updateByBo(bo));

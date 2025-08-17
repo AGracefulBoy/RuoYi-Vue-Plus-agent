@@ -21,9 +21,7 @@ import org.dromara.system.domain.vo.SysModelConfigVo;
 import org.dromara.system.domain.vo.SysToolVo;
 import org.dromara.system.mapper.SysAgentChatMessageMapper;
 import org.dromara.system.service.*;
-import org.dromara.system.service.helper.PromptBuilderHelper;
-import org.dromara.system.service.helper.SaTokenReactiveHelper;
-import org.dromara.system.service.helper.StreamMessageBuilder;
+import org.dromara.system.service.helper.*;
 import org.dromara.system.service.tool.executor.IToolExecutor;
 import org.dromara.system.service.tool.executor.ToolExecutionResult;
 import org.dromara.system.util.HttpUtils;
@@ -64,19 +62,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
     private ChatContextService chatContextService;
 
     @Autowired
-    private List<IToolExecutor> toolExecutors;
-
-    @Autowired
-    private ISysToolService toolService;
-
-    @Autowired
     private ISysPythonPackageService pythonPackageService;
-
-    @Autowired
-    private PythonProperties pythonProperties;
-
-    @Autowired
-    private IElasticsearchDocumentService elasticsearchDocumentService;
 
     @Autowired
     private PromptBuilderHelper promptBuilderHelper;
@@ -86,6 +72,25 @@ public class TaskAgentServiceImpl implements TaskAgentService {
 
     @Autowired
     private SysAgentChatMessageMapper agentChatMessageMapper;
+
+    // 新增的Helper类
+    @Autowired
+    private ReActExecutionHelper reActExecutionHelper;
+
+    @Autowired
+    private ToolExecutionHelper toolExecutionHelper;
+
+    @Autowired
+    private MessagePersistenceHelper messagePersistenceHelper;
+
+    @Autowired
+    private StreamProcessingHelper streamProcessingHelper;
+
+    @Autowired
+    private EnhancementHelper enhancementHelper;
+
+    @Autowired
+    private TokenUsageHelper tokenUsageHelper;
 
     @Override
     public Flux<StreamMessageResponseDto> executeReActStream(SysAgent agent, List<ToolDto> availableTools, String userInput, Long chatId) {
@@ -149,7 +154,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
             ctx.setUserMessageId(userMsgId);
 
             // 3. 保存用户消息
-            saveUserMessage(chatId, userInput);
+            messagePersistenceHelper.saveUserMessage(chatId, userInput);
 
             // 5. 启动ReAct循环
             startReActLoopWithChat(agent, availableTools, userInput, modelContext, sink, 0, chatId, ctx);
@@ -239,12 +244,12 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                 .append(aiResponse)
                 .append("\n");
 
-            if (containsFinalAnswer(aiResponse)) {
+            if (reActExecutionHelper.containsFinalAnswer(aiResponse)) {
                 // 将包含Final Answer的完整响应添加到历史记录
-                appendToConversationHistory("Assistant", aiResponse, ctx);
+                reActExecutionHelper.appendToConversationHistory("Assistant", aiResponse, ctx);
 
                 // 提取最终答案
-                String finalAnswer = extractFinalAnswer(aiResponse);
+                String finalAnswer = reActExecutionHelper.extractFinalAnswer(aiResponse);
 
                 // 判断是否需要增强回复
                 if (modelContext.getEnhanceModel() != null && StringUtils.hasText(finalAnswer)
@@ -261,25 +266,25 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                 return;
             }
             // 解析AI响应，查找工具调用指令
-            ToolCallInstruction toolCall = parseToolCallFromResponse(aiResponse, availableTools);
+            ToolCallInstruction toolCall = reActExecutionHelper.parseToolCallFromResponse(aiResponse, availableTools);
             if (toolCall != null) {
                 // 保存思考步骤（包含工具调用决策）
-                saveThoughtStep(chatId, aiResponse, "action", currentStep, ctx);
+                messagePersistenceHelper.saveThoughtStep(chatId, aiResponse, "action", currentStep, ctx);
 
                 // 需要执行工具调用
                 sink.next(createStreamMessage(String.format("\n🔧 **执行工具:** %s\n", toolCall.getToolName()), "action", false, ctx));
                 sink.next(createStreamMessage(String.format("📝 **参数:** %s\n", toolCall.getParameters()), "action", false, ctx));
 
                 // 执行工具调用
-                String toolResult = executeToolCall(toolCall, sink, ctx);
+                String toolResult = toolExecutionHelper.executeToolCall(toolCall, sink, ctx);
 
                 // 如果不是流式输出，显示工具结果
-                if (!isStreamingTool(toolCall)) {
+                if (!toolExecutionHelper.isStreamingTool(toolCall)) {
                     sink.next(createStreamMessage(String.format("✅ **工具结果:** %s\n", toolResult), "observation", false, ctx));
                 }
 
                 // 保存工具执行结果
-                saveToolResult(chatId, toolCall, toolResult, currentStep, ctx);
+                messagePersistenceHelper.saveToolResult(chatId, toolCall, toolResult, currentStep, ctx);
 
                 // 将工具执行结果添加到对话历史中，继续下一轮
                 appendToolResultAndContinue(agent, availableTools, userInput, aiResponse,
@@ -287,12 +292,12 @@ public class TaskAgentServiceImpl implements TaskAgentService {
 
             } else {
                 // 没有工具调用，检查是否包含最终答案
-                if (containsFinalAnswer(aiResponse)) {
+                if (reActExecutionHelper.containsFinalAnswer(aiResponse)) {
                     // 将包含Final Answer的完整响应添加到历史记录
                     appendToConversationHistory("Assistant", aiResponse, ctx);
 
                     // 提取最终答案
-                    String finalAnswer = extractFinalAnswer(aiResponse);
+                    String finalAnswer = reActExecutionHelper.extractFinalAnswer(aiResponse);
 
                     // 判断是否需要增强回复
                     if (modelContext.getEnhanceModel() != null && StringUtils.hasText(finalAnswer)
@@ -328,227 +333,15 @@ public class TaskAgentServiceImpl implements TaskAgentService {
         }
     }
 
-    /**
-     * 执行工具调用
-     *
-     * @param toolCall 工具调用指令
-     * @param sink     流式输出sink
-     * @param ctx      流式上下文
-     * @return 执行结果
-     */
-    private String executeToolCall(ToolCallInstruction toolCall, reactor.core.publisher.FluxSink<StreamMessageResponseDto> sink, StreamingContext ctx) {
-        try {
-            String type = toolCall.getType();
-            if ("tool".equals(type)) {
-                // 查询工具配置
-                SysToolVo tool = toolService.queryById(toolCall.getId());
-                if (tool == null) {
-                    return "工具不存在: " + toolCall.getToolName();
-                }
 
-                // 根据工具类型执行
-                if ("2".equals(tool.getToolType())) {
-                    // Python脚本执行
-                    return executePythonScript(tool, toolCall.getParameters(), sink, ctx);
-                } else {
-                    // API工具或其他类型
-                    for (IToolExecutor executor : toolExecutors) {
-                        if (executor.supports(tool.getToolType())) {
-                            ToolExecutionResult result = executor.execute(tool, toolCall.getParameters());
-                            return result.isSuccess() ?
-                                String.valueOf(result.getData()) :
-                                "执行失败: " + result.getErrorMessage();
-                        }
-                    }
-                    return "未找到支持的执行器: " + tool.getToolType();
-                }
-            } else if ("knowledge".equals(type)) {
-                // 实现知识库查询功能
-                try {
-                    // 解析参数，获取查询问题
-                    String parameters = toolCall.getParameters();
-                    String question = parameters;
-                    String metadata = null;
 
-                    // 如果参数是JSON格式，尝试解析
-                    if (parameters != null && parameters.trim().startsWith("{")) {
-                        Map<String, Object> params = JSONUtil.toBean(parameters, Map.class);
-                        question = (String) params.getOrDefault("question", parameters);
-                        metadata = params.containsKey("metadata") ? JSONUtil.toJsonStr(params.get("metadata")) : null;
-                    }
-
-                    // 调用ElasticsearchDocumentService进行混合搜索
-                    List<HitSourceDTO> hitSourceDTOS = elasticsearchDocumentService.hybridSearch(
-                        toolCall.getId(), question, metadata, true);
-
-                    // 格式化搜索结果
-                    if (hitSourceDTOS == null || hitSourceDTOS.isEmpty()) {
-                        return "未找到相关文档";
-                    }
-
-                    List<HashMap<String, String>> resultHit = new ArrayList<>();
-                    for (HitSourceDTO hitSourceDTO : hitSourceDTOS) {
-                        HitDocumentDTO doc = hitSourceDTO.getHitDocument();
-                        if (doc != null) {
-                            HashMap<String, String> hitSourceMap = new HashMap<>();
-                            hitSourceMap.put("content", doc.getContent());
-                            hitSourceMap.put("metadata", doc.getMetadata());
-                            resultHit.add(hitSourceMap);
-                        }
-                    }
-
-                    return JSONUtil.toJsonStr(resultHit);
-                } catch (Exception e) {
-                    log.error("执行知识库查询失败", e);
-                    return "知识库查询失败: " + e.getMessage();
-                }
-            } else if ("datasource".equals(type)) {
-                // 符合YAGNI原则，暂时返回占位信息
-                return "数据源查询功能待实现";
-            } else {
-                return "不支持的工具类型: " + type;
-            }
-        } catch (Exception e) {
-            log.error("执行工具调用失败", e);
-            return "执行异常: " + e.getMessage();
-        }
-    }
-
-    /**
-     * 执行Python脚本
-     *
-     * @param tool       工具配置
-     * @param parameters 参数（JSON格式）
-     * @param sink       流式输出sink（可选，用于流式输出）
-     * @param ctx        流式上下文（可选，用于流式输出）
-     * @return 执行结果
-     */
-    private String executePythonScript(SysToolVo tool, String parameters, reactor.core.publisher.FluxSink<StreamMessageResponseDto> sink, StreamingContext ctx) {
-        try {
-            // 构建Python调试请求
-            PythonDebugRequestBo request = new PythonDebugRequestBo();
-            request.setCode(tool.getScriptCode());
-            request.setFunctionName(tool.getFunctionName());
-            request.setStream("1".equals(tool.getIsStream()));
-
-            // 解析参数
-            if (StringUtils.hasText(parameters)) {
-                Map<String, Object> params = JSONUtil.toBean(parameters, Map.class);
-                request.setParams(params);
-            }
-
-            // 构建请求数据
-            Map<String, String> data = new HashMap<>();
-            data.put("code", request.getCode());
-            data.put("func_name", request.getFunctionName());
-            data.put("params", parameters != null ? parameters : "{}");
-
-            String requestJson = JSONUtil.toJsonStr(data);
-
-            // 检查是否需要流式输出
-            if ("1".equals(tool.getIsStream()) && sink != null && ctx != null) {
-                // 流式输出模式
-                log.info("Python脚本流式执行开始，工具：{}", tool.getToolName());
-
-                // 用于收集所有输出内容
-                StringBuilder fullOutput = new StringBuilder();
-
-                // 创建自定义输出流，将数据写入FluxSink
-                OutputStream streamingOutput = new OutputStream() {
-                    private final ByteArrayOutputStream lineBuffer = new ByteArrayOutputStream();
-
-                    @Override
-                    public void write(int b) throws IOException {
-                        // 当遇到换行符时（字节值为10），发送一行数据
-                        if (b == '\n') {
-                            // 将累积的字节转换为UTF-8字符串（不包含换行符）
-                            String line = lineBuffer.toString(StandardCharsets.UTF_8);
-                            // 发送流式消息
-                            sink.next(createStreamMessage(line, "observation", false, ctx));
-                            // 将内容添加到完整输出中，加上换行符以保持原始格式
-                            fullOutput.append(line).append('\n');
-                            // 清空缓冲区
-                            lineBuffer.reset();
-                        } else {
-                            // 非换行符，添加到缓冲区
-                            lineBuffer.write(b);
-                        }
-                    }
-
-                    @Override
-                    public void flush() throws IOException {
-                        // 如果缓冲区还有数据，发送出去
-                        if (lineBuffer.size() > 0) {
-                            // 将累积的字节转换为UTF-8字符串
-                            String remainingData = lineBuffer.toString(StandardCharsets.UTF_8);
-                            sink.next(createStreamMessage(remainingData, "observation", false, ctx));
-                            // 将内容添加到完整输出中
-                            fullOutput.append(remainingData);
-                            lineBuffer.reset();
-                        }
-                    }
-                };
-
-                // 使用流式API
-                String streamUrl = pythonProperties.getApi().getStreamUrl();
-                boolean success = HttpUtils.sendPostStream(streamUrl, requestJson, streamingOutput);
-
-                if (success) {
-                    log.info("Python脚本流式执行完成，工具：{}，完整输出：{}", tool.getToolName(), fullOutput.toString());
-                    // 返回完整的输出内容
-                    return fullOutput.toString();
-                } else {
-                    log.error("Python脚本流式执行失败，工具：{}", tool.getToolName());
-                    // 如果有部分输出，也返回
-                    if (fullOutput.length() > 0) {
-                        return fullOutput.toString();
-                    }
-                    return String.format("Python脚本 %s 执行失败", tool.getToolName());
-                }
-            } else {
-                // 非流式输出模式（原有逻辑）
-                String url = pythonProperties.getApi().getExecUrl();
-                String result = HttpUtils.sendPost(url, requestJson);
-
-                log.info("Python脚本执行完成，工具：{}，结果：{}", tool.getToolName(), result);
-
-                // 直接返回结果（Python服务返回的是执行结果的字符串）
-                return result;
-            }
-
-        } catch (Exception e) {
-            log.error("执行Python脚本失败，工具：{}", tool.getToolName(), e);
-            return "Python脚本执行异常: " + e.getMessage();
-        }
-    }
-
-    /**
-     * 检查工具是否配置为流式输出
-     *
-     * @param toolCall 工具调用指令
-     * @return 是否为流式输出工具
-     */
-    private boolean isStreamingTool(ToolCallInstruction toolCall) {
-        try {
-            if ("tool".equals(toolCall.getType())) {
-                SysToolVo tool = toolService.queryById(toolCall.getId());
-                if (tool != null && "2".equals(tool.getToolType())) {
-                    // Python脚本类型且配置为流式输出
-                    return "1".equals(tool.getIsStream());
-                }
-            }
-        } catch (Exception e) {
-            log.error("检查工具流式配置失败", e);
-        }
-        return false;
-    }
 
     /**
      * 构建指定步骤的提示词
      */
     private String buildPromptForStep(SysAgent agent, List<ToolDto> availableTools,
                                       String userInput, int step, StreamingContext ctx) {
-        return promptBuilderHelper.buildPromptForStep(agent, availableTools, userInput, step, getConversationHistory(ctx));
+        return promptBuilderHelper.buildPromptForStep(agent, availableTools, userInput, step, reActExecutionHelper.getConversationHistory(ctx));
     }
 
     /**
@@ -559,7 +352,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                                    reactor.core.publisher.FluxSink<StreamMessageResponseDto> sink, int currentStep, Long chatId, StreamingContext ctx) {
 
         // 将之前的响应添加到历史记录
-        appendToConversationHistory("Assistant", previousResponse, ctx);
+        reActExecutionHelper.appendToConversationHistory("Assistant", previousResponse, ctx);
 
         // 继续下一轮推理
         startReActLoop(agent, availableTools, userInput, modelContext, sink, currentStep + 1, chatId, ctx);
@@ -574,11 +367,11 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                                              int currentStep, Long chatId, StreamingContext ctx) {
 
         // 将AI响应和工具执行结果添加到历史记录
-        appendToConversationHistory("Assistant", aiResponse, ctx);
-        appendToConversationHistory("Observation", toolResult, ctx);
+        reActExecutionHelper.appendToConversationHistory("Assistant", aiResponse, ctx);
+        reActExecutionHelper.appendToConversationHistory("Observation", toolResult, ctx);
 
         // 记录当前对话历史以便调试
-        log.debug("第{}步 - 工具执行后的对话历史: {}", currentStep + 1, getConversationHistory(ctx));
+        log.debug("第{}步 - 工具执行后的对话历史: {}", currentStep + 1, reActExecutionHelper.getConversationHistory(ctx));
 
         // 继续下一轮推理
         startReActLoop(agent, availableTools, userInput, modelContext, sink, currentStep + 1, chatId, ctx);
