@@ -24,6 +24,7 @@ import org.springframework.util.CollectionUtils;
 import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 @Slf4j
@@ -464,6 +465,37 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
         }
 
         return parameters;
+    }
+
+    @Override
+    public void cancelOngoingOperations(String traceId) {
+        log.info("取消正在进行的操作 - 追踪ID: {}", traceId);
+        // 通知TaskAgentService取消操作
+        taskAgentService.cancelOperation(traceId);
+    }
+
+    @Override
+    public void updateChatStatus(Long chatId, String status) {
+        if (chatId == null) {
+            return;
+        }
+        
+        SysAgentChat chat = agentChatMapper.selectById(chatId);
+        if (chat != null) {
+            chat.setStatus(status);
+            chat.setEndTime(new Date());
+            agentChatMapper.updateById(chat);
+            log.info("更新会话状态 - 会话ID: {}, 状态: {}", chatId, status);
+        }
+    }
+
+    @Override
+    public void cleanupResources(String traceId) {
+        log.debug("清理资源 - 追踪ID: {}", traceId);
+        // 清理可能的缓存
+        if (agentLocalCacheService != null) {
+            // 清理缓存中的临时数据
+        }
     }
 }
 

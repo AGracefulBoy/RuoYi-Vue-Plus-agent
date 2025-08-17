@@ -1966,8 +1966,6 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                     }
 
                     // 发送开始消息
-                    sink.next(createStreamMessage("开始处理您的问题...", "thought", false, ctx));
-
                     SysModelConfigVo mainModelConfig = getModelConfig(agent.getModel(), "主要模型");
                     assert mainModelConfig != null;
                     IChatService chatService = AiService.getChatService(mainModelConfig.getModelProvider());
@@ -2183,6 +2181,15 @@ public class TaskAgentServiceImpl implements TaskAgentService {
         } catch (Exception e) {
             log.error("保存助手消息失败，会话ID: {}", chatId, e);
         }
+    }
+
+    @Override
+    public void cancelOperation(String traceId) {
+        log.info("取消操作请求 - 追踪ID: {}", traceId);
+        // TODO: 实现取消逻辑
+        // 1. 设置取消标志
+        // 2. 中断正在执行的模型调用
+        // 3. 停止工具执行
     }
 
     /**

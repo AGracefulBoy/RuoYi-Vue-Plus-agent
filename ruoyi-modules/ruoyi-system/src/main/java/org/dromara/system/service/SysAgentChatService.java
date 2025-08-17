@@ -35,4 +35,26 @@ public interface SysAgentChatService {
      */
     boolean deleteDebugChatsByAgentId(Long agentId);
 
+    /**
+     * 取消正在进行的操作
+     *
+     * @param traceId 追踪ID
+     */
+    void cancelOngoingOperations(String traceId);
+
+    /**
+     * 更新会话状态
+     *
+     * @param chatId 会话ID
+     * @param status 状态
+     */
+    void updateChatStatus(Long chatId, String status);
+
+    /**
+     * 清理资源
+     *
+     * @param traceId 追踪ID
+     */
+    void cleanupResources(String traceId);
+
 }

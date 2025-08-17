@@ -52,4 +52,11 @@ public interface TaskAgentService {
      * @return 包含流式响应和完整响应的结果对象
      */
     TaskAgentServiceImpl.StreamResult executeFreeChatStreamWithFullResponse(SysAgent agent, String userInput, Long chatId);
+    
+    /**
+     * 取消正在进行的操作
+     *
+     * @param traceId 追踪ID
+     */
+    void cancelOperation(String traceId);
 }

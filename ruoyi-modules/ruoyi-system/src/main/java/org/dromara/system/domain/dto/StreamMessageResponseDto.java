@@ -40,6 +40,16 @@ public class StreamMessageResponseDto {
      * 会话ID
      */
     private String chatId;
+    
+    /**
+     * 错误类型
+     */
+    private String errorType;
+    
+    /**
+     * 是否可重试
+     */
+    private Boolean canRetry;
 
     /**
      * 消息数据
