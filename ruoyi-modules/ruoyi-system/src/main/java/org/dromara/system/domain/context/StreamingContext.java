@@ -42,6 +42,9 @@ public class StreamingContext {
     
     // Chat ID for database operations
     private Long chatId;
+    
+    // Agent for maintaining agent context
+    private Object agent; // Using Object to avoid circular dependency
 
     public StreamingContext() {
         this.totalTokenUsage = new IChatResponse.Usage();
@@ -184,6 +187,14 @@ public class StreamingContext {
     
     public void setChatId(Long chatId) {
         this.chatId = chatId;
+    }
+    
+    public Object getAgent() {
+        return agent;
+    }
+    
+    public void setAgent(Object agent) {
+        this.agent = agent;
     }
     
     public boolean isShouldStopEnhanceStream() {

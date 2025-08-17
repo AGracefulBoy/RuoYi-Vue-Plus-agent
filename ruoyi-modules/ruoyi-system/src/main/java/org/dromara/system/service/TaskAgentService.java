@@ -44,16 +44,6 @@ public interface TaskAgentService {
     Flux<StreamMessageResponseDto> executeFreeChatStream(SysAgent agent, String userInput, Long chatId);
 
     /**
-     * 执行自由对话模式的流式处理（带完整响应）
-     *
-     * @param agent 智能体信息
-     * @param userInput 用户输入
-     * @param chatId 会话ID
-     * @return 包含流式响应和完整响应的结果对象
-     */
-    TaskAgentServiceImpl.StreamResult executeFreeChatStreamWithFullResponse(SysAgent agent, String userInput, Long chatId);
-    
-    /**
      * 取消正在进行的操作
      *
      * @param traceId 追踪ID
