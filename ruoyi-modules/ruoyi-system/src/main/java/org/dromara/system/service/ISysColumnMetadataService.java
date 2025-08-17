@@ -206,4 +206,12 @@ public interface ISysColumnMetadataService {
                                String dataClassification, String sensitivityLevel, String isPii,
                                String maskingRule, String validationRule);
 
+    /**
+     * 批量更新字段描述
+     *
+     * @param columnDescMap 字段ID和描述的映射（key: columnMetaId, value: columnDesc）
+     * @return 更新结果
+     */
+    Boolean batchUpdateColumnDesc(java.util.Map<Long, String> columnDescMap);
+
 }

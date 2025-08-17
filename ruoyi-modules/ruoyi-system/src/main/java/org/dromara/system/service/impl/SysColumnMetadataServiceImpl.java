@@ -27,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -480,6 +481,40 @@ public class SysColumnMetadataServiceImpl implements ISysColumnMetadataService {
         }
 
         return baseMapper.update(null, updateWrapper) > 0;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Boolean batchUpdateColumnDesc(Map<Long, String> columnDescMap) {
+        if (ObjectUtil.isEmpty(columnDescMap)) {
+            return true;
+        }
+        
+        // 验证所有字段是否存在
+        List<Long> columnIds = new ArrayList<>(columnDescMap.keySet());
+        List<SysDatasourceColumnMetadata> existingColumns = baseMapper.selectBatchIds(columnIds);
+        
+        if (existingColumns.size() != columnIds.size()) {
+            Set<Long> existingIds = existingColumns.stream()
+                .map(SysDatasourceColumnMetadata::getColumnMetaId)
+                .collect(Collectors.toSet());
+            List<Long> missingIds = columnIds.stream()
+                .filter(id -> !existingIds.contains(id))
+                .collect(Collectors.toList());
+            throw new ServiceException("字段元数据不存在：" + missingIds);
+        }
+        
+        // 构建批量更新列表
+        List<SysDatasourceColumnMetadata> updateList = new ArrayList<>();
+        for (Map.Entry<Long, String> entry : columnDescMap.entrySet()) {
+            SysDatasourceColumnMetadata update = new SysDatasourceColumnMetadata();
+            update.setColumnMetaId(entry.getKey());
+            update.setColumnDesc(entry.getValue());
+            updateList.add(update);
+        }
+        
+        // 批量更新
+        return baseMapper.updateBatchById(updateList);
     }
 
 }

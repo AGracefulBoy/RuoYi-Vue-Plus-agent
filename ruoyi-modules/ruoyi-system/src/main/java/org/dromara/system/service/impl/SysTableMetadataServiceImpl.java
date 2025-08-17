@@ -278,36 +278,57 @@ public class SysTableMetadataServiceImpl implements ISysTableMetadataService {
         if (ObjectUtil.isEmpty(bo.getTableDescUpdateList())) {
             throw new ServiceException("批量更新列表不能为空");
         }
-
-        // 批量更新每个表的描述和字段描述
+        
+        // 1. 收集所有表ID，批量验证表是否存在
+        List<Long> tableIds = bo.getTableDescUpdateList().stream()
+            .map(SysTableDescUpdateBo::getTableMetaId)
+            .collect(Collectors.toList());
+        
+        List<SysDatasourceTableMetadata> existingTables = baseMapper.selectBatchIds(tableIds);
+        
+        if (existingTables.size() != tableIds.size()) {
+            Set<Long> existingIds = existingTables.stream()
+                .map(SysDatasourceTableMetadata::getTableMetaId)
+                .collect(Collectors.toSet());
+            List<Long> missingIds = tableIds.stream()
+                .filter(id -> !existingIds.contains(id))
+                .collect(Collectors.toList());
+            throw new ServiceException("表元数据不存在，表ID：" + missingIds);
+        }
+        
+        // 2. 构建批量更新表描述的列表
+        List<SysDatasourceTableMetadata> tableUpdateList = new ArrayList<>();
+        Map<Long, String> allColumnDescMap = new LinkedHashMap<>();
+        
         for (SysTableDescUpdateBo tableUpdateBo : bo.getTableDescUpdateList()) {
-            // 验证表是否存在
-            SysTableMetadataVo existingTable = queryById(tableUpdateBo.getTableMetaId());
-            if (existingTable == null) {
-                throw new ServiceException("表元数据不存在，表ID：" + tableUpdateBo.getTableMetaId());
-            }
-
-            // 更新表描述
-            Boolean tableUpdateResult = updateTableDesc(tableUpdateBo.getTableMetaId(), tableUpdateBo.getTableDesc());
-            if (!tableUpdateResult) {
-                throw new ServiceException("更新表描述失败，表ID：" + tableUpdateBo.getTableMetaId());
-            }
-
-            // 更新字段描述（如果有提供）
+            // 构建表更新对象
+            SysDatasourceTableMetadata tableUpdate = new SysDatasourceTableMetadata();
+            tableUpdate.setTableMetaId(tableUpdateBo.getTableMetaId());
+            tableUpdate.setTableDesc(tableUpdateBo.getTableDesc());
+            tableUpdateList.add(tableUpdate);
+            
+            // 收集所有字段描述更新
             if (ObjectUtil.isNotEmpty(tableUpdateBo.getSysColumnDescUpdateBoList())) {
                 for (SysColumnDescUpdateBo columnBo : tableUpdateBo.getSysColumnDescUpdateBoList()) {
-                    Boolean columnUpdateResult = columnMetadataService.updateColumnDesc(
-                        columnBo.getColumnMetaId(),
-                        columnBo.getColumnDesc()
-                    );
-                    if (!columnUpdateResult) {
-                        throw new ServiceException("更新字段描述失败，表ID：" + tableUpdateBo.getTableMetaId() + 
-                            "，字段名称：" + columnBo.getColumnName());
-                    }
+                    allColumnDescMap.put(columnBo.getColumnMetaId(), columnBo.getColumnDesc());
                 }
             }
         }
-
+        
+        // 3. 批量更新表描述
+        boolean tableUpdateResult = baseMapper.updateBatchById(tableUpdateList);
+        if (!tableUpdateResult) {
+            throw new ServiceException("批量更新表描述失败");
+        }
+        
+        // 4. 批量更新字段描述
+        if (!allColumnDescMap.isEmpty()) {
+            boolean columnUpdateResult = columnMetadataService.batchUpdateColumnDesc(allColumnDescMap);
+            if (!columnUpdateResult) {
+                throw new ServiceException("批量更新字段描述失败");
+            }
+        }
+        
         return true;
     }
 
