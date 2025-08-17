@@ -23,7 +23,6 @@ import org.dromara.system.mapper.SysKnowledgeBaseMapper;
 import org.dromara.system.mapper.SysDatasourceMapper;
 import org.dromara.system.mapper.SysModelConfigMapper;
 import org.dromara.system.service.ISysAgentService;
-import org.dromara.system.service.AgentLocalCacheService;
 
 import org.springframework.stereotype.Service;
 
@@ -46,7 +45,6 @@ public class SysAgentServiceImpl implements ISysAgentService {
     private final SysKnowledgeBaseMapper knowledgeBaseMapper;
     private final SysDatasourceMapper datasourceMapper;
     private final SysModelConfigMapper modelConfigMapper;
-    private final AgentLocalCacheService agentLocalCacheService;
 
     /**
      * 查询智能体管理
@@ -192,11 +190,6 @@ public class SysAgentServiceImpl implements ISysAgentService {
         validEntityBeforeSave(update);
         boolean result = baseMapper.updateById(update) > 0;
         
-        // 更新成功后清除缓存
-        if (result && update.getAgentId() != null) {
-            agentLocalCacheService.evictAgent(update.getAgentId());
-        }
-        
         return result;
     }
 
@@ -209,11 +202,6 @@ public class SysAgentServiceImpl implements ISysAgentService {
         wrapper.eq(SysAgent::getAgentId, agentId);
         wrapper.set(SysAgent::getStatus, status);
         boolean result = baseMapper.update(null, wrapper) > 0;
-        
-        // 更新成功后清除缓存
-        if (result) {
-            agentLocalCacheService.evictAgent(agentId);
-        }
         
         return result;
     }
@@ -290,11 +278,6 @@ public class SysAgentServiceImpl implements ISysAgentService {
             }
         }
         boolean result = baseMapper.deleteBatchIds(ids) > 0;
-        
-        // 删除成功后清除缓存
-        if (result) {
-            agentLocalCacheService.evictAgents(new ArrayList<>(ids));
-        }
         
         return result;
     }

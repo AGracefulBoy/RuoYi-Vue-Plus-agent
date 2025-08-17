@@ -49,65 +49,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-/**
- * 任务智能体服务实现类
- *
- * <p>ReAct循环处理流程：</p>
- * <pre>
- * 1. 🤔 思考 (Thought) - AI分析问题和当前状态
- * 2. 🔧 行动 (Action) - 选择并执行工具调用
- * 3. 👀 观察 (Observation) - 获取工具执行结果
- * 4. 🔄 重复上述步骤直到获得最终答案
- * 5. ✨ 完成 (Final Answer) - 提供最终结果
- * </pre>
- *
- * <p>使用示例：</p>
- * <pre>
- * // 示例1: 基础流式调用（支持ReAct循环）
- * Flux&lt;String&gt; stream = taskAgentService.executeReActStream(agent, tools, "查询今天的天气");
- * stream.subscribe(
- *     text -> System.out.print(text), // 实时显示推理过程
- *     error -> log.error("调用失败", error),
- *     () -> log.info("推理完成")
- * );
- *
- * // 示例2: 带完整响应的调用
- * StreamResult result = taskAgentService.executeReActStreamWithFullResponse(agent, tools,
- *     "帮我分析这个数据并生成报告");
- *
- * // 实时显示推理过程
- * result.getStream().subscribe(text -> System.out.print(text));
- *
- * // 获取完整的推理过程和结果
- * result.getFullResponseFuture().thenAccept(fullResponse -> {
- *     log.info("完整推理过程和结果: {}", fullResponse);
- *     // 保存完整推理过程到数据库等操作
- * });
- *
- * // 工具调用示例（AI会自动解析并调用）
- * // AI响应: "Thought: 我需要查询天气信息
- * //          Action: weather_query
- * //          Action Input: {\"city\": \"北京\", \"date\": \"today\"}"
- * // 系统会自动：
- * // 1. 解析出工具名称: weather_query
- * // 2. 解析出参数: {"city": "北京", "date": "today"}
- * // 3. 执行工具调用
- * // 4. 将结果返回给AI继续推理
- * </pre>
- *
- * <p>支持的AI响应格式：</p>
- * <pre>
- * Thought: 分析和思考
- * Action: tool_name
- * Action Input: {"param1": "value1", "param2": "value2"}
- *
- * 或直接提供最终答案：
- * Final Answer: 这是最终答案
- * </pre>
- *
- * @author assistant
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -313,7 +254,6 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                     executeEnhanceStreamingCall(finalAnswer, agent, modelContext, sink, ctx);
                 } else {
                     // 不需要增强，直接输出最终答案
-                    sink.next(createStreamMessage("\n✨ **推理完成**\n", "answer", false, ctx));
                     handleFinalStepCompleteForMessage(finalAnswer, modelContext, sink, response -> {
                     }, ctx);
                 }

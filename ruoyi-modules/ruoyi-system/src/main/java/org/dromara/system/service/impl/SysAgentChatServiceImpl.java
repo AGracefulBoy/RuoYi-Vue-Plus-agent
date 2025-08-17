@@ -15,7 +15,6 @@ import org.dromara.system.domain.dto.StreamMessageResponseDto;
 import org.dromara.system.domain.dto.ToolDto;
 import org.dromara.system.domain.vo.SysAgentChatDetailVo;
 import org.dromara.system.mapper.*;
-import org.dromara.system.service.AgentLocalCacheService;
 import org.dromara.system.service.ChatContextService;
 import org.dromara.system.service.SysAgentChatService;
 import org.dromara.system.service.TaskAgentService;
@@ -40,7 +39,6 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
     private final SysDatasourceMapper datasourceMapper;
     private final TaskAgentService taskAgentService;
     private final ChatContextService chatContextService;
-    private final AgentLocalCacheService agentLocalCacheService;
 
     @Override
     public Flux<StreamMessageResponseDto> completions(ChatRequestDto chatRequest) {
@@ -153,26 +151,6 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
 
         // 执行自由对话处理 - 传递会话ID
         return taskAgentService.executeFreeChatStream(agent, chatRequest.getMessage(), chat.getChatId());
-    }
-
-    /**
-     * 根据ID获取智能体信息
-     *
-     * @deprecated 使用 agentLocalCacheService.getAgent() 代替
-     */
-    @Deprecated
-    private SysAgent getAgentById(Long agentId) {
-        return agentLocalCacheService.getAgent(agentId);
-    }
-
-    /**
-     * 构建智能体可用工具列表
-     *
-     * @deprecated 使用 agentLocalCacheService.getAvailableTools() 代替
-     */
-    @Deprecated
-    private List<ToolDto> buildAvailableToolsList(SysAgent agent) {
-        return agentLocalCacheService.getAvailableTools(agent.getAgentId());
     }
 
     /**
@@ -479,7 +457,7 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
         if (chatId == null) {
             return;
         }
-        
+
         SysAgentChat chat = agentChatMapper.selectById(chatId);
         if (chat != null) {
             chat.setStatus(status);
@@ -492,10 +470,7 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
     @Override
     public void cleanupResources(String traceId) {
         log.debug("清理资源 - 追踪ID: {}", traceId);
-        // 清理可能的缓存
-        if (agentLocalCacheService != null) {
-            // 清理缓存中的临时数据
-        }
+        // 资源清理逻辑（如需要可在此处添加）
     }
 }
 

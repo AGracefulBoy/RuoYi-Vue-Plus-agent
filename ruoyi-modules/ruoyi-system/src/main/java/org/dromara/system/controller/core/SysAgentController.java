@@ -61,7 +61,6 @@ public class SysAgentController extends BaseController {
      */
     @SaCheckPermission("system:agent:add")
     @Log(title = "智能体管理", businessType = BusinessType.INSERT)
-    @RepeatSubmit()
     @PostMapping("/add")
     public R<Void> add(@Validated(AddGroup.class) @RequestBody SysAgentBo bo) {
         return toAjax(agentService.insertByBo(bo));
