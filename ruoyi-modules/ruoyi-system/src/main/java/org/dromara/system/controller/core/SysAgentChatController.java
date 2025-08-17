@@ -111,10 +111,6 @@ public class SysAgentChatController extends BaseController {
                     chatRequest.getTraceId(), duration, userId);
                 // 通知服务层取消正在进行的操作
                 sysAgentChatService.cancelOngoingOperations(chatRequest.getTraceId());
-//                // 更新会话状态为已取消
-//                if (chatRequest.getChatId() != null) {
-//                    sysAgentChatService.updateChatStatus(chatRequest.getChatId(), "cancelled");
-//                }
             })
             .doOnComplete(() -> {
                 if (!isCancelled.get()) {

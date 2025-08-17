@@ -42,11 +42,4 @@ public interface TaskAgentService {
      * @return 流式响应
      */
     Flux<StreamMessageResponseDto> executeFreeChatStream(SysAgent agent, String userInput, Long chatId);
-
-    /**
-     * 取消正在进行的操作
-     *
-     * @param traceId 追踪ID
-     */
-    void cancelOperation(String traceId);
 }

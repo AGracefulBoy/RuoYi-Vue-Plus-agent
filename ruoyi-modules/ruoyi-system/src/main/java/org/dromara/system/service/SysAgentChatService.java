@@ -42,13 +42,6 @@ public interface SysAgentChatService {
      */
     void cancelOngoingOperations(String traceId);
 
-    /**
-     * 更新会话状态
-     *
-     * @param chatId 会话ID
-     * @param status 状态
-     */
-    void updateChatStatus(Long chatId, String status);
 
     /**
      * 清理资源

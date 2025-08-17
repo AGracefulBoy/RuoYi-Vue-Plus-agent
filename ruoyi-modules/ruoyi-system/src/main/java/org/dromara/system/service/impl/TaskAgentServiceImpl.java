@@ -1768,13 +1768,4 @@ public class TaskAgentServiceImpl implements TaskAgentService {
         return prompt.toString();
     }
 
-
-    @Override
-    public void cancelOperation(String traceId) {
-        log.info("取消操作请求 - 追踪ID: {}", traceId);
-        // TODO: 实现取消逻辑
-        // 1. 设置取消标志
-        // 2. 中断正在执行的模型调用
-        // 3. 停止工具执行
-    }
 }
