@@ -5,26 +5,32 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.MapstructUtils;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
+import org.dromara.common.core.exception.ServiceException;
+import org.dromara.common.satoken.utils.LoginHelper;
 import org.dromara.system.domain.SysTool;
-import org.dromara.system.domain.bo.PythonDebugRequestBo;
+import org.dromara.system.domain.SysToolPackage;
+import jakarta.servlet.http.HttpServletResponse;
+import org.dromara.system.domain.bo.InstallPackageRequestBo;
 import org.dromara.system.domain.bo.SysToolBo;
 import org.dromara.system.domain.bo.ToolDebugRequestBo;
 import org.dromara.system.domain.vo.SysToolListVo;
 import org.dromara.system.domain.vo.SysToolVo;
 import org.dromara.system.mapper.SysToolMapper;
-import org.dromara.system.service.ISysPythonPackageService;
+import org.dromara.system.mapper.SysToolPackageMapper;
 import org.dromara.system.service.ISysToolService;
+import org.dromara.system.service.IToolVirtualEnvService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -39,10 +45,11 @@ import java.util.Map;
 public class SysToolServiceImpl implements ISysToolService {
 
     private final SysToolMapper baseMapper;
-    private final ISysPythonPackageService pythonPackageService;
+    private final IToolVirtualEnvService virtualEnvService;
+    private final SysToolPackageMapper toolPackageMapper;
 
     /**
-     * 查询工具管理（包含脚本代码）
+     * 查询工具管理（包含脚本代码和包依赖）
      */
     @Override
     public SysToolVo queryById(Long toolId) {
@@ -87,12 +94,28 @@ public class SysToolServiceImpl implements ISysToolService {
      * 新增工具管理
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Boolean insertByBo(SysToolBo bo) {
         SysTool add = MapstructUtils.convert(bo, SysTool.class);
         validEntityBeforeSave(add);
         boolean flag = baseMapper.insert(add) > 0;
         if (flag) {
             bo.setToolId(add.getToolId());
+
+            // 为script类型的工具创建虚拟环境
+            if ("script".equals(bo.getToolType())) {
+                try {
+                    String pythonVersion = StringUtils.isNotBlank(bo.getPythonVersion())
+                        ? bo.getPythonVersion() : "3.9";
+                    boolean venvCreated = virtualEnvService.createToolVirtualEnv(add.getToolId(), pythonVersion);
+                    if (!venvCreated) {
+                        log.warn("工具虚拟环境创建失败，但工具已创建: toolId={}", add.getToolId());
+                    }
+                } catch (Exception e) {
+                    log.error("创建工具虚拟环境失败: toolId={}", add.getToolId(), e);
+                    // 不影响工具创建，继续执行
+                }
+            }
         }
         return flag;
     }
@@ -101,6 +124,7 @@ public class SysToolServiceImpl implements ISysToolService {
      * 修改工具管理
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Boolean updateByBo(SysToolBo bo) {
         SysTool update = MapstructUtils.convert(bo, SysTool.class);
         validEntityBeforeSave(update);
@@ -118,10 +142,22 @@ public class SysToolServiceImpl implements ISysToolService {
      * 批量删除工具管理
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Boolean deleteWithValidByIds(Collection<Long> ids, Boolean isValid) {
         if (isValid) {
             // TODO 做一些业务上的校验,判断是否需要校验
         }
+
+        // 删除工具前，先删除对应的虚拟环境
+        for (Long toolId : ids) {
+            try {
+                virtualEnvService.deleteToolVirtualEnv(toolId);
+            } catch (Exception e) {
+                log.error("删除工具虚拟环境失败: toolId={}", toolId, e);
+                // 继续删除其他环境
+            }
+        }
+
         return baseMapper.deleteBatchIds(ids) > 0;
     }
 
@@ -134,17 +170,6 @@ public class SysToolServiceImpl implements ISysToolService {
         lqw.eq(SysTool::getToolName, bo.getToolName());
         lqw.ne(ObjectUtil.isNotNull(bo.getToolId()), SysTool::getToolId, bo.getToolId());
         return baseMapper.selectCount(lqw) == 0;
-    }
-
-    /**
-     * 根据工具名称查询工具管理
-     */
-    @Override
-    public SysToolVo queryByToolName(String toolName) {
-        LambdaQueryWrapper<SysTool> lqw = Wrappers.lambdaQuery();
-        lqw.eq(SysTool::getToolName, toolName);
-        lqw.last("limit 1");
-        return baseMapper.selectVoOne(lqw);
     }
 
     /**
@@ -218,45 +243,221 @@ public class SysToolServiceImpl implements ISysToolService {
         return insertByBo(copyToolBo);
     }
 
+
+
     /**
-     * 根据工具ID执行Python代码调试
+     * 安装工具的Python包
      */
     @Override
-    public void debugToolCode(ToolDebugRequestBo request, HttpServletResponse response) {
-        // 1. 根据工具ID查询工具信息
-        SysToolVo tool = queryById(request.getToolId());
+    @Transactional(rollbackFor = Exception.class)
+    public String installToolPackage(InstallPackageRequestBo request) {
+        Long toolId = request.getToolId();
+        String packageName = request.getPackageName();
+        String packageVersion = request.getPackageVersion();
+        
+        // 1. 验证工具是否存在
+        SysTool tool = baseMapper.selectById(toolId);
         if (tool == null) {
-            throw new ServiceException("工具不存在");
+            throw new ServiceException("工具不存在: " + toolId);
         }
-
-        // 2. 验证工具状态
-        if (!"0".equals(tool.getToolStatus())) {
-            throw new ServiceException("工具已停用");
+        
+        // 2. 检查虚拟环境状态，首次安装时创建
+        if (StringUtils.isBlank(tool.getVenvPath()) || !"ready".equals(tool.getVenvStatus())) {
+            log.info("工具 {} 首次安装包，创建虚拟环境", toolId);
+            
+            // 获取Python版本，默认3.9
+            String pythonVersion = StringUtils.isNotBlank(tool.getPythonVersion()) 
+                ? tool.getPythonVersion() : "3.9";
+                
+            // 创建虚拟环境
+            boolean created = virtualEnvService.createToolVirtualEnv(toolId, pythonVersion);
+            if (!created) {
+                throw new ServiceException("虚拟环境创建失败，无法安装包");
+            }
+            
+            // 重新查询工具信息，获取更新后的虚拟环境路径
+            tool = baseMapper.selectById(toolId);
         }
-
-        // 3. 验证工具类型
-        if (!"script".equals(tool.getToolType())) {
-            throw new ServiceException("该工具不是脚本类型，无法调试");
+        
+        // 3. 检查包是否已安装（避免重复）
+        LambdaQueryWrapper<SysToolPackage> queryWrapper = Wrappers.lambdaQuery();
+        queryWrapper.eq(SysToolPackage::getToolId, toolId)
+                    .eq(SysToolPackage::getPackageName, packageName);
+        
+        SysToolPackage existingPackage = toolPackageMapper.selectOne(queryWrapper);
+        if (existingPackage != null) {
+            // 如果包已存在，检查是否需要更新版本
+            if (StringUtils.isNotBlank(packageVersion) && 
+                !packageVersion.equals(existingPackage.getPackageVersion())) {
+                log.info("更新包版本: {} from {} to {}", packageName, 
+                    existingPackage.getPackageVersion(), packageVersion);
+            } else {
+                return "包已安装: " + packageName + 
+                    (StringUtils.isNotBlank(existingPackage.getPackageVersion()) 
+                        ? "==" + existingPackage.getPackageVersion() : "");
+            }
         }
+        
+        // 4. 构建包安装命令（包含版本号）
+        String packageSpec = packageName;
+        if (StringUtils.isNotBlank(packageVersion)) {
+            packageSpec += "==" + packageVersion;
+        }
+        
+        // 5. 在虚拟环境中安装包
+        log.info("在工具 {} 的虚拟环境中安装包: {}", toolId, packageSpec);
+        String installResult = virtualEnvService.installPackagesInToolEnv(
+            toolId, 
+            Collections.singletonList(packageSpec)
+        );
+        
+        // 6. 记录或更新包信息到数据库
+        if (existingPackage != null) {
+            // 更新现有记录
+            existingPackage.setPackageVersion(packageVersion);
+            existingPackage.setUpdateBy(LoginHelper.getUserId());
+            existingPackage.setUpdateTime(new Date());
+            toolPackageMapper.updateById(existingPackage);
+        } else {
+            // 插入新记录
+            SysToolPackage toolPackage = new SysToolPackage();
+            toolPackage.setToolId(toolId);
+            toolPackage.setPackageName(packageName);
+            toolPackage.setPackageVersion(StringUtils.isNotBlank(packageVersion) ? packageVersion : "latest");
+            // packageId 是自增的，不需要设置
+            toolPackageMapper.insert(toolPackage);
+        }
+        
+        // 7. 返回安装结果
+        return "包安装成功: " + packageSpec + "\n" + installResult;
+    }
 
-        // 4. 验证脚本代码是否存在
+    /**
+     * 在虚拟环境中执行工具脚本（非流式）
+     */
+    @Override
+    public String executeToolScript(ToolDebugRequestBo request) {
+        Long toolId = request.getToolId();
+        
+        // 1. 验证工具存在并获取脚本代码
+        SysTool tool = baseMapper.selectById(toolId);
+        if (tool == null) {
+            throw new ServiceException("工具不存在: " + toolId);
+        }
+        
         if (StringUtils.isBlank(tool.getScriptCode())) {
-            throw new ServiceException("工具脚本代码为空");
+            throw new ServiceException("工具没有脚本代码");
         }
+        
+        if (StringUtils.isBlank(tool.getFunctionName())) {
+            throw new ServiceException("工具没有指定函数名");
+        }
+        
+        // 2. 检查并创建虚拟环境
+        // 如果虚拟环境路径为空或状态不是ready，需要创建虚拟环境
+        if (StringUtils.isBlank(tool.getVenvPath()) || !"ready".equals(tool.getVenvStatus())) {
+            log.info("工具 {} 虚拟环境未就绪（状态: {}, 路径: {}），开始创建虚拟环境", 
+                toolId, tool.getVenvStatus(), tool.getVenvPath());
+            
+            // 获取Python版本，默认使用3.9
+            String pythonVersion = StringUtils.isNotBlank(tool.getPythonVersion()) 
+                ? tool.getPythonVersion() : "3.9";
+            
+            log.info("使用Python版本 {} 创建虚拟环境", pythonVersion);
+            
+            // 创建虚拟环境
+            boolean created = virtualEnvService.createToolVirtualEnv(toolId, pythonVersion);
+            if (!created) {
+                throw new ServiceException("虚拟环境创建失败，无法执行脚本");
+            }
+            
+            // 重新获取工具信息以获取更新后的虚拟环境路径
+            tool = baseMapper.selectById(toolId);
+            log.info("虚拟环境创建成功，路径: {}, 状态: {}", tool.getVenvPath(), tool.getVenvStatus());
+        } else {
+            log.info("工具 {} 虚拟环境已就绪，路径: {}", toolId, tool.getVenvPath());
+        }
+        
+        // 3. 使用虚拟环境执行脚本
+        try {
+            String result = virtualEnvService.executeInToolEnvSync(
+                toolId,
+                tool.getScriptCode(),
+                tool.getFunctionName(),
+                request.getParams()
+            );
+            
+            // 4. 记录执行日志
+            log.info("工具 {} 脚本执行成功，函数: {}", toolId, tool.getFunctionName());
+            
+            return result;
+        } catch (Exception e) {
+            log.error("工具 {} 脚本执行失败", toolId, e);
+            throw new ServiceException("脚本执行失败: " + e.getMessage());
+        }
+    }
 
-        // 5. 构建Python调试请求对象
-        PythonDebugRequestBo pythonRequest = new PythonDebugRequestBo();
-        pythonRequest.setCode(tool.getScriptCode());
-        pythonRequest.setFunctionName(tool.getFunctionName());
-        pythonRequest.setParams(request.getParams());
-        pythonRequest.setStream(request.getStream());
-
-        // 6. 记录调试信息
-        log.info("开始调试工具：{}, 工具ID：{}, 函数名：{}, 流式：{}",
-            tool.getToolName(), tool.getToolId(), tool.getFunctionName(), request.getStream());
-
-        // 7. 调用Python调试服务
-        pythonPackageService.debugPythonCode(pythonRequest, response);
+    /**
+     * 在虚拟环境中执行工具脚本（流式）
+     */
+    @Override
+    public void executeToolScriptStream(ToolDebugRequestBo request, HttpServletResponse response) {
+        Long toolId = request.getToolId();
+        
+        // 1. 验证工具
+        SysTool tool = baseMapper.selectById(toolId);
+        if (tool == null) {
+            throw new ServiceException("工具不存在: " + toolId);
+        }
+        
+        if (StringUtils.isBlank(tool.getScriptCode())) {
+            throw new ServiceException("工具没有脚本代码");
+        }
+        
+        if (StringUtils.isBlank(tool.getFunctionName())) {
+            throw new ServiceException("工具没有指定函数名");
+        }
+        
+        // 2. 检查并创建虚拟环境
+        // 如果虚拟环境路径为空或状态不是ready，需要创建虚拟环境
+        if (StringUtils.isBlank(tool.getVenvPath()) || !"ready".equals(tool.getVenvStatus())) {
+            log.info("工具 {} 虚拟环境未就绪（状态: {}, 路径: {}），开始创建虚拟环境", 
+                toolId, tool.getVenvStatus(), tool.getVenvPath());
+            
+            // 获取Python版本，默认使用3.9
+            String pythonVersion = StringUtils.isNotBlank(tool.getPythonVersion()) 
+                ? tool.getPythonVersion() : "3.9";
+            
+            log.info("使用Python版本 {} 创建虚拟环境", pythonVersion);
+            
+            // 创建虚拟环境
+            boolean created = virtualEnvService.createToolVirtualEnv(toolId, pythonVersion);
+            if (!created) {
+                throw new ServiceException("虚拟环境创建失败，无法执行流式脚本");
+            }
+            
+            // 重新获取工具信息以获取更新后的虚拟环境路径
+            tool = baseMapper.selectById(toolId);
+            log.info("虚拟环境创建成功，路径: {}, 状态: {}", tool.getVenvPath(), tool.getVenvStatus());
+        } else {
+            log.info("工具 {} 虚拟环境已就绪，路径: {}", toolId, tool.getVenvPath());
+        }
+        
+        // 3. 使用虚拟环境执行脚本（流式）
+        try {
+            virtualEnvService.executeInToolEnv(
+                toolId,
+                tool.getScriptCode(),
+                tool.getFunctionName(),
+                request.getParams(),
+                response
+            );
+            
+            log.info("工具 {} 流式脚本执行完成", toolId);
+        } catch (Exception e) {
+            log.error("工具 {} 流式脚本执行失败", toolId, e);
+            throw new ServiceException("流式执行失败: " + e.getMessage());
+        }
     }
 
 }

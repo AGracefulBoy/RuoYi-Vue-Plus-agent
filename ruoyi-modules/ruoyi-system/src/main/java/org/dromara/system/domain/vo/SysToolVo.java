@@ -11,6 +11,7 @@ import org.dromara.system.domain.SysTool;
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.Date;
+import java.util.List;
 
 /**
  * 工具管理视图对象 sys_tool
@@ -160,5 +161,41 @@ public class SysToolVo implements Serializable {
      */
     @ExcelProperty(value = "速率限制")
     private Integer rateLimit;
+
+    /**
+     * Python版本
+     */
+    @ExcelProperty(value = "Python版本")
+    private String pythonVersion;
+
+    /**
+     * 虚拟环境名称
+     */
+    @ExcelProperty(value = "虚拟环境名称")
+    private String venvName;
+
+    /**
+     * 虚拟环境路径
+     */
+    @ExcelProperty(value = "虚拟环境路径")
+    private String venvPath;
+
+    /**
+     * 环境状态 (pending/creating/ready/error)
+     */
+    @ExcelProperty(value = "环境状态")
+    private String venvStatus;
+
+    /**
+     * 环境创建时间
+     */
+    @ExcelProperty(value = "环境创建时间")
+    private Date venvCreateTime;
+
+    /**
+     * 环境最后更新时间
+     */
+    @ExcelProperty(value = "环境最后更新时间")
+    private Date venvLastUpdate;
 
 }

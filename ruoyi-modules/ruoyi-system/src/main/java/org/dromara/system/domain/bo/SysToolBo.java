@@ -11,6 +11,8 @@ import org.dromara.common.core.validate.EditGroup;
 import org.dromara.common.mybatis.core.domain.BaseEntity;
 import org.dromara.system.domain.SysTool;
 
+import java.util.List;
+
 /**
  * 工具管理业务对象 sys_tool
  *
@@ -110,4 +112,25 @@ public class SysToolBo extends BaseEntity {
      */
     private Integer rateLimit;
 
-} 
+    /**
+     * Python版本
+     */
+    @Size(min = 0, max = 20, message = "Python版本长度不能超过{max}个字符")
+    private String pythonVersion;
+
+    /**
+     * 虚拟环境名称
+     */
+    private String venvName;
+
+    /**
+     * 虚拟环境路径
+     */
+    private String venvPath;
+
+    /**
+     * 环境状态 (pending/creating/ready/error)
+     */
+    private String venvStatus;
+
+}

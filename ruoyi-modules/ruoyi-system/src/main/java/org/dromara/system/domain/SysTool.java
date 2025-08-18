@@ -8,6 +8,7 @@ import lombok.EqualsAndHashCode;
 import org.dromara.common.tenant.core.TenantEntity;
 
 import java.io.Serial;
+import java.util.Date;
 
 /**
  * 工具管理对象 sys_tool
@@ -108,5 +109,35 @@ public class SysTool extends TenantEntity {
      * 速率限制（次/分钟，0表示不限制）
      */
     private Integer rateLimit;
+
+    /**
+     * Python版本
+     */
+    private String pythonVersion;
+
+    /**
+     * 虚拟环境名称
+     */
+    private String venvName;
+
+    /**
+     * 虚拟环境路径
+     */
+    private String venvPath;
+
+    /**
+     * 环境状态 (pending/creating/ready/error)
+     */
+    private String venvStatus;
+
+    /**
+     * 环境创建时间
+     */
+    private Date venvCreateTime;
+
+    /**
+     * 环境最后更新时间
+     */
+    private Date venvLastUpdate;
 
 } 

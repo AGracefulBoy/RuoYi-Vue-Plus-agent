@@ -4,6 +4,9 @@ import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+import java.util.Arrays;
+import java.util.List;
+
 /**
  * Python配置属性
  *
@@ -99,6 +102,16 @@ public class PythonProperties {
          * 远程激活脚本路径
          */
         private String activateScript = "/opt/myenv/bin/activate";
+        
+        /**
+         * 虚拟环境基础路径
+         */
+        private String virtualenvBasePath = "/python-runtime/env";
+        
+        /**
+         * 支持的Python版本列表
+         */
+        private List<String> pythonVersions = Arrays.asList("3.8", "3.9", "3.10", "3.11");
     }
 
     /**

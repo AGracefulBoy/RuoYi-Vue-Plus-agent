@@ -1,8 +1,9 @@
 package org.dromara.system.service;
 
-import jakarta.servlet.http.HttpServletResponse;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
+import jakarta.servlet.http.HttpServletResponse;
+import org.dromara.system.domain.bo.InstallPackageRequestBo;
 import org.dromara.system.domain.bo.SysToolBo;
 import org.dromara.system.domain.bo.ToolDebugRequestBo;
 import org.dromara.system.domain.vo.SysToolListVo;
@@ -76,13 +77,7 @@ public interface ISysToolService {
      */
     boolean checkToolNameUnique(SysToolBo bo);
 
-    /**
-     * 根据工具名称查询工具管理
-     *
-     * @param toolName 工具名称
-     * @return 工具管理
-     */
-    SysToolVo queryByToolName(String toolName);
+
 
     /**
      * 根据工具类型查询工具管理列表
@@ -117,12 +112,29 @@ public interface ISysToolService {
      */
     Boolean copyTool(Long toolId);
 
-    /**
-     * 根据工具ID执行Python代码调试
-     *
-     * @param request  调试请求对象
-     * @param response HTTP响应
-     */
-    void debugToolCode(ToolDebugRequestBo request, HttpServletResponse response);
 
-} 
+    /**
+     * 安装工具的Python包
+     *
+     * @param request 安装请求参数（包含工具ID）
+     * @return 安装结果消息
+     */
+    String installToolPackage(InstallPackageRequestBo request);
+
+    /**
+     * 在虚拟环境中执行工具脚本（非流式）
+     *
+     * @param request 执行请求
+     * @return 执行结果
+     */
+    String executeToolScript(ToolDebugRequestBo request);
+
+    /**
+     * 在虚拟环境中执行工具脚本（流式）
+     *
+     * @param request 执行请求
+     * @param response HTTP响应对象
+     */
+    void executeToolScriptStream(ToolDebugRequestBo request, HttpServletResponse response);
+
+}

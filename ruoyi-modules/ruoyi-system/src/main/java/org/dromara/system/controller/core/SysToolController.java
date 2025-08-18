@@ -6,21 +6,24 @@ import lombok.RequiredArgsConstructor;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.core.validate.AddGroup;
 import org.dromara.common.core.validate.EditGroup;
-import org.dromara.common.excel.utils.ExcelUtil;
 import org.dromara.common.idempotent.annotation.RepeatSubmit;
 import org.dromara.common.log.annotation.Log;
 import org.dromara.common.log.enums.BusinessType;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.common.web.core.BaseController;
+import org.dromara.system.domain.bo.InstallPackageRequestBo;
 import org.dromara.system.domain.bo.SysToolBo;
 import org.dromara.system.domain.bo.ToolDebugRequestBo;
+//import org.dromara.system.domain.vo.SysPythonPackageVo;
 import org.dromara.system.domain.vo.SysToolListVo;
 import org.dromara.system.domain.vo.SysToolVo;
 import org.dromara.system.service.ISysToolService;
+import org.springframework.http.MediaType;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.util.List;
 
 /**
@@ -54,17 +57,6 @@ public class SysToolController extends BaseController {
     @GetMapping("/{toolId}")
     public R<SysToolVo> getInfo(@PathVariable Long toolId) {
         return R.ok(toolService.queryById(toolId));
-    }
-
-    /**
-     * 根据工具名称查询工具管理
-     *
-     * @param toolName 工具名称
-     */
-    @SaCheckPermission("system:tool:query")
-    @GetMapping("/name/{toolName}")
-    public R<SysToolVo> getByToolName(@PathVariable String toolName) {
-        return R.ok(toolService.queryByToolName(toolName));
     }
 
     /**
@@ -158,20 +150,56 @@ public class SysToolController extends BaseController {
     }
 
     /**
-     * 根据工具ID执行Python代码调试（支持流式和非流式）
+     * 安装工具的Python包依赖
      *
-     * @param toolId   工具ID
-     * @param request  调试请求对象
-     * @param response HTTP响应
+     * @param request 安装请求参数（包含工具ID）
      */
-    @SaCheckPermission("system:tool:debug")
-    @Log(title = "工具代码调试", businessType = BusinessType.OTHER)
-    @PostMapping("/debug/{toolId}")
-    public void debugByToolId(@PathVariable Long toolId,
-                              @RequestBody ToolDebugRequestBo request,
-                              HttpServletResponse response) {
-        request.setToolId(toolId);
-        toolService.debugToolCode(request, response);
+    @SaCheckPermission("system:tool:edit")
+    @Log(title = "安装Python包", businessType = BusinessType.OTHER)
+    @PostMapping("/packages/install")
+    public R<String> installToolPackages(@RequestBody @Validated InstallPackageRequestBo request) {
+        String result = toolService.installToolPackage(request);
+        return R.ok(result);
+    }
+
+    /**
+     * 执行工具脚本（非流式）
+     *
+     * @param request 执行请求
+     */
+    @SaCheckPermission("system:tool:execute")
+    @Log(title = "执行工具脚本", businessType = BusinessType.OTHER)
+    @PostMapping("/execute")
+    public R<String> executeScript(@RequestBody @Validated ToolDebugRequestBo request) {
+        try {
+            String result = toolService.executeToolScript(request);
+            return R.ok(result);
+        } catch (Exception e) {
+            return R.fail("执行失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 执行工具脚本（流式）
+     *
+     * @param request 执行请求
+     * @param response HTTP响应对象
+     */
+    @SaCheckPermission("system:tool:execute")
+    @Log(title = "执行工具脚本(流式)", businessType = BusinessType.OTHER)
+    @PostMapping(path = "/execute/stream", produces = {MediaType.APPLICATION_JSON_VALUE, MediaType.TEXT_EVENT_STREAM_VALUE})
+    public void executeScriptStream(@RequestBody @Validated ToolDebugRequestBo request,
+                                    HttpServletResponse response) {
+        try {
+            toolService.executeToolScriptStream(request, response);
+        } catch (Exception e) {
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            try {
+                response.getWriter().write("执行失败: " + e.getMessage());
+            } catch (IOException ex) {
+                // 写入错误响应失败
+            }
+        }
     }
 
 }

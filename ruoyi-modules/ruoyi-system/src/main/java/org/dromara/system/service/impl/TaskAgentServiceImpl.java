@@ -9,22 +9,20 @@ import org.dromara.common.llm.model.protocol.req.IChatRequest;
 import org.dromara.common.llm.model.protocol.resp.IChatResponse;
 import org.dromara.common.satoken.utils.LoginHelper;
 import org.dromara.common.tenant.helper.TenantHelper;
-import org.dromara.system.config.PythonProperties;
 import org.dromara.system.domain.SysAgent;
 import org.dromara.system.domain.SysAgentChatMessage;
-import org.dromara.system.domain.bo.PythonDebugRequestBo;
 import org.dromara.system.domain.context.ModelConfigContext;
 import org.dromara.system.domain.context.StreamingContext;
-import org.dromara.system.domain.dto.*;
+import org.dromara.system.domain.dto.StreamMessageResponseDto;
+import org.dromara.system.domain.dto.TokenUsageDto;
+import org.dromara.system.domain.dto.ToolDto;
 import org.dromara.system.domain.instruction.ToolCallInstruction;
 import org.dromara.system.domain.vo.SysModelConfigVo;
-import org.dromara.system.domain.vo.SysToolVo;
 import org.dromara.system.mapper.SysAgentChatMessageMapper;
-import org.dromara.system.service.*;
+import org.dromara.system.service.ChatContextService;
+import org.dromara.system.service.ISysModelConfigService;
+import org.dromara.system.service.TaskAgentService;
 import org.dromara.system.service.helper.*;
-import org.dromara.system.service.tool.executor.IToolExecutor;
-import org.dromara.system.service.tool.executor.ToolExecutionResult;
-import org.dromara.system.util.HttpUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
@@ -33,14 +31,8 @@ import reactor.core.Disposable;
 import reactor.core.publisher.BufferOverflowStrategy;
 import reactor.core.publisher.Flux;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -60,9 +52,6 @@ public class TaskAgentServiceImpl implements TaskAgentService {
 
     @Autowired
     private ChatContextService chatContextService;
-
-    @Autowired
-    private ISysPythonPackageService pythonPackageService;
 
     @Autowired
     private PromptBuilderHelper promptBuilderHelper;
