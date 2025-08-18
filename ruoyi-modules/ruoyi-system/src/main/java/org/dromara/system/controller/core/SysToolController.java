@@ -13,11 +13,13 @@ import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.common.web.core.BaseController;
 import org.dromara.system.domain.bo.InstallPackageRequestBo;
+import org.dromara.system.domain.bo.UninstallPackageRequestBo;
 import org.dromara.system.domain.bo.SysToolBo;
 import org.dromara.system.domain.bo.ToolDebugRequestBo;
 //import org.dromara.system.domain.vo.SysPythonPackageVo;
 import org.dromara.system.domain.vo.SysToolListVo;
 import org.dromara.system.domain.vo.SysToolVo;
+import org.dromara.system.domain.vo.PythonPackageVo;
 import org.dromara.system.service.ISysToolService;
 import org.springframework.http.MediaType;
 import org.springframework.validation.annotation.Validated;
@@ -60,28 +62,6 @@ public class SysToolController extends BaseController {
     }
 
     /**
-     * 根据工具类型查询工具管理列表
-     *
-     * @param toolType 工具类型
-     */
-    @SaCheckPermission("system:tool:query")
-    @GetMapping("/type/{toolType}")
-    public R<List<SysToolVo>> getByToolType(@PathVariable String toolType) {
-        return R.ok(toolService.queryByToolType(toolType));
-    }
-
-    /**
-     * 根据工具状态查询工具管理列表
-     *
-     * @param toolStatus 工具状态
-     */
-    @SaCheckPermission("system:tool:query")
-    @GetMapping("/status/{toolStatus}")
-    public R<List<SysToolVo>> getByToolStatus(@PathVariable String toolStatus) {
-        return R.ok(toolService.queryByToolStatus(toolStatus));
-    }
-
-    /**
      * 新增工具管理
      */
     @SaCheckPermission("system:tool:add")
@@ -109,18 +89,6 @@ public class SysToolController extends BaseController {
         return toAjax(toolService.updateByBo(bo));
     }
 
-    /**
-     * 更新工具状态
-     *
-     * @param toolId     工具ID
-     * @param toolStatus 工具状态
-     */
-    @SaCheckPermission("system:tool:edit")
-    @Log(title = "工具管理", businessType = BusinessType.UPDATE)
-    @PostMapping("/status/{toolId}/{toolStatus}")
-    public R<Void> updateToolStatus(@PathVariable Long toolId, @PathVariable String toolStatus) {
-        return toAjax(toolService.updateToolStatus(toolId, toolStatus));
-    }
 
     /**
      * 删除工具管理
@@ -163,6 +131,17 @@ public class SysToolController extends BaseController {
     }
 
     /**
+     * 卸载Python包
+     */
+    @SaCheckPermission("system:tool:edit")
+    @Log(title = "卸载Python包", businessType = BusinessType.OTHER)
+    @PostMapping("/packages/uninstall")
+    public R<String> uninstallToolPackages(@RequestBody @Validated UninstallPackageRequestBo request) {
+        String result = toolService.uninstallToolPackage(request);
+        return R.ok(result);
+    }
+
+    /**
      * 执行工具脚本（非流式）
      *
      * @param request 执行请求
@@ -200,6 +179,19 @@ public class SysToolController extends BaseController {
                 // 写入错误响应失败
             }
         }
+    }
+
+    /**
+     * 搜索Python包
+     *
+     * @param query 搜索关键词
+     * @param pageQuery 分页参数
+     * @return Python包信息分页列表
+     */
+    @SaCheckPermission("system:tool:list")
+    @GetMapping("/searchPythonPackages")
+    public TableDataInfo<PythonPackageVo> searchPythonPackages(@RequestParam String query, PageQuery pageQuery) {
+        return toolService.searchPythonPackages(query, pageQuery);
     }
 
 }

@@ -4,10 +4,12 @@ import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import jakarta.servlet.http.HttpServletResponse;
 import org.dromara.system.domain.bo.InstallPackageRequestBo;
+import org.dromara.system.domain.bo.UninstallPackageRequestBo;
 import org.dromara.system.domain.bo.SysToolBo;
 import org.dromara.system.domain.bo.ToolDebugRequestBo;
 import org.dromara.system.domain.vo.SysToolListVo;
 import org.dromara.system.domain.vo.SysToolVo;
+import org.dromara.system.domain.vo.PythonPackageVo;
 
 import java.util.Collection;
 import java.util.List;
@@ -78,32 +80,6 @@ public interface ISysToolService {
     boolean checkToolNameUnique(SysToolBo bo);
 
 
-
-    /**
-     * 根据工具类型查询工具管理列表
-     *
-     * @param toolType 工具类型
-     * @return 工具管理集合
-     */
-    List<SysToolVo> queryByToolType(String toolType);
-
-    /**
-     * 根据工具状态查询工具管理列表
-     *
-     * @param toolStatus 工具状态
-     * @return 工具管理集合
-     */
-    List<SysToolVo> queryByToolStatus(String toolStatus);
-
-    /**
-     * 更新工具状态
-     *
-     * @param toolId     工具ID
-     * @param toolStatus 工具状态
-     * @return 结果
-     */
-    Boolean updateToolStatus(Long toolId, String toolStatus);
-
     /**
      * 复制工具管理
      *
@@ -122,6 +98,14 @@ public interface ISysToolService {
     String installToolPackage(InstallPackageRequestBo request);
 
     /**
+     * 卸载工具的Python包
+     *
+     * @param request 卸载请求参数（包含工具ID、包名、版本号）
+     * @return 卸载结果消息
+     */
+    String uninstallToolPackage(UninstallPackageRequestBo request);
+
+    /**
      * 在虚拟环境中执行工具脚本（非流式）
      *
      * @param request 执行请求
@@ -136,5 +120,14 @@ public interface ISysToolService {
      * @param response HTTP响应对象
      */
     void executeToolScriptStream(ToolDebugRequestBo request, HttpServletResponse response);
+
+    /**
+     * 搜索Python包（分页）
+     *
+     * @param query 搜索关键词
+     * @param pageQuery 分页参数
+     * @return Python包信息分页列表
+     */
+    TableDataInfo<PythonPackageVo> searchPythonPackages(String query, PageQuery pageQuery);
 
 }
