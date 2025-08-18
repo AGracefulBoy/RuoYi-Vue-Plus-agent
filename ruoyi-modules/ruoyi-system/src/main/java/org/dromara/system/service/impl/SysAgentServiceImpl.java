@@ -189,20 +189,7 @@ public class SysAgentServiceImpl implements ISysAgentService {
         SysAgent update = MapstructUtils.convert(bo, SysAgent.class);
         validEntityBeforeSave(update);
         boolean result = baseMapper.updateById(update) > 0;
-        
-        return result;
-    }
 
-    /**
-     * 修改智能体状态
-     */
-    @Override
-    public Boolean updateAgentStatus(Long agentId, String status) {
-        LambdaUpdateWrapper<SysAgent> wrapper = Wrappers.lambdaUpdate();
-        wrapper.eq(SysAgent::getAgentId, agentId);
-        wrapper.set(SysAgent::getStatus, status);
-        boolean result = baseMapper.update(null, wrapper) > 0;
-        
         return result;
     }
 
@@ -278,7 +265,7 @@ public class SysAgentServiceImpl implements ISysAgentService {
             }
         }
         boolean result = baseMapper.deleteBatchIds(ids) > 0;
-        
+
         return result;
     }
 

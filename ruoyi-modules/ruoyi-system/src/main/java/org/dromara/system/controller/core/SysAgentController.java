@@ -77,16 +77,6 @@ public class SysAgentController extends BaseController {
     }
 
     /**
-     * 状态修改
-     */
-    @SaCheckPermission("system:agent:edit")
-    @Log(title = "智能体管理", businessType = BusinessType.UPDATE)
-    @PostMapping("/changeStatus")
-    public R<Void> changeStatus(@RequestBody SysAgentBo bo) {
-        return toAjax(agentService.updateAgentStatus(bo.getAgentId(), bo.getStatus()));
-    }
-
-    /**
      * 删除智能体管理
      *
      * @param agentIds 智能体ID串

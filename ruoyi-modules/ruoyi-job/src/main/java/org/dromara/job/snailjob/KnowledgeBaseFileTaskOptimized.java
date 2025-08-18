@@ -163,9 +163,9 @@ public class KnowledgeBaseFileTaskOptimized {
             // 等待所有任务完成
             CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 
-            SnailJobLog.REMOTE.info("文档URL同步任务完成: 成功 {} 个, 失败 {} 个", 
+            SnailJobLog.REMOTE.info("文档URL同步任务完成: 成功 {} 个, 失败 {} 个",
                 successCount.get(), failCount.get());
-            return ExecuteResult.success(String.format("处理完成: 成功 %d 个, 失败 %d 个", 
+            return ExecuteResult.success(String.format("处理完成: 成功 %d 个, 失败 %d 个",
                 successCount.get(), failCount.get()));
 
         } catch (Exception e) {
@@ -208,7 +208,7 @@ public class KnowledgeBaseFileTaskOptimized {
                     } catch (Exception e) {
                         failCount.incrementAndGet();
                         SnailJobLog.REMOTE.error("处理文档 {} 分块时发生错误", doc.getName(), e);
-                        updateDocumentStatus(doc.getDocumentId(), 
+                        updateDocumentStatus(doc.getDocumentId(),
                             SysKnowledgeBaseDocumentConstants.STATUS_DOCUMENT_FAIL);
                     }
                 }, documentProcessingExecutor))
@@ -217,9 +217,9 @@ public class KnowledgeBaseFileTaskOptimized {
             // 等待所有任务完成
             CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 
-            SnailJobLog.REMOTE.info("文档分块任务完成: 成功 {} 个, 失败 {} 个", 
+            SnailJobLog.REMOTE.info("文档分块任务完成: 成功 {} 个, 失败 {} 个",
                 successCount.get(), failCount.get());
-            return ExecuteResult.success(String.format("处理完成: 成功 %d 个, 失败 %d 个", 
+            return ExecuteResult.success(String.format("处理完成: 成功 %d 个, 失败 %d 个",
                 successCount.get(), failCount.get()));
 
         } catch (Exception e) {
@@ -266,9 +266,9 @@ public class KnowledgeBaseFileTaskOptimized {
             // 等待所有文档处理完成
             CompletableFuture.allOf(documentFutures.toArray(new CompletableFuture[0])).join();
 
-            SnailJobLog.REMOTE.info("文档向量化任务完成: 成功 {} 个, 失败 {} 个", 
+            SnailJobLog.REMOTE.info("文档向量化任务完成: 成功 {} 个, 失败 {} 个",
                 successCount.get(), failCount.get());
-            return ExecuteResult.success(String.format("处理完成: 成功 %d 个, 失败 %d 个", 
+            return ExecuteResult.success(String.format("处理完成: 成功 %d 个, 失败 %d 个",
                 successCount.get(), failCount.get()));
 
         } catch (Exception e) {
@@ -302,13 +302,13 @@ public class KnowledgeBaseFileTaskOptimized {
             IChatService chatService = AiService.getChatService(modelConfig.getModelProvider());
 
             // 分批处理chunks
-            List<List<SysKnowledgeBaseDocumentChunk>> chunkBatches = 
+            List<List<SysKnowledgeBaseDocumentChunk>> chunkBatches =
                 Lists.partition(chunks, embeddingBatchSize);
 
-            List<CompletableFuture<List<Map<String, Object>>>> embeddingFutures = 
+            List<CompletableFuture<List<Map<String, Object>>>> embeddingFutures =
                 chunkBatches.stream()
-                    .map(batch -> CompletableFuture.supplyAsync(() -> 
-                        processChunkBatch(batch, doc, chatService, modelConfig), 
+                    .map(batch -> CompletableFuture.supplyAsync(() ->
+                        processChunkBatch(batch, doc, chatService, modelConfig),
                         documentProcessingExecutor))
                     .collect(Collectors.toList());
 
@@ -335,7 +335,7 @@ public class KnowledgeBaseFileTaskOptimized {
 
             // 检查并更新文档状态
             if (batchOperationHelper.checkAllChunksCompleted(doc.getDocumentId())) {
-                updateDocumentStatus(doc.getDocumentId(), 
+                updateDocumentStatus(doc.getDocumentId(),
                     SysKnowledgeBaseDocumentConstants.STATUS_DOCUMENT_FINISHED);
                 return true;
             }
@@ -356,14 +356,14 @@ public class KnowledgeBaseFileTaskOptimized {
             SysKnowledgeBaseDocument doc,
             IChatService chatService,
             SysModelConfigVo modelConfig) {
-        
+
         List<Map<String, Object>> esDocuments = new ArrayList<>();
-        
+
         for (SysKnowledgeBaseDocumentChunk chunk : chunks) {
             try {
                 // 构建请求
                 IChatRequest request = buildChatRequest(modelConfig, doc.getSlicePrompt(), chunk.getContent());
-                
+
                 // 收集响应
                 StringBuilder responseContent = new StringBuilder();
                 chatService.stream(request)
@@ -379,29 +379,29 @@ public class KnowledgeBaseFileTaskOptimized {
                 // 解析响应
                 JSONObject responseJson = new JSONObject(responseContent.toString());
                 LinkedHashMap<String, String> parsedData = parseJsonToFlatFormat(responseJson);
-                
+
                 // 生成向量
                 List<String> textList = new ArrayList<>(parsedData.keySet());
                 if (!textList.isEmpty()) {
                     List<List<Double>> embeddings = embeddingService.textsToEmbeddings(textList);
-                    
+
                     // 构建ES文档
                     String createTime = LocalDateTime.now().format(
                         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-                    
+
                     for (int i = 0; i < textList.size() && i < embeddings.size(); i++) {
                         Map<String, Object> esDoc = buildEsDocument(
-                            chunk, doc, textList.get(i), parsedData.get(textList.get(i)), 
+                            chunk, doc, textList.get(i), parsedData.get(textList.get(i)),
                             embeddings.get(i), createTime);
                         esDocuments.add(esDoc);
                     }
                 }
-                
+
             } catch (Exception e) {
                 SnailJobLog.REMOTE.error("处理chunk {} 向量化失败", chunk.getChunkId(), e);
             }
         }
-        
+
         return esDocuments;
     }
 
@@ -410,58 +410,58 @@ public class KnowledgeBaseFileTaskOptimized {
     private List<SysKnowledgeBaseDocument> fetchDocumentsToProcess(int limit) {
         Page<SysKnowledgeBaseDocument> page = new Page<>(1, limit);
         LambdaQueryWrapper<SysKnowledgeBaseDocument> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(SysKnowledgeBaseDocument::getStatus, 
+        queryWrapper.eq(SysKnowledgeBaseDocument::getStatus,
                 SysKnowledgeBaseDocumentConstants.STATUS_TO_BE_EXECUTED)
             .notIn(SysKnowledgeBaseDocument::getType, "xlsx", "xls")
             .orderByAsc(SysKnowledgeBaseDocument::getCreateTime);
-        
+
         return documentMapper.selectPage(page, queryWrapper).getRecords();
     }
 
     private List<SysKnowledgeBaseDocument> fetchParsingDocuments(int limit) {
         Page<SysKnowledgeBaseDocument> page = new Page<>(1, limit);
         LambdaQueryWrapper<SysKnowledgeBaseDocument> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(SysKnowledgeBaseDocument::getStatus, 
+        queryWrapper.eq(SysKnowledgeBaseDocument::getStatus,
                 SysKnowledgeBaseDocumentConstants.STATUS_DOCUMENT_PARSING)
             .isNotNull(SysKnowledgeBaseDocument::getTaskId)
             .notIn(SysKnowledgeBaseDocument::getType, "xlsx", "xls")
             .ne(SysKnowledgeBaseDocument::getTaskId, "")
             .orderByAsc(SysKnowledgeBaseDocument::getCreateTime);
-        
+
         return documentMapper.selectPage(page, queryWrapper).getRecords();
     }
 
     private List<SysKnowledgeBaseDocument> fetchChunkingDocuments(int limit) {
         Page<SysKnowledgeBaseDocument> page = new Page<>(1, limit);
         LambdaQueryWrapper<SysKnowledgeBaseDocument> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(SysKnowledgeBaseDocument::getStatus, 
+        queryWrapper.eq(SysKnowledgeBaseDocument::getStatus,
                 SysKnowledgeBaseDocumentConstants.STATUS_DOCUMENT_CHUNK)
             .notIn(SysKnowledgeBaseDocument::getType, "xlsx", "xls")
             .isNotNull(SysKnowledgeBaseDocument::getParseCompletedUrl)
             .ne(SysKnowledgeBaseDocument::getParseCompletedUrl, "")
             .orderByAsc(SysKnowledgeBaseDocument::getCreateTime);
-        
+
         return documentMapper.selectPage(page, queryWrapper).getRecords();
     }
 
     private List<SysKnowledgeBaseDocument> fetchEmbeddingDocuments(int limit) {
         Page<SysKnowledgeBaseDocument> page = new Page<>(1, limit);
         LambdaQueryWrapper<SysKnowledgeBaseDocument> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(SysKnowledgeBaseDocument::getStatus, 
+        queryWrapper.eq(SysKnowledgeBaseDocument::getStatus,
                 SysKnowledgeBaseDocumentConstants.STATUS_DOCUMENT_EMBEDDING)
             .notIn(SysKnowledgeBaseDocument::getType, "xlsx", "xls")
             .orderByAsc(SysKnowledgeBaseDocument::getCreateTime);
-        
+
         return documentMapper.selectPage(page, queryWrapper).getRecords();
     }
 
     private List<SysKnowledgeBaseDocumentChunk> fetchPendingChunks(Long documentId) {
-        LambdaQueryWrapper<SysKnowledgeBaseDocumentChunk> queryWrapper = 
+        LambdaQueryWrapper<SysKnowledgeBaseDocumentChunk> queryWrapper =
             new LambdaQueryWrapper<>();
         queryWrapper.eq(SysKnowledgeBaseDocumentChunk::getDocumentId, documentId)
             .eq(SysKnowledgeBaseDocumentChunk::getVectorStatus, "0")
             .orderByAsc(SysKnowledgeBaseDocumentChunk::getChunkIndex);
-        
+
         return chunkMapper.selectList(queryWrapper);
     }
 
@@ -470,7 +470,7 @@ public class KnowledgeBaseFileTaskOptimized {
             .fileType(doc.getType())
             .mode(doc.getMode() != null ? doc.getMode() : 1)
             .fileUrl(doc.getUrl())
-            .enableImageRecognition(doc.getEnableImageRecognition() != null && 
+            .enableImageRecognition(doc.getEnableImageRecognition() != null &&
                 doc.getEnableImageRecognition() == 1)
             .prompt(doc.getImagePrompt())
             .build();
@@ -479,18 +479,18 @@ public class KnowledgeBaseFileTaskOptimized {
     private boolean syncDocumentUrl(SysKnowledgeBaseDocument doc) {
         List<DocumentTask> completedTasks = documentTaskService.queryByTaskIdAndStatus(
             doc.getTaskId(), "completed");
-        
+
         if (CollUtil.isNotEmpty(completedTasks)) {
             DocumentTask completedTask = completedTasks.get(0);
-            
+
             if (StrUtil.isNotBlank(completedTask.getProcessedUrl())) {
                 Map<String, Object> updates = new HashMap<>();
                 updates.put("parseCompletedUrl", completedTask.getProcessedUrl());
                 updates.put("status", SysKnowledgeBaseDocumentConstants.STATUS_DOCUMENT_CHUNK);
-                
+
                 Map<Long, Map<String, Object>> documentUpdates = new HashMap<>();
                 documentUpdates.put(doc.getDocumentId(), updates);
-                
+
                 int result = batchOperationHelper.batchUpdateDocuments(documentUpdates);
                 if (result > 0) {
                     SnailJobLog.REMOTE.info("文档 {} 更新解析URL成功", doc.getName());
@@ -498,7 +498,7 @@ public class KnowledgeBaseFileTaskOptimized {
                 }
             }
         }
-        
+
         return false;
     }
 
@@ -522,26 +522,26 @@ public class KnowledgeBaseFileTaskOptimized {
 
                 // 批量插入
                 int insertedCount = batchOperationHelper.batchInsertChunks(chunkEntities);
-                
+
                 // 更新文档状态
                 if (insertedCount > 0) {
-                    updateDocumentStatus(doc.getDocumentId(), 
+                    updateDocumentStatus(doc.getDocumentId(),
                         SysKnowledgeBaseDocumentConstants.STATUS_DOCUMENT_EMBEDDING);
-                    SnailJobLog.REMOTE.info("文档 {} 分块成功，生成 {} 个块", 
+                    SnailJobLog.REMOTE.info("文档 {} 分块成功，生成 {} 个块",
                         doc.getName(), insertedCount);
                     return true;
                 }
             }
-            
+
             return false;
-            
+
         } catch (Exception e) {
             SnailJobLog.REMOTE.error("文档 {} 分块失败", doc.getName(), e);
             throw new RuntimeException("文档分块失败", e);
         }
     }
 
-    private SysKnowledgeBaseDocumentChunk buildChunkEntity(DocumentChunk chunk, 
+    private SysKnowledgeBaseDocumentChunk buildChunkEntity(DocumentChunk chunk,
                                                            SysKnowledgeBaseDocument doc) {
         SysKnowledgeBaseDocumentChunk entity = new SysKnowledgeBaseDocumentChunk();
         entity.setDocumentId(doc.getDocumentId());
@@ -554,7 +554,7 @@ public class KnowledgeBaseFileTaskOptimized {
         return entity;
     }
 
-    private IChatRequest buildChatRequest(SysModelConfigVo modelConfig, String promptTemplate, 
+    private IChatRequest buildChatRequest(SysModelConfigVo modelConfig, String promptTemplate,
                                          String content) {
         IChatRequest request = new IChatRequest();
         request.setCode(modelConfig.getModelCode());
@@ -563,12 +563,12 @@ public class KnowledgeBaseFileTaskOptimized {
         request.setApiKey(modelConfig.getApiKey());
         request.setStream(Boolean.TRUE);
         request.setPrompt(promptTemplate.replace("{input}", content));
-        
+
         ResponseFormatRequest responseFormat = ResponseFormatRequest.builder()
             .type(ResponseFormatRequest.Type.JSON_OBJECT)
             .build();
         request.setResponseFormat(responseFormat);
-        
+
         return request;
     }
 
@@ -594,7 +594,7 @@ public class KnowledgeBaseFileTaskOptimized {
             Collections.singletonList(documentId), status);
     }
 
-    private int processParseResponseAndUpdate(List<SysKnowledgeBaseDocument> documents, 
+    private int processParseResponseAndUpdate(List<SysKnowledgeBaseDocument> documents,
                                              DocumentParseResponse response) {
         if (response == null || response.getSuccessTaskIds() == null) {
             SnailJobLog.REMOTE.error("文档解析API调用失败或返回空响应");
@@ -602,7 +602,7 @@ public class KnowledgeBaseFileTaskOptimized {
         }
 
         Map<Long, Map<String, Object>> updates = new ConcurrentHashMap<>();
-        
+
         for (Map.Entry<String, String> entry : response.getSuccessTaskIds().entrySet()) {
             String fileUrl = entry.getKey();
             String taskId = entry.getValue();
@@ -654,7 +654,7 @@ public class KnowledgeBaseFileTaskOptimized {
         return result;
     }
 
-    private void parseJsonRecursive(Object obj, String currentPath, 
+    private void parseJsonRecursive(Object obj, String currentPath,
                                    LinkedHashMap<String, String> result) {
         if (obj instanceof JSONObject) {
             JSONObject jsonObj = (JSONObject) obj;

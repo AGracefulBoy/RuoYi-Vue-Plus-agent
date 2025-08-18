@@ -10,6 +10,7 @@ import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import co.elastic.clients.elasticsearch._types.query_dsl.TextQueryType;
 import co.elastic.clients.elasticsearch.core.*;
 import co.elastic.clients.elasticsearch.core.search.Hit;
+import co.elastic.clients.elasticsearch.indices.ExistsRequest;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -85,6 +86,19 @@ public class ElasticsearchDocumentServiceImpl implements IElasticsearchDocumentS
                 return TableDataInfo.build();
             }
 
+            // Check if index exists before querying
+            try {
+                ExistsRequest existsRequest = ExistsRequest.of(builder -> builder.index(indexName));
+                boolean indexExists = elasticsearchClient.indices().exists(existsRequest).value();
+                if (!indexExists) {
+                    log.warn("Index does not exist: {}", indexName);
+                    return TableDataInfo.build();
+                }
+            } catch (Exception e) {
+                log.error("Failed to check index existence: {}", indexName, e);
+                return TableDataInfo.build();
+            }
+
             // Calculate pagination parameters
             int from = (int) ((pageQuery.getPageNum() - 1) * pageQuery.getPageSize());
             int size = (int) pageQuery.getPageSize();
@@ -94,7 +108,7 @@ public class ElasticsearchDocumentServiceImpl implements IElasticsearchDocumentS
                 .index(indexName)
                 .query(query -> query
                     .term(term -> term
-                        .field("documentId.keyword")
+                        .field("documentId")
                         .value(documentId.toString())
                     )
                 )

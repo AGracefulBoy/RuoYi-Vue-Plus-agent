@@ -66,9 +66,6 @@ public class ElasticsearchIndexServiceImpl implements IElasticsearchIndexService
                         .object(o -> o
                             .enabled(true)
                             .dynamic(DynamicMapping.True))))
-                    .properties("createTime", Property.of(p -> p
-                        .date(d -> d
-                            .format("yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis"))))
                     .properties("embedding", Property.of(p -> p
                         .denseVector(v -> v
                             .dims(768))))

@@ -57,14 +57,6 @@ public interface ISysAgentService {
      */
     Boolean updateByBo(SysAgentBo bo);
 
-    /**
-     * 修改智能体状态
-     *
-     * @param agentId 智能体ID
-     * @param status  状态
-     * @return 是否修改成功
-     */
-    Boolean updateAgentStatus(Long agentId, String status);
 
     /**
      * 校验并批量删除智能体管理信息
