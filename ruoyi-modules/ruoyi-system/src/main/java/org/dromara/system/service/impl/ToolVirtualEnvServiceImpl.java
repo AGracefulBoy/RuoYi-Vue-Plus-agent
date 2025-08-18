@@ -251,30 +251,30 @@ public class ToolVirtualEnvServiceImpl implements IToolVirtualEnvService {
         // 创建临时Python脚本文件
         String scriptFile = String.format("/tmp/tool_%d_%s.py", toolId, System.currentTimeMillis());
         String pythonExec = tool.getVenvPath() + "/bin/python";
-        
+
         // 构建支持流式输出的Python脚本
         String fullScript = buildStreamingExecutionScript(code, functionName, params);
-        
+
         log.info("准备流式执行工具 {} 的Python脚本，函数: {}", toolId, functionName);
-        
+
         try {
             // 设置响应头为SSE格式
             response.setContentType("text/event-stream");
             response.setCharacterEncoding("UTF-8");
             response.setHeader("Cache-Control", "no-cache");
             response.setHeader("Connection", "keep-alive");
-            
+
             // 1. 写入脚本文件
             String writeCmd = String.format("cat > %s << 'EOF'\n%s\nEOF", scriptFile, fullScript);
             SshUtil.executeRemoteCommand(pythonProperties.getRemote(), writeCmd);
-            
+
             // 2. 执行脚本并实时获取输出
             String execCmd = String.format("%s -u %s 2>&1", pythonExec, scriptFile);
             log.info("流式执行命令: {}", execCmd);
-            
+
             // 使用SSH执行并流式读取输出
             boolean success = executeStreamingCommand(pythonProperties.getRemote(), execCmd, response);
-            
+
             // 3. 清理临时文件
             String cleanCmd = String.format("rm -f %s", scriptFile);
             try {
@@ -282,12 +282,12 @@ public class ToolVirtualEnvServiceImpl implements IToolVirtualEnvService {
             } catch (Exception e) {
                 log.warn("清理临时文件失败: {}", scriptFile);
             }
-            
+
             // 如果执行失败，记录日志
             if (!success) {
                 log.error("工具 {} 流式执行返回错误状态", toolId);
             }
-            
+
         } catch (Exception e) {
             log.error("流式执行失败，工具ID: {}", toolId, e);
             try {
@@ -316,7 +316,7 @@ public class ToolVirtualEnvServiceImpl implements IToolVirtualEnvService {
 
         // 构建完整的执行脚本
         String fullScript = buildExecutionScript(code, functionName, params);
-        
+
         log.info("准备执行工具 {} 的Python脚本，函数: {}, 参数: {}", toolId, functionName, params);
         log.debug("生成的Python脚本: \n{}", fullScript);
 
@@ -329,7 +329,7 @@ public class ToolVirtualEnvServiceImpl implements IToolVirtualEnvService {
             // 2. 执行脚本，同时捕获错误输出
             String execCmd = String.format("%s %s 2>&1", pythonExec, scriptFile);
             log.info("执行命令: {}", execCmd);
-            
+
             String result = null;
             try {
                 result = SshUtil.executeRemoteCommand(pythonProperties.getRemote(), execCmd);
@@ -344,7 +344,7 @@ public class ToolVirtualEnvServiceImpl implements IToolVirtualEnvService {
                 } catch (Exception diagEx) {
                     log.error("无法读取脚本内容", diagEx);
                 }
-                
+
                 // 检查Python解释器是否存在
                 try {
                     String checkPythonCmd = String.format("ls -la %s", pythonExec);
@@ -353,7 +353,7 @@ public class ToolVirtualEnvServiceImpl implements IToolVirtualEnvService {
                 } catch (Exception checkEx) {
                     log.error("Python解释器可能不存在: {}", pythonExec);
                 }
-                
+
                 throw execEx;
             }
 
@@ -369,7 +369,7 @@ public class ToolVirtualEnvServiceImpl implements IToolVirtualEnvService {
 
         } catch (Exception e) {
             log.error("代码执行失败，工具ID: {}, 错误: {}", toolId, e.getMessage(), e);
-            
+
             // 清理临时文件
             try {
                 String cleanCmd = String.format("rm -f %s", scriptFile);
@@ -377,7 +377,7 @@ public class ToolVirtualEnvServiceImpl implements IToolVirtualEnvService {
             } catch (Exception cleanEx) {
                 log.warn("异常处理中清理临时文件失败: {}", scriptFile);
             }
-            
+
             throw new ServiceException("代码执行失败: " + e.getMessage());
         }
     }
@@ -791,26 +791,26 @@ public class ToolVirtualEnvServiceImpl implements IToolVirtualEnvService {
         script.append("import sys\n");
         script.append("import json\n");
         script.append("import traceback\n\n");
-        
+
         // 添加用户代码
         script.append("# User Code Start\n");
         script.append(code).append("\n");
         script.append("# User Code End\n\n");
-        
+
         // 主执行逻辑，支持生成器的流式输出
         script.append("if __name__ == '__main__':\n");
         script.append("    try:\n");
         script.append("        # 禁用输出缓冲\n");
         script.append("        sys.stdout.reconfigure(line_buffering=True)\n");
         script.append("        sys.stderr.reconfigure(line_buffering=True)\n");
-        
+
         if (params != null && !params.isEmpty()) {
             script.append("        params = ").append(JSONUtil.toJsonStr(params)).append("\n");
             script.append("        result = ").append(functionName).append("(**params)\n");
         } else {
             script.append("        result = ").append(functionName).append("()\n");
         }
-        
+
         // 处理生成器或普通返回值
         script.append("        # 检查是否是生成器\n");
         script.append("        import types\n");
@@ -835,7 +835,7 @@ public class ToolVirtualEnvServiceImpl implements IToolVirtualEnvService {
         script.append("            print('', flush=True)\n");
         script.append("            print('data: [DONE]', flush=True)\n");
         script.append("            print('', flush=True)\n");
-        
+
         script.append("    except Exception as e:\n");
         script.append("        error_info = {\n");
         script.append("            'error': str(e),\n");
@@ -845,23 +845,23 @@ public class ToolVirtualEnvServiceImpl implements IToolVirtualEnvService {
         script.append("        print(f'data: {json.dumps(error_info, ensure_ascii=False)}', flush=True)\n");
         script.append("        print('', flush=True)\n");
         script.append("        sys.exit(1)\n");
-        
+
         return script.toString();
     }
-    
+
     /**
      * 执行流式命令并实时输出
      */
-    private boolean executeStreamingCommand(PythonProperties.Remote remoteConfig, String command, 
+    private boolean executeStreamingCommand(PythonProperties.Remote remoteConfig, String command,
                                         HttpServletResponse response) throws Exception {
         Session session = null;
         Channel channel = null;
         boolean hasError = false;
-        
+
         try {
             // 创建SSH连接
             JSch jsch = new JSch();
-            
+
             // 设置私钥
             if (remoteConfig.getPrivateKeyPath() != null && !remoteConfig.getPrivateKeyPath().trim().isEmpty()) {
                 if (remoteConfig.getPrivateKeyPassphrase() != null && !remoteConfig.getPrivateKeyPassphrase().trim().isEmpty()) {
@@ -870,49 +870,49 @@ public class ToolVirtualEnvServiceImpl implements IToolVirtualEnvService {
                     jsch.addIdentity(remoteConfig.getPrivateKeyPath());
                 }
             }
-            
+
             // 获取SSH会话
             session = jsch.getSession(remoteConfig.getUsername(), remoteConfig.getHost(), remoteConfig.getPort());
-            
+
             // 设置密码
             if (remoteConfig.getPassword() != null && !remoteConfig.getPassword().trim().isEmpty()) {
                 session.setPassword(remoteConfig.getPassword());
             }
-            
+
             // 配置SSH会话
             Properties config = new Properties();
             config.put("StrictHostKeyChecking", "no");
             session.setConfig(config);
             session.setTimeout(remoteConfig.getConnectionTimeout() * 1000);
-            
+
             // 连接
             session.connect();
-            
+
             // 打开执行通道
             channel = session.openChannel("exec");
             ChannelExec execChannel = (ChannelExec) channel;
             execChannel.setCommand(command);
-            
+
             // 获取输入流和错误流
             InputStream in = execChannel.getInputStream();
             InputStream err = execChannel.getErrStream();
             execChannel.connect();
-            
+
             // 实时读取并输出
             BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
             BufferedReader errorReader = new BufferedReader(new InputStreamReader(err, StandardCharsets.UTF_8));
             PrintWriter writer = response.getWriter();
-            
+
             // 用于收集所有输出，以便检测错误
             StringBuilder allOutput = new StringBuilder();
             String line;
-            
+
             // 读取标准输出
             while ((line = reader.readLine()) != null) {
                 allOutput.append(line).append("\n");
-                
+
                 // 检测Python错误标志
-                if (line.contains("Traceback (most recent call last)") || 
+                if (line.contains("Traceback (most recent call last)") ||
                     line.contains("ModuleNotFoundError") ||
                     line.contains("ImportError") ||
                     line.contains("NameError") ||
@@ -923,19 +923,33 @@ public class ToolVirtualEnvServiceImpl implements IToolVirtualEnvService {
                     hasError = true;
                     log.error("检测到Python执行错误: {}", line);
                 }
-                
-                // 直接转发SSE格式的数据
-                writer.write(line + "\n");
-                if (line.isEmpty() || line.startsWith("data:")) {
-                    writer.flush(); // 立即发送SSE数据
-                }
-                
-                // 检查是否结束
-                if (line.equals("data: [DONE]")) {
-                    break;
+
+                // 处理SSE格式数据，提取实际内容
+                if (line.startsWith("data: ")) {
+                    String actualData = line.substring(6); // 移除 "data: " 前缀
+
+                    // 检查是否为结束标志
+                    if ("[DONE]".equals(actualData)) {
+                        break;
+                    }
+
+                    // 只输出实际数据内容，不包含SSE格式
+                    if (!actualData.trim().isEmpty()) {
+                        writer.write(actualData );
+                        writer.flush();
+                        log.info("工具流式输出(实际数据): {}", actualData);
+                    }
+                } else if (line.trim().isEmpty()) {
+                    // SSE格式的空行，忽略
+                    continue;
+                } else {
+                    // 非SSE格式的输出（可能是错误信息或其他输出）
+                    writer.write(line );
+                    writer.flush();
+                    log.info("工具流式输出(非SSE): {}", line);
                 }
             }
-            
+
             // 读取错误流（如果有）
             String errorLine;
             StringBuilder errorOutput = new StringBuilder();
@@ -943,27 +957,27 @@ public class ToolVirtualEnvServiceImpl implements IToolVirtualEnvService {
                 errorOutput.append(errorLine).append("\n");
                 hasError = true;
             }
-            
+
             // 如果有错误输出，发送错误信息
             if (errorOutput.length() > 0) {
                 log.error("Python脚本错误输出: {}", errorOutput);
-                writer.write("data: {\"error\": \"" + 
-                    errorOutput.toString().replace("\"", "\\\"").replace("\n", "\\n") + 
+                writer.write("data: {\"error\": \"" +
+                    errorOutput.toString().replace("\"", "\\\"").replace("\n", "\\n") +
                     "\"}\n\n");
                 writer.flush();
             }
-            
+
             // 等待命令执行完成
             while (!execChannel.isClosed()) {
                 Thread.sleep(100);
             }
-            
+
             // 获取退出状态
             int exitStatus = execChannel.getExitStatus();
             if (exitStatus != 0) {
                 hasError = true;
                 log.error("Python脚本执行失败，退出状态: {}", exitStatus);
-                
+
                 // 如果没有捕获到具体错误，发送通用错误信息
                 if (errorOutput.length() == 0 && !allOutput.toString().contains("data: {\"error\"")) {
                     // 尝试从输出中提取错误信息
@@ -976,9 +990,9 @@ public class ToolVirtualEnvServiceImpl implements IToolVirtualEnvService {
                     writer.flush();
                 }
             }
-            
+
             return !hasError;
-            
+
         } finally {
             if (channel != null) {
                 channel.disconnect();
@@ -988,7 +1002,7 @@ public class ToolVirtualEnvServiceImpl implements IToolVirtualEnvService {
             }
         }
     }
-    
+
     /**
      * 从输出中提取错误信息
      */
@@ -996,29 +1010,29 @@ public class ToolVirtualEnvServiceImpl implements IToolVirtualEnvService {
         if (output == null || output.isEmpty()) {
             return null;
         }
-        
+
         // 查找Python错误的典型模式
         String[] lines = output.split("\n");
         StringBuilder errorMsg = new StringBuilder();
         boolean inTraceback = false;
-        
+
         for (String line : lines) {
             if (line.contains("Traceback (most recent call last)")) {
                 inTraceback = true;
                 errorMsg = new StringBuilder();
             }
-            
+
             if (inTraceback) {
                 errorMsg.append(line).append("\\n");
-                
+
                 // 检查是否是错误类型行（通常是traceback的最后一行）
-                if (line.matches("^[A-Z][a-zA-Z]*Error:.*") || 
+                if (line.matches("^[A-Z][a-zA-Z]*Error:.*") ||
                     line.matches("^[A-Z][a-zA-Z]*Exception:.*")) {
                     return errorMsg.toString();
                 }
             }
         }
-        
+
         // 如果没找到标准的traceback，查找特定错误
         for (String line : lines) {
             if (line.contains("ModuleNotFoundError:")) {
@@ -1031,7 +1045,7 @@ public class ToolVirtualEnvServiceImpl implements IToolVirtualEnvService {
                 return line;
             }
         }
-        
+
         return null;
     }
 
@@ -1045,12 +1059,12 @@ public class ToolVirtualEnvServiceImpl implements IToolVirtualEnvService {
         script.append("import sys\n");
         script.append("import json\n");
         script.append("import traceback\n\n");
-        
+
         // 添加用户代码
         script.append("# User Code Start\n");
         script.append(code).append("\n");
         script.append("# User Code End\n\n");
-        
+
         // 主执行逻辑，包含错误处理
         script.append("if __name__ == '__main__':\n");
         script.append("    try:\n");
@@ -1066,7 +1080,7 @@ public class ToolVirtualEnvServiceImpl implements IToolVirtualEnvService {
         script.append("            print(json.dumps(result, ensure_ascii=False))\n");
         script.append("        else:\n");
         script.append("            print(json.dumps({'success': True, 'data': None}))\n");
-        
+
         script.append("    except Exception as e:\n");
         script.append("        error_info = {\n");
         script.append("            'error': str(e),\n");
