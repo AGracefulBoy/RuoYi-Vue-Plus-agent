@@ -21,9 +21,4 @@ public class ToolDebugRequestBo {
      * 函数参数（Map对象）
      */
     private Map<String, Object> params;
-
-    /**
-     * 是否使用流式响应
-     */
-    private Boolean stream = false;
 }
