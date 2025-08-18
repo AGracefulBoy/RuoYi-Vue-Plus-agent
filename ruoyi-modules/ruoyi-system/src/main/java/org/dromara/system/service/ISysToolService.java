@@ -10,6 +10,7 @@ import org.dromara.system.domain.bo.ToolDebugRequestBo;
 import org.dromara.system.domain.vo.SysToolListVo;
 import org.dromara.system.domain.vo.SysToolVo;
 import org.dromara.system.domain.vo.PythonPackageVo;
+import org.dromara.system.domain.vo.ToolPackageVo;
 
 import java.util.Collection;
 import java.util.List;
@@ -104,6 +105,14 @@ public interface ISysToolService {
      * @return 卸载结果消息
      */
     String uninstallToolPackage(UninstallPackageRequestBo request);
+
+    /**
+     * 查询工具已安装的Python包
+     *
+     * @param toolId 工具ID
+     * @return 已安装的Python包列表
+     */
+    List<ToolPackageVo> getInstalledPackagesByToolId(Long toolId);
 
     /**
      * 在虚拟环境中执行工具脚本（非流式）

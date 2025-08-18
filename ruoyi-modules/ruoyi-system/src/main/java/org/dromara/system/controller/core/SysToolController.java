@@ -20,6 +20,7 @@ import org.dromara.system.domain.bo.ToolDebugRequestBo;
 import org.dromara.system.domain.vo.SysToolListVo;
 import org.dromara.system.domain.vo.SysToolVo;
 import org.dromara.system.domain.vo.PythonPackageVo;
+import org.dromara.system.domain.vo.ToolPackageVo;
 import org.dromara.system.service.ISysToolService;
 import org.springframework.http.MediaType;
 import org.springframework.validation.annotation.Validated;
@@ -139,6 +140,19 @@ public class SysToolController extends BaseController {
     public R<String> uninstallToolPackages(@RequestBody @Validated UninstallPackageRequestBo request) {
         String result = toolService.uninstallToolPackage(request);
         return R.ok(result);
+    }
+
+    /**
+     * 查询工具已安装的Python包
+     *
+     * @param toolId 工具ID
+     * @return 已安装的Python包列表
+     */
+    @SaCheckPermission("system:tool:query")
+    @GetMapping("/{toolId}/packages")
+    public R<List<ToolPackageVo>> getInstalledPackages(@PathVariable Long toolId) {
+        List<ToolPackageVo> packages = toolService.getInstalledPackagesByToolId(toolId);
+        return R.ok(packages);
     }
 
     /**

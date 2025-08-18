@@ -23,6 +23,7 @@ import org.dromara.system.domain.bo.ToolDebugRequestBo;
 import org.dromara.system.domain.vo.SysToolListVo;
 import org.dromara.system.domain.vo.SysToolVo;
 import org.dromara.system.domain.vo.PythonPackageVo;
+import org.dromara.system.domain.vo.ToolPackageVo;
 import org.dromara.system.mapper.SysToolMapper;
 import org.dromara.system.mapper.SysToolPackageMapper;
 import org.dromara.system.service.ISysToolService;
@@ -371,6 +372,39 @@ public class SysToolServiceImpl implements ISysToolService {
 
         // 7. 返回卸载结果
         return "包卸载成功: " + packageSpec + "\n" + uninstallResult;
+    }
+
+    /**
+     * 查询工具已安装的Python包
+     */
+    @Override
+    public List<ToolPackageVo> getInstalledPackagesByToolId(Long toolId) {
+        // 1. 验证工具是否存在
+        SysTool tool = baseMapper.selectById(toolId);
+        if (tool == null) {
+            throw new ServiceException("工具不存在: " + toolId);
+        }
+        
+        // 2. 查询该工具的所有已安装包
+        LambdaQueryWrapper<SysToolPackage> queryWrapper = Wrappers.lambdaQuery();
+        queryWrapper.eq(SysToolPackage::getToolId, toolId)
+                    .orderByAsc(SysToolPackage::getPackageName);
+        
+        List<SysToolPackage> packages = toolPackageMapper.selectList(queryWrapper);
+        
+        // 3. 手动转换为VO对象
+        List<ToolPackageVo> result = new ArrayList<>();
+        for (SysToolPackage pkg : packages) {
+            ToolPackageVo vo = new ToolPackageVo();
+            vo.setPackageId(pkg.getPackageId());
+            vo.setPackageName(pkg.getPackageName());
+            vo.setPackageVersion(pkg.getPackageVersion());
+            vo.setCreateTime(pkg.getCreateTime());
+            vo.setUpdateTime(pkg.getUpdateTime());
+            result.add(vo);
+        }
+        
+        return result;
     }
 
     /**
