@@ -11,10 +11,11 @@ import java.util.List;
 /**
  * 流式处理上下文
  * 用于在流式处理过程中维护状态和数据
- * 
+ *
  * @author TaskAgentService
  */
 public class StreamingContext {
+    private String message;
     private StringBuilder conversationHistory = new StringBuilder();
     private StringBuilder promptChain = new StringBuilder();  // 记录完整的提示词链
     private Integer messageIndexCounter = 0;
@@ -30,19 +31,19 @@ public class StreamingContext {
     private StringBuilder thoughtProcess = new StringBuilder();
     private boolean shouldStopCurrentStream = false;
     private FluxSink<StreamMessageResponseDto> currentSink;
-    
+
     // Enhancement stream control
     private boolean shouldStopEnhanceStream = false;
     private Disposable enhanceStreamSubscription;
-    
+
     // User context information for maintaining across thread boundaries
     private Long userId;
     private Long deptId;
     private String tenantId;
-    
+
     // Chat ID for database operations
     private Long chatId;
-    
+
     // Agent for maintaining agent context
     private Object agent; // Using Object to avoid circular dependency
 
@@ -64,11 +65,18 @@ public class StreamingContext {
         return messageIndexCounter++;
     }
 
+
     // Getters and setters
+    public String getMessage() {
+        return message;
+    }
+    public void setMessage(String message) {
+        this.message = message;
+    }
     public StringBuilder getConversationHistory() {
         return conversationHistory;
     }
-    
+
     public StringBuilder getPromptChain() {
         return promptChain;
     }
@@ -156,59 +164,59 @@ public class StreamingContext {
     public void setCurrentSink(FluxSink<StreamMessageResponseDto> currentSink) {
         this.currentSink = currentSink;
     }
-    
+
     public Long getUserId() {
         return userId;
     }
-    
+
     public void setUserId(Long userId) {
         this.userId = userId;
     }
-    
+
     public Long getDeptId() {
         return deptId;
     }
-    
+
     public void setDeptId(Long deptId) {
         this.deptId = deptId;
     }
-    
+
     public String getTenantId() {
         return tenantId;
     }
-    
+
     public void setTenantId(String tenantId) {
         this.tenantId = tenantId;
     }
-    
+
     public Long getChatId() {
         return chatId;
     }
-    
+
     public void setChatId(Long chatId) {
         this.chatId = chatId;
     }
-    
+
     public Object getAgent() {
         return agent;
     }
-    
+
     public void setAgent(Object agent) {
         this.agent = agent;
     }
-    
+
     public boolean isShouldStopEnhanceStream() {
         return shouldStopEnhanceStream;
     }
-    
+
     public void setShouldStopEnhanceStream(boolean shouldStopEnhanceStream) {
         this.shouldStopEnhanceStream = shouldStopEnhanceStream;
     }
-    
+
     public Disposable getEnhanceStreamSubscription() {
         return enhanceStreamSubscription;
     }
-    
+
     public void setEnhanceStreamSubscription(Disposable enhanceStreamSubscription) {
         this.enhanceStreamSubscription = enhanceStreamSubscription;
     }

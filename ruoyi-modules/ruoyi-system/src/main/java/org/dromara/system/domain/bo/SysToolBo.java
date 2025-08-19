@@ -52,7 +52,7 @@ public class SysToolBo extends BaseEntity {
     /**
      * 工具类型（api、script、builtin等）
      */
-    @NotBlank(message = "工具类型不能为空", groups = { AddGroup.class, EditGroup.class })
+    @NotBlank(message = "工具类型不能为空", groups = { EditGroup.class })
     @Size(min = 0, max = 50, message = "工具类型长度不能超过{max}个字符")
     private String toolType;
 

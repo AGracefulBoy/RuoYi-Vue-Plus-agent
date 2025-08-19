@@ -107,7 +107,7 @@ public class EnhancementHelper {
 
         // 获取智能体人设，如果为空则使用默认值
         String agentPersonality = StringUtils.hasText(agent.getAgentPersonality()) ?
-            agent.getAgentPersonality() : "智能助手";
+            agent.getAgentPersonality() : "";
 
         // 添加系统角色设定
         prompt.append(agentPersonality).append("。\n\n");

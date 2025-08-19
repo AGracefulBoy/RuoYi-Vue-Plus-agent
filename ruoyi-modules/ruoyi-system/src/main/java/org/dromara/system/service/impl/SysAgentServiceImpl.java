@@ -40,6 +40,23 @@ import java.util.stream.Collectors;
 @Service
 public class SysAgentServiceImpl implements ISysAgentService {
 
+    public static final String PROMPT_CONTENT = "Answer the following questions as best you can, Answer in Chinese,You have access to the following tools:\n" +
+        "{{tools}}\n" +
+        "\n" +
+        "Use the following format:\n" +
+        "Question: thae input question you must answer\n" +
+        "Thought: you should always think about what to do\n" +
+        "Action: he action to take, you can be one of [{tool_names}]\n" +
+        "Action Input: the input to the action,The output format must be JSON data\n" +
+        "Observation:  the result of the action\n" +
+        "... (this Thought/Action/Action Input/Observation can repeat N times)\n" +
+        "Thought: I now know the final answer\n" +
+        "Final Answer: the final answer to the original input question\n" +
+        "\n" +
+        "Begin!Use lots of \"Arg\"s\n" +
+        "1\n" +
+        "Question: {{input}}\n" +
+        "{{agent_personality}}";
     private final SysAgentMapper baseMapper;
     private final SysToolMapper toolMapper;
     private final SysKnowledgeBaseMapper knowledgeBaseMapper;
@@ -174,6 +191,7 @@ public class SysAgentServiceImpl implements ISysAgentService {
     public SysAgentVo insertByBo(SysAgentBo bo) {
         SysAgent add = MapstructUtils.convert(bo, SysAgent.class);
         validEntityBeforeSave(add);
+        add.setPromptContent(PROMPT_CONTENT);
         boolean flag = baseMapper.insert(add) > 0;
         if (flag) {
             bo.setAgentId(add.getAgentId());

@@ -39,6 +39,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -93,6 +94,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                     // 创建StreamingContext
                     StreamingContext ctx = new StreamingContext();
                     ctx.setAgent(agent);  // 保存agent到上下文
+                    ctx.setMessage(userInput);
                     // 执行流式推理
                     performStreamingReasoningChain(agent, availableTools, userInput, chatId, sink, ctx);
                 });
@@ -321,8 +323,6 @@ public class TaskAgentServiceImpl implements TaskAgentService {
             sink.complete();
         }
     }
-
-
 
 
     /**
@@ -1378,17 +1378,17 @@ public class TaskAgentServiceImpl implements TaskAgentService {
 
         // 获取智能体人设，如果为空则使用默认值
         String agentPersonality = StringUtils.hasText(agent.getAgentPersonality()) ?
-            agent.getAgentPersonality() : "智能助手";
+            agent.getAgentPersonality() : "";
 
         // 添加系统角色设定
-        prompt.append(agentPersonality).append("。\n\n");
+        prompt.append(agentPersonality).append("\n\n");
 
+        prompt.append("用户问题：").append(ctx.getMessage()).append("。\n\n");
 
         // 添加原始推理过程和答案
         prompt.append(finalAnswer);
 
         return prompt.toString()
-            .replace("Question", "用户问题")
             .replace("Thought", "思考")
             .replace("Observation", "工具执行的结果")
             .replace("Action Input", "工具入参")
@@ -1643,7 +1643,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
 
                     IChatRequest chatRequest = buildChatRequest(prompt, mainModelConfig);
                     // 设定系统身份
-                    chatRequest.setSystemPrompt( StringUtils.hasText(agent.getAgentPersonality()) ?
+                    chatRequest.setSystemPrompt(StringUtils.hasText(agent.getAgentPersonality()) ?
                         agent.getAgentPersonality() : agent.getAgentName());
                     // 执行流式调用
                     Flux<IChatResponse> modelStream = chatService.stream(chatRequest);
@@ -1666,7 +1666,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                                     // 发送推理内容作为增强事件
                                     sink.next(createStreamMessage(reasoningText, "thought", false, finalCtx));
                                 }
-                            }else if (content != null) {
+                            } else if (content != null) {
                                 fullResponse.append(content);
                                 sink.next(createStreamMessage(content, "answer", false, finalCtx));
                             }
@@ -1735,7 +1735,6 @@ public class TaskAgentServiceImpl implements TaskAgentService {
             });
         });
     }
-
 
 
     /**
