@@ -171,14 +171,14 @@ public class SysAgentServiceImpl implements ISysAgentService {
      * 新增智能体管理
      */
     @Override
-    public Boolean insertByBo(SysAgentBo bo) {
+    public SysAgentVo insertByBo(SysAgentBo bo) {
         SysAgent add = MapstructUtils.convert(bo, SysAgent.class);
         validEntityBeforeSave(add);
         boolean flag = baseMapper.insert(add) > 0;
         if (flag) {
             bo.setAgentId(add.getAgentId());
         }
-        return flag;
+        return MapstructUtils.convert(add, SysAgentVo.class);
     }
 
     /**

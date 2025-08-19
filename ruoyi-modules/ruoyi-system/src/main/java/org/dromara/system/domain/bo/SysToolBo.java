@@ -45,7 +45,7 @@ public class SysToolBo extends BaseEntity {
     /**
      * 函数名称
      */
-    @NotBlank(message = "函数名称不能为空", groups = { AddGroup.class, EditGroup.class })
+    @NotBlank(message = "函数名称不能为空", groups = { EditGroup.class })
     @Size(min = 0, max = 200, message = "函数名称长度不能超过{max}个字符")
     private String functionName;
 

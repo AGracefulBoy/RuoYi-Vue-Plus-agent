@@ -19,6 +19,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.dromara.system.domain.bo.InstallPackageRequestBo;
 import org.dromara.system.domain.bo.UninstallPackageRequestBo;
 import org.dromara.system.domain.bo.SysToolBo;
+import org.dromara.system.domain.bo.SysToolBasicInfoBo;
 import org.dromara.system.domain.bo.ToolDebugRequestBo;
 import org.dromara.system.domain.vo.SysToolListVo;
 import org.dromara.system.domain.vo.SysToolVo;
@@ -109,7 +110,7 @@ public class SysToolServiceImpl implements ISysToolService {
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Boolean insertByBo(SysToolBo bo) {
+    public SysToolVo insertByBo(SysToolBo bo) {
         SysTool add = MapstructUtils.convert(bo, SysTool.class);
         validEntityBeforeSave(add);
         boolean flag = baseMapper.insert(add) > 0;
@@ -131,7 +132,7 @@ public class SysToolServiceImpl implements ISysToolService {
                 }
             }
         }
-        return flag;
+        return MapstructUtils.convert(add, SysToolVo.class);
     }
 
     /**
@@ -143,6 +144,47 @@ public class SysToolServiceImpl implements ISysToolService {
         SysTool update = MapstructUtils.convert(bo, SysTool.class);
         validEntityBeforeSave(update);
         return baseMapper.updateById(update) > 0;
+    }
+
+    /**
+     * 修改工具基本信息
+     * 仅更新工具的基本描述信息，不影响技术配置
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Boolean updateBasicInfoByBo(SysToolBasicInfoBo bo) {
+        // 使用LambdaUpdateWrapper进行选择性更新
+        LambdaUpdateWrapper<SysTool> updateWrapper = Wrappers.lambdaUpdate();
+        updateWrapper.eq(SysTool::getToolId, bo.getToolId());
+        
+        // 仅更新基本信息字段
+        if (StringUtils.isNotBlank(bo.getToolName())) {
+            updateWrapper.set(SysTool::getToolName, bo.getToolName());
+        }
+        if (StringUtils.isNotBlank(bo.getToolDesc())) {
+            updateWrapper.set(SysTool::getToolDesc, bo.getToolDesc());
+        }
+        if (StringUtils.isNotBlank(bo.getToolStatus())) {
+            updateWrapper.set(SysTool::getToolStatus, bo.getToolStatus());
+        }
+        if (StringUtils.isNotBlank(bo.getRemark())) {
+            updateWrapper.set(SysTool::getRemark, bo.getRemark());
+        }
+        if (ObjectUtil.isNotNull(bo.getTimeoutSeconds())) {
+            updateWrapper.set(SysTool::getTimeoutSeconds, bo.getTimeoutSeconds());
+        }
+        if (ObjectUtil.isNotNull(bo.getRetryTimes())) {
+            updateWrapper.set(SysTool::getRetryTimes, bo.getRetryTimes());
+        }
+        if (ObjectUtil.isNotNull(bo.getRateLimit())) {
+            updateWrapper.set(SysTool::getRateLimit, bo.getRateLimit());
+        }
+        
+        // 更新时间和更新人
+        updateWrapper.set(SysTool::getUpdateTime, new Date());
+        updateWrapper.set(SysTool::getUpdateBy, LoginHelper.getUserId());
+        
+        return baseMapper.update(null, updateWrapper) > 0;
     }
 
     /**
@@ -222,7 +264,8 @@ public class SysToolServiceImpl implements ISysToolService {
         copyToolBo.setUpdateTime(null);
 
         // 插入新的工具记录
-        return insertByBo(copyToolBo);
+        SysToolVo newTool = insertByBo(copyToolBo);
+        return newTool != null;
     }
 
 

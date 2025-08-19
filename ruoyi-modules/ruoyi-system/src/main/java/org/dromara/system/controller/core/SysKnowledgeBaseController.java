@@ -83,8 +83,8 @@ public class SysKnowledgeBaseController extends BaseController {
     @Log(title = "知识库管理", businessType = BusinessType.INSERT)
     @RepeatSubmit()
     @PostMapping()
-    public R<Void> add(@Validated(AddGroup.class) @RequestBody SysKnowledgeBaseBo bo) {
-        return toAjax(knowledgeBaseService.insertByBo(bo));
+    public R<SysKnowledgeBaseVo> add(@Validated(AddGroup.class) @RequestBody SysKnowledgeBaseBo bo) {
+        return R.ok(knowledgeBaseService.insertByBo(bo));
     }
 
     /**

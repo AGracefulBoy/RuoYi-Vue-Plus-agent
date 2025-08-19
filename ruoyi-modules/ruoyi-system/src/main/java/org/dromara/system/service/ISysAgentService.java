@@ -45,9 +45,9 @@ public interface ISysAgentService {
      * 新增智能体管理
      *
      * @param bo 智能体管理业务对象
-     * @return 是否新增成功
+     * @return 新增的智能体信息
      */
-    Boolean insertByBo(SysAgentBo bo);
+    SysAgentVo insertByBo(SysAgentBo bo);
 
     /**
      * 修改智能体管理

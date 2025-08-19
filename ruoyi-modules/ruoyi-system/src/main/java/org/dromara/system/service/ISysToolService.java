@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.dromara.system.domain.bo.InstallPackageRequestBo;
 import org.dromara.system.domain.bo.UninstallPackageRequestBo;
 import org.dromara.system.domain.bo.SysToolBo;
+import org.dromara.system.domain.bo.SysToolBasicInfoBo;
 import org.dromara.system.domain.bo.ToolDebugRequestBo;
 import org.dromara.system.domain.vo.SysToolListVo;
 import org.dromara.system.domain.vo.SysToolVo;
@@ -51,9 +52,9 @@ public interface ISysToolService {
      * 新增工具管理
      *
      * @param bo 工具管理
-     * @return 结果
+     * @return 新增的工具信息
      */
-    Boolean insertByBo(SysToolBo bo);
+    SysToolVo insertByBo(SysToolBo bo);
 
     /**
      * 修改工具管理
@@ -62,6 +63,15 @@ public interface ISysToolService {
      * @return 结果
      */
     Boolean updateByBo(SysToolBo bo);
+
+    /**
+     * 修改工具基本信息
+     * 仅更新工具的基本描述信息，不影响技术配置
+     *
+     * @param bo 工具基本信息
+     * @return 结果
+     */
+    Boolean updateBasicInfoByBo(SysToolBasicInfoBo bo);
 
     /**
      * 校验并批量删除工具管理信息

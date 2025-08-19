@@ -15,6 +15,7 @@ import org.dromara.common.web.core.BaseController;
 import org.dromara.system.domain.bo.InstallPackageRequestBo;
 import org.dromara.system.domain.bo.UninstallPackageRequestBo;
 import org.dromara.system.domain.bo.SysToolBo;
+import org.dromara.system.domain.bo.SysToolBasicInfoBo;
 import org.dromara.system.domain.bo.ToolDebugRequestBo;
 //import org.dromara.system.domain.vo.SysPythonPackageVo;
 import org.dromara.system.domain.vo.SysToolListVo;
@@ -69,11 +70,11 @@ public class SysToolController extends BaseController {
     @Log(title = "工具管理", businessType = BusinessType.INSERT)
     @RepeatSubmit()
     @PostMapping("/add")
-    public R<Void> add(@Validated(AddGroup.class) @RequestBody SysToolBo bo) {
+    public R<SysToolVo> add(@Validated(AddGroup.class) @RequestBody SysToolBo bo) {
         if (!toolService.checkToolNameUnique(bo)) {
             return R.fail("新增工具'" + bo.getToolName() + "'失败，工具名称已存在");
         }
-        return toAjax(toolService.insertByBo(bo));
+        return R.ok(toolService.insertByBo(bo));
     }
 
     /**
@@ -90,6 +91,26 @@ public class SysToolController extends BaseController {
         return toAjax(toolService.updateByBo(bo));
     }
 
+    /**
+     * 修改工具基本信息
+     * 仅更新工具的基本描述信息，不影响技术配置
+     */
+    @SaCheckPermission("system:tool:edit")
+    @Log(title = "工具基本信息", businessType = BusinessType.UPDATE)
+    @RepeatSubmit()
+    @PostMapping("/editBasicInfo")
+    public R<Void> editBasicInfo(@Validated(EditGroup.class) @RequestBody SysToolBasicInfoBo bo) {
+        // 如果更新工具名称，需要检查唯一性
+        if (bo.getToolName() != null) {
+            SysToolBo checkBo = new SysToolBo();
+            checkBo.setToolId(bo.getToolId());
+            checkBo.setToolName(bo.getToolName());
+            if (!toolService.checkToolNameUnique(checkBo)) {
+                return R.fail("修改工具'" + bo.getToolName() + "'失败，工具名称已存在");
+            }
+        }
+        return toAjax(toolService.updateBasicInfoByBo(bo));
+    }
 
     /**
      * 删除工具管理

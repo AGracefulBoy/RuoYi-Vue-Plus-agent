@@ -44,9 +44,9 @@ public interface ISysKnowledgeBaseService {
      * 新增知识库管理
      *
      * @param bo 知识库管理
-     * @return 结果
+     * @return 新增的知识库信息
      */
-    Boolean insertByBo(SysKnowledgeBaseBo bo);
+    SysKnowledgeBaseVo insertByBo(SysKnowledgeBaseBo bo);
 
     /**
      * 修改知识库管理

@@ -84,7 +84,7 @@ public class SysKnowledgeBaseServiceImpl implements ISysKnowledgeBaseService {
      * 新增知识库管理
      */
     @Override
-    public Boolean insertByBo(SysKnowledgeBaseBo bo) {
+    public SysKnowledgeBaseVo insertByBo(SysKnowledgeBaseBo bo) {
         SysKnowledgeBase add = MapstructUtils.convert(bo, SysKnowledgeBase.class);
         validEntityBeforeSave(add);
         boolean flag = baseMapper.insert(add) > 0;
@@ -99,7 +99,7 @@ public class SysKnowledgeBaseServiceImpl implements ISysKnowledgeBaseService {
                 log.error("Error creating Elasticsearch index for knowledge base: {}", add.getKnowledgeBaseId().toString(), exception);
             }
         }
-        return flag;
+        return MapstructUtils.convert(add, SysKnowledgeBaseVo.class);
     }
 
     /**
