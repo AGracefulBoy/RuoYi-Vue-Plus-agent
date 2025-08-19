@@ -52,13 +52,15 @@ public class ReActExecutionHelper {
 
             if (matchedTool != null) {
                 // 查找工具参数：Action Input: parameters
+                // 支持多行JSON格式，匹配到下一个Action:或Observation:或字符串结尾
                 Pattern inputPattern = Pattern.compile(
-                    "Action Input:\\s*(.+?)(?=\\n|$)", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+                    "Action Input:\\s*(.+?)(?=(?:\\n(?:Action|Observation|Thought):|\\z))", 
+                    Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
                 Matcher inputMatcher = inputPattern.matcher(response);
 
                 String parameters = inputMatcher.find() ? inputMatcher.group(1).trim() : "{}";
                 // 使用匹配到的工具的实际名称，确保大小写一致
-                return new ToolCallInstruction(matchedTool.getName(), matchedTool.getId(), matchedTool.getType(), parameters);
+                return new ToolCallInstruction(matchedTool.getName(), matchedTool.getId(), matchedTool.getType(), JsonRepairTool.repairJson(parameters));
             }
         }
 
