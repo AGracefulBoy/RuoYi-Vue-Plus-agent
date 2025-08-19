@@ -73,15 +73,6 @@ public class TaskAgentServiceImpl implements TaskAgentService {
     @Autowired
     private MessagePersistenceHelper messagePersistenceHelper;
 
-    @Autowired
-    private StreamProcessingHelper streamProcessingHelper;
-
-    @Autowired
-    private EnhancementHelper enhancementHelper;
-
-    @Autowired
-    private TokenUsageHelper tokenUsageHelper;
-
     @Override
     public Flux<StreamMessageResponseDto> executeReActStream(SysAgent agent, List<ToolDto> availableTools, String userInput, Long chatId) {
         // 捕获当前线程的Sa-Token上下文
@@ -557,14 +548,14 @@ public class TaskAgentServiceImpl implements TaskAgentService {
     /**
      * 保存增强回复到数据库
      */
-    private void saveEnhancedReply(Long chatId, String enhancedContent, StreamingContext ctx, IChatResponse.Usage tokenUsage) {
+    private void saveEnhancedReply(Long chatId, String enhancedContent, StreamingContext ctx, String messageType, IChatResponse.Usage tokenUsage) {
         if (chatId == null || !StringUtils.hasText(enhancedContent)) return;
 
         SysAgentChatMessage message = new SysAgentChatMessage();
         message.setChatId(chatId);
         message.setRole("assistant");
         message.setContent(enhancedContent);
-        message.setMessageType("answer");
+        message.setMessageType(messageType);
         message.setStatus("completed");
 
         // 从StreamingContext获取用户信息，避免线程切换导致的上下文丢失
@@ -641,72 +632,6 @@ public class TaskAgentServiceImpl implements TaskAgentService {
         return null;
     }
 
-    /**
-     * 根据工具名称解析工具ID
-     */
-    private Long resolveToolId(String toolName, StreamingContext ctx) {
-        // 从上下文中获取工具列表
-        List<ToolDto> availableTools = ctx.getCurrentAvailableTools();
-        if (availableTools == null || availableTools.isEmpty()) {
-            throw new RuntimeException("无法找到可用工具列表");
-        }
-
-        // 查找工具
-        return availableTools.stream()
-            .filter(tool -> toolName.equals(tool.getName()))
-            .map(ToolDto::getId)
-            .findFirst()
-            .orElseThrow(() -> new RuntimeException("工具不存在: " + toolName));
-    }
-
-    /**
-     * 检查响应是否包含最终答案
-     */
-    private boolean containsFinalAnswer(String response) {
-        if (!StringUtils.hasText(response)) {
-            return false;
-        }
-
-        String lowerResponse = response.toLowerCase();
-        return lowerResponse.contains("final answer:") ||
-            lowerResponse.contains("最终答案:") ||
-            lowerResponse.contains("final answer：") ||
-            lowerResponse.contains("最终答案：") ||
-            lowerResponse.contains("answer:") ||
-            lowerResponse.contains("答案:");
-    }
-
-    /**
-     * 提取最终答案
-     */
-    private String extractFinalAnswer(String response) {
-        if (!StringUtils.hasText(response)) {
-            return response;
-        }
-
-        // 定义可能的最终答案标记
-        String[] markers = {
-            "Final Answer:", "final answer:", "FINAL ANSWER:",
-            "最终答案:", "最终答案：",
-            "Answer:", "answer:", "ANSWER:",
-            "答案:", "答案："
-        };
-
-        for (String marker : markers) {
-            int index = response.indexOf(marker);
-            if (index != -1) {
-                // 提取标记后的内容作为最终答案
-                String answer = response.substring(index + marker.length()).trim();
-                // 如果答案不为空，返回答案；否则继续尝试其他标记
-                if (StringUtils.hasText(answer)) {
-                    return answer;
-                }
-            }
-        }
-
-        // 如果没有找到标记，返回整个响应
-        return response;
-    }
 
     /**
      * 获取并验证模型配置（用于StreamMessageResponseDto）
@@ -748,34 +673,6 @@ public class TaskAgentServiceImpl implements TaskAgentService {
         }
     }
 
-    /**
-     * 获取并验证模型配置（用于String，保留兼容性）
-     */
-    private ModelConfigContext getAndValidateModelConfigs(SysAgent agent, reactor.core.publisher.FluxSink<String> sink) {
-        try {
-            SysModelConfigVo mainModelConfig = getModelConfig(agent.getModel(), "主要模型");
-            SysModelConfigVo enhanceModelConfig = getModelConfig(agent.getEnhanceModel(), "增强模型");
-
-            // 验证主要模型配置
-            if (mainModelConfig == null) {
-                sink.error(new RuntimeException("智能体主要模型配置不存在或无效，无法执行推理任务"));
-                return null;
-            }
-
-            // 检查模型类型
-            if (!isValidModelType(mainModelConfig)) {
-                sink.error(new RuntimeException("主要模型不支持聊天功能，请检查模型配置"));
-                return null;
-            }
-
-            return new ModelConfigContext(mainModelConfig, enhanceModelConfig);
-
-        } catch (Exception e) {
-            log.error("查询模型配置失败", e);
-            sink.error(new RuntimeException("查询模型配置失败: " + e.getMessage()));
-            return null;
-        }
-    }
 
     /**
      * 获取模型配置
@@ -796,36 +693,6 @@ public class TaskAgentServiceImpl implements TaskAgentService {
         return modelConfig;
     }
 
-    /**
-     * 验证模型类型是否支持聊天
-     */
-    private boolean isValidModelType(SysModelConfigVo modelConfig) {
-        List<String> modelType = modelConfig.getModelType();
-        return modelType != null && (modelType.contains("chat") || modelType.contains("llm"));
-    }
-
-    /**
-     * 执行流式AI调用（带步骤类型参数）
-     */
-    private void executeStreamingAICall(String cotPrompt, ModelConfigContext modelContext,
-                                        reactor.core.publisher.FluxSink<String> sink,
-                                        Consumer<String> fullResponseCallback,
-                                        boolean isFinalStep) {
-        // 获取聊天服务
-        IChatService chatService = aiService.getChatService(modelContext.getMainModel().getModelProvider());
-        if (chatService == null) {
-            sink.error(new RuntimeException("无法获取聊天服务，提供商: " + modelContext.getMainModel().getModelProvider()));
-            return;
-        }
-
-        // 构建聊天请求
-        IChatRequest chatRequest = buildChatRequest(cotPrompt, modelContext.getMainModel());
-
-        // 执行流式调用
-        Flux<IChatResponse> modelStream = chatService.stream(chatRequest);
-        processModelStream(modelStream, modelContext, sink, fullResponseCallback, isFinalStep);
-
-    }
 
     /**
      * 执行流式AI调用（用于StreamMessageResponseDto）
@@ -882,28 +749,6 @@ public class TaskAgentServiceImpl implements TaskAgentService {
 
 
     /**
-     * 处理模型流式响应
-     */
-    private void processModelStream(Flux<IChatResponse> modelStream, ModelConfigContext modelContext,
-                                    reactor.core.publisher.FluxSink<String> sink,
-                                    java.util.function.Consumer<String> fullResponseCallback,
-                                    boolean isFinalStep) {
-        StringBuilder fullResponse = new StringBuilder();
-
-        modelStream
-            .doOnNext(chunk -> handleStreamChunk(chunk, sink, fullResponse))
-            .doOnComplete(() -> {
-                if (isFinalStep) {
-                    handleFinalStepComplete(fullResponse.toString(), modelContext, sink, fullResponseCallback);
-                } else {
-                    handleIntermediateStepComplete(fullResponse.toString(), sink, fullResponseCallback);
-                }
-            })
-            .doOnError(error -> handleStreamError(error, sink))
-            .subscribe();
-    }
-
-    /**
      * 处理模型流式响应（用于StreamMessageResponseDto）
      */
     private void processModelStreamForMessage(Flux<IChatResponse> modelStream, ModelConfigContext modelContext,
@@ -944,19 +789,6 @@ public class TaskAgentServiceImpl implements TaskAgentService {
             .subscribe();
     }
 
-    /**
-     * 处理流式响应块
-     */
-    private void handleStreamChunk(IChatResponse chunk, reactor.core.publisher.FluxSink<String> sink,
-                                   StringBuilder fullResponse) {
-        if (chunk.getResult() != null && chunk.getResult().getOutput() != null) {
-            String text = chunk.getResult().getOutput().getText();
-            if (StringUtils.hasText(text)) {
-                sink.next(text);
-                fullResponse.append(text);
-            }
-        }
-    }
 
     /**
      * 处理流式响应块（用于StreamMessageResponseDto）
@@ -1084,7 +916,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                         log.info("检测到Final Answer，准备使用增强模型进行回复增强");
 
                         // 保存当前已有的思维过程（包括"Final Answer"之前的内容）
-                        String thoughtContent = ctx.getThoughtProcess().toString();
+                        String thoughtContent = ctx.getConversationHistory().toString();
 
                         // 发送增强开始事件
 
@@ -1094,14 +926,8 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                         // 清空缓冲区
                         buffer.setLength(0);
 
-                        // 提取Final Answer后的内容作为原始答案
-//                        String remainingContent = bufferContent.substring(finalAnswerIndex);
-                        // 将剩余内容拼接到思维过程中，用于增强回复
-                        String fullThoughtProcess = thoughtContent;
-
                         // 立即调用增强模型（需要异步处理）
-                        executeEnhanceStreamingCall(fullThoughtProcess, (SysAgent) ctx.getAgent(), modelContext, sink, ctx);
-
+                        executeEnhanceStreamingCall(thoughtContent, (SysAgent) ctx.getAgent(), modelContext, sink, ctx);
                         return;
                     }
 
@@ -1187,63 +1013,6 @@ public class TaskAgentServiceImpl implements TaskAgentService {
         }
     }
 
-
-    /**
-     * 处理流式响应完成
-     */
-    /**
-     * 处理中间步骤的流式响应完成
-     */
-    private void handleIntermediateStepComplete(String stepResponse,
-                                                reactor.core.publisher.FluxSink<String> sink,
-                                                java.util.function.Consumer<String> fullResponseCallback) {
-        log.info("ReAct中间步骤流式调用完成");
-        // 调用回调函数继续处理，但不关闭流
-        fullResponseCallback.accept(stepResponse);
-        // 注意：这里不调用 sink.complete()，保持流开放
-    }
-
-    /**
-     * 处理最终步骤的流式响应完成（包含增强和关闭流）
-     */
-    private void handleFinalStepComplete(String finalResponse, ModelConfigContext modelContext,
-                                         reactor.core.publisher.FluxSink<String> sink,
-                                         java.util.function.Consumer<String> fullResponseCallback) {
-        log.info("ReAct最终步骤流式调用完成");
-        fullResponseCallback.accept(finalResponse); // 调用回调函数
-
-        // 如果配置了增强模型，使用增强模型优化回复
-        if (modelContext.getEnhanceModel() != null && StringUtils.hasText(finalResponse)) {
-            try {
-                // 明确告知客户端还有增强内容
-                sink.next("\n\n[ENHANCING] 正在优化回复...\n");
-                String enhancedResponse = enhanceResponse(finalResponse, modelContext.getEnhanceModel(), null);
-
-                if (!enhancedResponse.equals(finalResponse)) {
-                    sink.next("[ENHANCED]\n");
-                    sink.next(enhancedResponse);
-                    sink.next("\n[ENHANCEMENT_COMPLETE]\n");
-                } else {
-                    sink.next("[ENHANCEMENT_SKIPPED] 优化后内容与原始内容相同\n");
-                }
-            } catch (Exception e) {
-                log.error("增强模型处理失败", e);
-                sink.next("[ENHANCEMENT_FAILED] 增强失败，使用原始回复\n");
-            }
-        }
-
-        // 发送完成标记并关闭流
-        sink.next("[DONE]");
-        sink.complete();
-    }
-
-    /**
-     * 处理流式响应错误
-     */
-    private void handleStreamError(Throwable error, reactor.core.publisher.FluxSink<String> sink) {
-        log.error("AI模型流式调用失败", error);
-        sink.error(new RuntimeException("AI模型调用失败: " + error.getMessage()));
-    }
 
     /**
      * 处理流式响应错误（用于StreamMessageResponseDto）
@@ -1349,10 +1118,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
             String enhancePrompt = buildEnhancePrompt(finalAnswer, agent, ctx);
 
             // 打印增强模型的提示词
-            log.info("=== 增强模型提示词开始 ===");
-            log.info("增强模型: {}", modelContext.getEnhanceModel().getModelId());
-            log.info("提示词内容:\n{}", enhancePrompt);
-            log.info("=== 增强模型提示词结束 ===");
+            log.info("=== 增强模型提示词内容:\n{}", enhancePrompt);
 
             // 构建增强模型请求
             IChatRequest enhanceRequest = buildChatRequest(enhancePrompt, modelContext.getEnhanceModel());
@@ -1402,6 +1168,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                                       reactor.core.publisher.FluxSink<StreamMessageResponseDto> sink,
                                       StreamingContext ctx) {
         StringBuilder enhancedResponse = new StringBuilder();
+        StringBuilder enhancedReasonResponse = new StringBuilder();
         AtomicReference<IChatResponse> lastChunk = new AtomicReference<>();
         AtomicBoolean isCompleted = new AtomicBoolean(false);
 
@@ -1430,7 +1197,7 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                         if (reasoningContent != null) {
                             String reasoningText = reasoningContent.toString();
                             if (StringUtils.hasText(reasoningText) && !sink.isCancelled()) {
-                                enhancedResponse.append(reasoningText);
+                                enhancedReasonResponse.append(reasoningText);
                                 // 发送推理内容作为增强事件
                                 sink.next(createStreamMessage(reasoningText, "enhanced_reason", false, ctx));
                             }
@@ -1454,10 +1221,15 @@ public class TaskAgentServiceImpl implements TaskAgentService {
                     accumulateTokenUsage(lastChunk.get(), ctx);
 
                     // 保存增强后的回复到数据库
-                    if (enhancedResponse.length() > 0) {
-                        log.info("增强模型优化完成，响应长度: {}", enhancedResponse.length());
+                    if (!enhancedReasonResponse.isEmpty()) {
                         // 保存增强回复到数据库
-                        saveEnhancedReply(ctx.getChatId(), enhancedResponse.toString(), ctx, ctx.getTotalTokenUsage());
+                        saveEnhancedReply(ctx.getChatId(), enhancedReasonResponse.toString(), ctx, "action", ctx.getTotalTokenUsage());
+                    }
+
+                    // 保存增强后的回复到数据库
+                    if (!enhancedResponse.isEmpty()) {
+                        // 保存增强回复到数据库
+                        saveEnhancedReply(ctx.getChatId(), enhancedResponse.toString(), ctx, "answer", ctx.getTotalTokenUsage());
                     }
 
                     // 完成整个流

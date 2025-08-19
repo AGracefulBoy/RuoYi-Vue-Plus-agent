@@ -79,7 +79,7 @@ public class MessagePersistenceHelper {
         userMessage.setCreateBy(ctx.getUserId());
         userMessage.setUpdateBy(ctx.getUserId());
         userMessage.setTenantId(ctx.getTenantId());
-        
+
         agentChatMessageMapper.insert(userMessage);
     }
 
@@ -110,6 +110,7 @@ public class MessagePersistenceHelper {
         message.setChatId(chatId);
         message.setRole("assistant");
         message.setContent(processedContent);
+
         message.setMessageType(messageType);
         message.setStatus("completed");
 
@@ -314,7 +315,7 @@ public class MessagePersistenceHelper {
         answerMessage.setCreateBy(ctx.getUserId());
         answerMessage.setUpdateBy(ctx.getUserId());
         answerMessage.setTenantId(ctx.getTenantId());
-        
+
         agentChatMessageMapper.insert(answerMessage);
     }
 }
