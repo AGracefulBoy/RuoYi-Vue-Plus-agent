@@ -169,28 +169,28 @@ public class ToolExecutionHelper {
     public String executePythonScript(SysToolVo tool, String parameters, FluxSink<StreamMessageResponseDto> sink, StreamingContext ctx) {
         try {
             Long toolId = tool.getToolId();
-            
+
             // 解析参数
             Map<String, Object> params = null;
             if (StringUtils.hasText(parameters)) {
                 params = JSONUtil.toBean(parameters, Map.class);
             }
-            
+
             // 检查并创建虚拟环境（如果需要）
             if (!StringUtils.hasText(tool.getVenvPath()) || !"ready".equals(tool.getVenvStatus())) {
                 log.info("工具 {} 虚拟环境未就绪，开始创建虚拟环境", toolId);
-                String pythonVersion = StringUtils.hasText(tool.getPythonVersion()) ? 
+                String pythonVersion = StringUtils.hasText(tool.getPythonVersion()) ?
                     tool.getPythonVersion() : "3.9";
-                    
+
                 boolean created = virtualEnvService.createToolVirtualEnv(toolId, pythonVersion);
                 if (!created) {
                     throw new ServiceException("虚拟环境创建失败，无法执行脚本");
                 }
-                
+
                 // 重新查询工具信息以获取更新后的虚拟环境信息
                 tool = toolService.queryById(toolId);
             }
-            
+
             // 检查是否需要流式输出
             if ("1".equals(tool.getIsStream()) && sink != null && ctx != null) {
                 return executeStreamingPythonWithVenv(tool, params, sink, ctx);
@@ -207,38 +207,38 @@ public class ToolExecutionHelper {
     /**
      * 使用虚拟环境执行流式Python脚本
      */
-    private String executeStreamingPythonWithVenv(SysToolVo tool, Map<String, Object> params, 
+    private String executeStreamingPythonWithVenv(SysToolVo tool, Map<String, Object> params,
                                                   FluxSink<StreamMessageResponseDto> sink, StreamingContext ctx) {
         log.info("Python脚本流式执行开始（虚拟环境），工具：{}", tool.getToolName());
-        
+
         // 用于收集所有输出内容
         StringBuilder fullOutput = new StringBuilder();
-        
+
         // 创建一个虚拟的HttpServletResponse来捕获流式输出
         HttpServletResponse virtualResponse = new FluxSinkResponseWrapper(sink, ctx, fullOutput, streamMessageBuilder);
-        
+
         try {
-            log.info("开始调用虚拟环境服务执行流式脚本，工具ID: {}, 函数: {}, 参数: {}", 
+            log.info("开始调用虚拟环境服务执行流式脚本，工具ID: {}, 函数: {}, 参数: {}",
                 tool.getToolId(), tool.getFunctionName(), params);
-            
+
             // 调用虚拟环境服务执行脚本
             virtualEnvService.executeInToolEnv(
-                tool.getToolId(), 
-                tool.getScriptCode(), 
+                tool.getToolId(),
+                tool.getScriptCode(),
                 tool.getFunctionName(),
-                params, 
+                params,
                 virtualResponse
             );
-            
+
             String result = fullOutput.toString();
-            log.info("Python脚本流式执行完成，工具：{}，输出长度: {} 字符，完整输出：\n{}", 
+            log.info("Python脚本流式执行完成，工具：{}，输出长度: {} 字符，完整输出：\n{}",
                 tool.getToolName(), result.length(), result);
             return result;
-            
+
         } catch (Exception e) {
             log.error("Python脚本流式执行失败，工具：{}", tool.getToolName(), e);
             String errorMsg = "执行失败: " + e.getMessage();
-            
+
             // 如果有部分输出，也返回
             if (!fullOutput.isEmpty()) {
                 return fullOutput + "\n" + errorMsg;
@@ -254,15 +254,15 @@ public class ToolExecutionHelper {
         try {
             // 调用虚拟环境服务同步执行脚本
             String result = virtualEnvService.executeInToolEnvSync(
-                tool.getToolId(), 
-                tool.getScriptCode(), 
+                tool.getToolId(),
+                tool.getScriptCode(),
                 tool.getFunctionName(),
                 params
             );
-            
+
             log.info("Python脚本执行完成（虚拟环境），工具：{}，结果：{}", tool.getToolName(), result);
             return result;
-            
+
         } catch (Exception e) {
             log.error("Python脚本执行失败，工具：{}", tool.getToolName(), e);
             return "执行失败: " + e.getMessage();
@@ -289,7 +289,7 @@ public class ToolExecutionHelper {
         }
         return false;
     }
-    
+
     /**
      * 虚拟HttpServletResponse实现，用于将流式输出转发到FluxSink
      */
@@ -300,9 +300,9 @@ public class ToolExecutionHelper {
         private final StreamMessageBuilder messageBuilder;
         private final FluxSinkOutputStream outputStream;
         private final PrintWriter printWriter;
-        
+
         public FluxSinkResponseWrapper(FluxSink<StreamMessageResponseDto> sink,
-                                      StreamingContext ctx, StringBuilder fullOutput, 
+                                      StreamingContext ctx, StringBuilder fullOutput,
                                       StreamMessageBuilder messageBuilder) {
             this.sink = sink;
             this.ctx = ctx;
@@ -311,27 +311,27 @@ public class ToolExecutionHelper {
             this.outputStream = new FluxSinkOutputStream();
             this.printWriter = new FluxSinkPrintWriter();
         }
-        
+
         @Override
         public ServletOutputStream getOutputStream() {
             return outputStream;
         }
-        
+
         @Override
         public PrintWriter getWriter() {
             return printWriter;
         }
-        
+
         @Override
         public void setContentType(String type) {
             // 忽略内容类型设置
         }
-        
+
         @Override
         public void setHeader(String name, String value) {
             // 忽略头部设置
         }
-        
+
         // 以下方法都为空实现，只为了满足接口要求
         @Override public String getCharacterEncoding() { return "UTF-8"; }
         @Override public String getContentType() { return null; }
@@ -363,35 +363,35 @@ public class ToolExecutionHelper {
         @Override public String getHeader(String name) { return null; }
         @Override public java.util.Collection<String> getHeaders(String name) { return java.util.Collections.emptyList(); }
         @Override public java.util.Collection<String> getHeaderNames() { return java.util.Collections.emptyList(); }
-        
+
         private class FluxSinkOutputStream extends ServletOutputStream {
             private final ByteArrayOutputStream lineBuffer = new ByteArrayOutputStream();
-            
+
             @Override
             public boolean isReady() {
                 return true;
             }
-            
+
             @Override
             public void setWriteListener(WriteListener writeListener) {
                 // 不需要实现
             }
-            
+
             @Override
             public void write(int b) {
                 if (b == '\n') {
                     String line = lineBuffer.toString(StandardCharsets.UTF_8);
-                    
+
                     // 处理SSE格式的数据
                     if (line.startsWith("data: ")) {
                         line = line.substring(6); // 移除 "data: " 前缀
                     }
-                    
+
                     // 日志记录流式输出内容
                     if (!line.trim().isEmpty()) {
                         log.info("工具流式输出: {}", line);
                     }
-                    
+
                     // 发送流式消息（不添加额外换行符）
                     sink.next(messageBuilder.createStreamMessage(line, "observation", false, ctx));
                     fullOutput.append(line).append('\n'); // 只在fullOutput中保留换行符用于日志
@@ -400,7 +400,7 @@ public class ToolExecutionHelper {
                     lineBuffer.write(b);
                 }
             }
-            
+
             @Override
             public void flush() {
                 if (lineBuffer.size() > 0) {
@@ -408,12 +408,12 @@ public class ToolExecutionHelper {
                     if (remainingData.startsWith("data: ")) {
                         remainingData = remainingData.substring(6);
                     }
-                    
+
                     // 日志记录流式输出内容（flush时）
                     if (!remainingData.trim().isEmpty()) {
                         log.info("工具流式输出(flush): {}", remainingData);
                     }
-                    
+
                     // 发送流式消息（flush时，不添加换行符）
                     sink.next(messageBuilder.createStreamMessage(remainingData, "observation", false, ctx));
                     fullOutput.append(remainingData);
@@ -421,65 +421,65 @@ public class ToolExecutionHelper {
                 }
             }
         }
-        
+
         /**
          * 专门用于FluxSink的PrintWriter实现
          */
         private class FluxSinkPrintWriter extends PrintWriter {
             private final StringBuilder lineBuffer = new StringBuilder();
-            
+
             public FluxSinkPrintWriter() {
                 super(new java.io.StringWriter()); // 虚拟Writer，不会真正使用
             }
-            
+
             @Override
             public void write(String str) {
                 if (str != null) {
                     lineBuffer.append(str);
                 }
             }
-            
+
             @Override
             public void write(char[] buf, int off, int len) {
                 if (buf != null && len > 0) {
                     lineBuffer.append(buf, off, len);
                 }
             }
-            
+
             @Override
             public void write(int c) {
                 lineBuffer.append((char) c);
             }
-            
+
             @Override
             public void println(String str) {
                 write(str);
                 // 注意：这里不自动添加换行符，交由原始内容决定
                 flush();
             }
-            
+
             @Override
             public void flush() {
                 if (lineBuffer.length() > 0) {
                     String content = lineBuffer.toString();
-                    
+
                     // 处理SSE格式的数据
                     if (content.startsWith("data: ")) {
                         content = content.substring(6);
                     }
-                    
+
                     // 日志记录流式输出内容
                     if (!content.trim().isEmpty()) {
                         log.info("工具流式输出(PrintWriter): {}", content.trim());
                     }
-                    
+
                     // 发送流式消息（PrintWriter，不添加额外换行符）
                     sink.next(messageBuilder.createStreamMessage(content, "observation", false, ctx));
                     fullOutput.append(content);
                     lineBuffer.setLength(0); // 清空缓冲区
                 }
             }
-            
+
             @Override
             public void close() {
                 flush();
