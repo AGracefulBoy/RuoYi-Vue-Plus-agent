@@ -76,6 +76,21 @@ public class SysKnowledgeBaseBo extends BaseEntity {
     private Long model;
 
     /**
+     * 视觉模型
+     */
+    private Long imageModel;
+
+    /**
+     * 向量模型
+     */
+    private Long embeddingModel;
+
+    /**
+     * 重排序模型
+     */
+    private Long rerankModel;
+
+    /**
      * 块大小
      */
     @NotNull(message = "块大小不能为空", groups = { AddGroup.class, EditGroup.class })

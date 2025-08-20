@@ -105,7 +105,7 @@ public class SysKnowledgeBaseServiceImpl implements ISysKnowledgeBaseService {
             String metadataJson = JSONUtil.toJsonStr(bo.getMetadataList());
             bo.setMetadata(metadataJson);
         }
-        
+
         SysKnowledgeBase add = MapstructUtils.convert(bo, SysKnowledgeBase.class);
         validEntityBeforeSave(add);
         boolean flag = baseMapper.insert(add) > 0;
@@ -133,7 +133,7 @@ public class SysKnowledgeBaseServiceImpl implements ISysKnowledgeBaseService {
             String metadataJson = JSONUtil.toJsonStr(bo.getMetadataList());
             bo.setMetadata(metadataJson);
         }
-        
+
         SysKnowledgeBase update = MapstructUtils.convert(bo, SysKnowledgeBase.class);
         validEntityBeforeSave(update);
         return baseMapper.updateById(update) > 0;
@@ -210,19 +210,6 @@ public class SysKnowledgeBaseServiceImpl implements ISysKnowledgeBaseService {
     }
 
     /**
-     * 根据知识库名称查询知识库管理
-     */
-    @Override
-    public SysKnowledgeBaseVo queryByName(String name) {
-        LambdaQueryWrapper<SysKnowledgeBase> lqw = Wrappers.lambdaQuery();
-        lqw.eq(SysKnowledgeBase::getName, name);
-        // 过滤已删除的数据
-        lqw.eq(SysKnowledgeBase::getDelFlag, SystemConstants.NORMAL);
-        lqw.last("LIMIT 1");
-        return baseMapper.selectVoOne(lqw);
-    }
-
-    /**
      * 校验知识库名称是否唯一
      */
     @Override
@@ -235,17 +222,6 @@ public class SysKnowledgeBaseServiceImpl implements ISysKnowledgeBaseService {
         // 过滤已删除的数据
         lqw.eq(SysKnowledgeBase::getDelFlag, SystemConstants.NORMAL);
         return !baseMapper.exists(lqw);
-    }
-
-    /**
-     * 修改知识库状态
-     */
-    @Override
-    public int updateKnowledgeBaseStatus(Long knowledgeBaseId, String status) {
-        LambdaUpdateWrapper<SysKnowledgeBase> updateWrapper = Wrappers.lambdaUpdate();
-        updateWrapper.eq(SysKnowledgeBase::getKnowledgeBaseId, knowledgeBaseId);
-        updateWrapper.set(SysKnowledgeBase::getStatus, status);
-        return baseMapper.update(null, updateWrapper);
     }
 
 }

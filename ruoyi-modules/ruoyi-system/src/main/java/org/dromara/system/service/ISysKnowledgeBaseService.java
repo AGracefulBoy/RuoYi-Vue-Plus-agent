@@ -66,14 +66,6 @@ public interface ISysKnowledgeBaseService {
     Boolean deleteWithValidByIds(Collection<Long> ids, Boolean isValid);
 
     /**
-     * 根据知识库名称查询知识库管理
-     *
-     * @param name 知识库名称
-     * @return 知识库管理
-     */
-    SysKnowledgeBaseVo queryByName(String name);
-
-    /**
      * 校验知识库名称是否唯一
      *
      * @param bo 知识库管理
@@ -81,13 +73,5 @@ public interface ISysKnowledgeBaseService {
      */
     boolean checkNameUnique(SysKnowledgeBaseBo bo);
 
-    /**
-     * 修改知识库状态
-     *
-     * @param knowledgeBaseId 知识库ID
-     * @param status          状态
-     * @return 结果
-     */
-    int updateKnowledgeBaseStatus(Long knowledgeBaseId, String status);
 
-} 
+}

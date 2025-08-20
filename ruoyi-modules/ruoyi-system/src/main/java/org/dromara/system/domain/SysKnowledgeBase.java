@@ -59,6 +59,21 @@ public class SysKnowledgeBase extends TenantEntity {
     private Long model;
 
     /**
+     * 视觉模型
+     */
+    private Long imageModel;
+
+    /**
+     * 向量模型
+     */
+    private Long embeddingModel;
+
+    /**
+     * 重排序模型
+     */
+    private Long rerankModel;
+
+    /**
      * 块大小
      */
     private Integer blockSize;

@@ -66,17 +66,6 @@ public class SysKnowledgeBaseController extends BaseController {
     }
 
     /**
-     * 根据知识库名称查询知识库管理
-     *
-     * @param name 知识库名称
-     */
-    @SaCheckPermission("system:knowledgeBase:query")
-    @GetMapping("/name/{name}")
-    public R<SysKnowledgeBaseVo> getByName(@PathVariable String name) {
-        return R.ok(knowledgeBaseService.queryByName(name));
-    }
-
-    /**
      * 新增知识库管理
      */
     @SaCheckPermission("system:knowledgeBase:add")
@@ -98,15 +87,6 @@ public class SysKnowledgeBaseController extends BaseController {
         return toAjax(knowledgeBaseService.updateByBo(bo));
     }
 
-    /**
-     * 状态修改
-     */
-    @SaCheckPermission("system:knowledgeBase:edit")
-    @Log(title = "知识库管理", businessType = BusinessType.UPDATE)
-    @PutMapping("/changeStatus")
-    public R<Void> changeStatus(@RequestBody SysKnowledgeBaseBo bo) {
-        return toAjax(knowledgeBaseService.updateKnowledgeBaseStatus(bo.getKnowledgeBaseId(), bo.getStatus()));
-    }
 
     /**
      * 删除知识库管理
