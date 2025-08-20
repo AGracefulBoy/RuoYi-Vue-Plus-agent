@@ -81,6 +81,11 @@ public class SysKnowledgeBaseDocumentBo extends BaseEntity {
     private Long model;
 
     /**
+     * 视觉模型
+     */
+    private Long imageModel;
+
+    /**
      * 块大小
      */
     private Integer blockSize;

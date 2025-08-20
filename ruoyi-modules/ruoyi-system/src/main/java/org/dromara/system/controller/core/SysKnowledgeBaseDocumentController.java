@@ -1,14 +1,12 @@
 package org.dromara.system.controller.core;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
-import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.core.validate.AddGroup;
 import org.dromara.common.core.validate.EditGroup;
-import org.dromara.common.excel.utils.ExcelUtil;
 import org.dromara.common.idempotent.annotation.RepeatSubmit;
 import org.dromara.common.log.annotation.Log;
 import org.dromara.common.log.enums.BusinessType;
@@ -19,7 +17,6 @@ import org.dromara.system.domain.bo.SysKnowledgeBaseDocumentBo;
 import org.dromara.system.domain.bo.SysKnowledgeBaseDocumentSliceUpdateBo;
 import org.dromara.system.domain.vo.SysKnowledgeBaseDocumentVo;
 import org.dromara.system.domain.vo.SysKnowledgeBaseEsDocumentVo;
-import org.dromara.system.service.IDocumentSplitService;
 import org.dromara.system.service.IElasticsearchDocumentService;
 import org.dromara.system.service.ISysKnowledgeBaseDocumentService;
 import org.springframework.validation.annotation.Validated;
@@ -39,7 +36,6 @@ import java.util.List;
 public class SysKnowledgeBaseDocumentController extends BaseController {
 
     private final ISysKnowledgeBaseDocumentService knowledgeBaseDocumentService;
-    private final IDocumentSplitService documentSplitService;
     private final IElasticsearchDocumentService elasticsearchDocumentService;
 
     /**
@@ -92,27 +88,6 @@ public class SysKnowledgeBaseDocumentController extends BaseController {
     @PostMapping("/edit")
     public R<Void> edit(@Validated(EditGroup.class) @RequestBody SysKnowledgeBaseDocumentBo bo) {
         return toAjax(knowledgeBaseDocumentService.updateByBo(bo));
-    }
-
-    /**
-     * 更新文档处理状态
-     */
-    @SaCheckPermission("system:knowledgeBaseDocument:edit")
-    @Log(title = "知识库文档管理", businessType = BusinessType.UPDATE)
-    @PostMapping("/updateStatus")
-    public R<Void> updateStatus(@RequestParam Long documentId, @RequestParam String status) {
-        return toAjax(knowledgeBaseDocumentService.updateDocumentStatus(documentId, status));
-    }
-
-    /**
-     * 更新文档切片参数
-     */
-    @SaCheckPermission("system:knowledgeBaseDocument:edit")
-    @Log(title = "知识库文档切片参数", businessType = BusinessType.UPDATE)
-    @RepeatSubmit()
-    @PostMapping("/updateSliceParams")
-    public R<Void> updateSliceParams(@Validated(EditGroup.class) @RequestBody SysKnowledgeBaseDocumentSliceUpdateBo bo) {
-        return toAjax(knowledgeBaseDocumentService.updateSliceParams(bo));
     }
 
     /**

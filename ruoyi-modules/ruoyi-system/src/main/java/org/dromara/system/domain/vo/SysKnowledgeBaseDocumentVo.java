@@ -98,6 +98,12 @@ public class SysKnowledgeBaseDocumentVo implements Serializable {
     private Long model;
 
     /**
+     * 视觉模型
+     */
+    @ExcelProperty(value = "视觉模型")
+    private Long imageModel;
+
+    /**
      * 块大小
      */
     @ExcelProperty(value = "块大小")
