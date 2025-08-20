@@ -11,6 +11,7 @@ import org.dromara.system.domain.SysKnowledgeBase;
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.Date;
+import java.util.List;
 
 /**
  * 知识库管理视图对象 sys_knowledge_base
@@ -65,6 +66,11 @@ public class SysKnowledgeBaseVo implements Serializable {
      */
     @ExcelProperty(value = "元数据")
     private String metadata;
+
+    /**
+     * 元数据列表（用于前端展示）
+     */
+    private List<KnowledgeBaseMetadata> metadataList;
 
     /**
      * 模型

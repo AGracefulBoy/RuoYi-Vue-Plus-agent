@@ -12,6 +12,9 @@ import org.dromara.common.core.validate.AddGroup;
 import org.dromara.common.core.validate.EditGroup;
 import org.dromara.common.mybatis.core.domain.BaseEntity;
 import org.dromara.system.domain.SysKnowledgeBase;
+import org.dromara.system.domain.vo.KnowledgeBaseMetadata;
+
+import java.util.List;
 
 /**
  * 知识库管理业务对象 sys_knowledge_base
@@ -61,6 +64,11 @@ public class SysKnowledgeBaseBo extends BaseEntity {
      */
     @Size(min = 0, max = 2000, message = "元数据长度不能超过{max}个字符")
     private String metadata;
+
+    /**
+     * 元数据列表（用于前端传入）
+     */
+    private List<KnowledgeBaseMetadata> metadataList;
 
     /**
      * 模型

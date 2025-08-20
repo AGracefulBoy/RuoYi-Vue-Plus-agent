@@ -21,7 +21,10 @@ import org.dromara.system.mapper.SysKnowledgeBaseMapper;
 import org.dromara.system.service.IElasticsearchIndexService;
 import org.dromara.system.service.ISysKnowledgeBaseService;
 import org.springframework.stereotype.Service;
+import cn.hutool.json.JSONUtil;
+import org.dromara.system.domain.vo.KnowledgeBaseMetadata;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
@@ -43,7 +46,19 @@ public class SysKnowledgeBaseServiceImpl implements ISysKnowledgeBaseService {
      */
     @Override
     public SysKnowledgeBaseVo queryById(Long knowledgeBaseId) {
-        return baseMapper.selectVoById(knowledgeBaseId);
+        SysKnowledgeBaseVo vo = baseMapper.selectVoById(knowledgeBaseId);
+        if (vo != null && StringUtils.isNotBlank(vo.getMetadata())) {
+            try {
+                // 将JSON字符串转换为List<KnowledgeBaseMetadata>
+                List<KnowledgeBaseMetadata> metadataList = JSONUtil.toList(vo.getMetadata(), KnowledgeBaseMetadata.class);
+                vo.setMetadataList(metadataList);
+            } catch (Exception e) {
+                log.error("解析metadata失败: knowledgeBaseId={}, error={}", knowledgeBaseId, e.getMessage());
+                // 解析失败时返回空列表
+                vo.setMetadataList(new ArrayList<>());
+            }
+        }
+        return vo;
     }
 
     /**
@@ -85,6 +100,12 @@ public class SysKnowledgeBaseServiceImpl implements ISysKnowledgeBaseService {
      */
     @Override
     public SysKnowledgeBaseVo insertByBo(SysKnowledgeBaseBo bo) {
+        // 处理metadataList转换为JSON字符串
+        if (bo.getMetadataList() != null && !bo.getMetadataList().isEmpty()) {
+            String metadataJson = JSONUtil.toJsonStr(bo.getMetadataList());
+            bo.setMetadata(metadataJson);
+        }
+        
         SysKnowledgeBase add = MapstructUtils.convert(bo, SysKnowledgeBase.class);
         validEntityBeforeSave(add);
         boolean flag = baseMapper.insert(add) > 0;
@@ -107,6 +128,12 @@ public class SysKnowledgeBaseServiceImpl implements ISysKnowledgeBaseService {
      */
     @Override
     public Boolean updateByBo(SysKnowledgeBaseBo bo) {
+        // 处理metadataList转换为JSON字符串
+        if (bo.getMetadataList() != null && !bo.getMetadataList().isEmpty()) {
+            String metadataJson = JSONUtil.toJsonStr(bo.getMetadataList());
+            bo.setMetadata(metadataJson);
+        }
+        
         SysKnowledgeBase update = MapstructUtils.convert(bo, SysKnowledgeBase.class);
         validEntityBeforeSave(update);
         return baseMapper.updateById(update) > 0;

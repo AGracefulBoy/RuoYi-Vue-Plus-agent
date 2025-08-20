@@ -82,7 +82,7 @@ public class SysKnowledgeBaseController extends BaseController {
     @SaCheckPermission("system:knowledgeBase:add")
     @Log(title = "知识库管理", businessType = BusinessType.INSERT)
     @RepeatSubmit()
-    @PostMapping()
+    @PostMapping("/add")
     public R<SysKnowledgeBaseVo> add(@Validated(AddGroup.class) @RequestBody SysKnowledgeBaseBo bo) {
         return R.ok(knowledgeBaseService.insertByBo(bo));
     }
