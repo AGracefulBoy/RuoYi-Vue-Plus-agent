@@ -2,6 +2,7 @@ package org.dromara.system.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.ObjectUtil;
+import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -18,6 +19,7 @@ import org.dromara.system.constant.SysKnowledgeBaseDocumentConstants;
 import org.dromara.system.domain.SysKnowledgeBaseDocument;
 import org.dromara.system.domain.bo.SysKnowledgeBaseDocumentBo;
 import org.dromara.system.domain.bo.SysKnowledgeBaseDocumentSliceUpdateBo;
+import org.dromara.system.domain.vo.KnowledgeBaseMetadata;
 import org.dromara.system.domain.vo.SysKnowledgeBaseDocumentVo;
 import org.dromara.system.mapper.SysKnowledgeBaseDocumentMapper;
 import org.dromara.system.mapper.SysKnowledgeBaseMapper;
@@ -309,7 +311,8 @@ public class SysKnowledgeBaseDocumentServiceImpl implements ISysKnowledgeBaseDoc
     }
 
     /**
-     * 将逗号分割的字符串转换为Map对象
+     * 将JSON格式的metadata转换为Map对象
+     * metadata格式为JSON数组，包含KnowledgeBaseMetadata对象
      */
     private Map<String, Object> convertMetadataToMap(String metadata) {
         Map<String, Object> metadataMap = new HashMap<>();
@@ -317,22 +320,21 @@ public class SysKnowledgeBaseDocumentServiceImpl implements ISysKnowledgeBaseDoc
             return metadataMap;
         }
 
-        // 按逗号分割
-        String[] items = metadata.split(",");
-        for (String item : items) {
-            String trimmedItem = item.trim();
-            if (StringUtils.isNotBlank(trimmedItem)) {
-                // 如果包含等号，则分割为键值对
-                if (trimmedItem.contains("=")) {
-                    String[] keyValue = trimmedItem.split("=", 2);
-                    if (keyValue.length == 2) {
-                        metadataMap.put(keyValue[0].trim(), keyValue[1].trim());
-                    }
-                } else {
-                    // 否则将项目作为键，值设为空字符串
-                    metadataMap.put(trimmedItem, "");
+        try {
+            // 解析JSON为List<KnowledgeBaseMetadata>
+            List<KnowledgeBaseMetadata> metadataList = JSONUtil.toList(metadata, KnowledgeBaseMetadata.class);
+            
+            // 将List转换为Map
+            for (KnowledgeBaseMetadata item : metadataList) {
+                if (item != null && StringUtils.isNotBlank(item.getName())) {
+                    // 使用name作为key，defaultValue作为value
+                    String value = StringUtils.isNotBlank(item.getDefaultValue()) ? item.getDefaultValue() : "";
+                    metadataMap.put(item.getName(), value);
                 }
             }
+        } catch (Exception e) {
+            log.error("解析metadata JSON失败: {}", metadata, e);
+            // 解析失败时返回空Map
         }
 
         return metadataMap;
