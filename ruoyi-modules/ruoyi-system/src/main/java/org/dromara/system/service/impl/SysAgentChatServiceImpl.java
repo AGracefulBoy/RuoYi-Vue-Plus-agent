@@ -1,5 +1,6 @@
 package org.dromara.system.service.impl;
 
+import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -281,7 +282,9 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
      */
     private List<ToolDto.Parameter> buildToolParameters(SysTool tool) {
         List<ToolDto.Parameter> parameters = new ArrayList<>();
-
+        if (JSONUtil.isTypeJSONArray(tool.getParameterSchema())){
+            parameters = JSONUtil.toList(tool.getParameterSchema(), ToolDto.Parameter.class);
+        }
         return parameters;
     }
 

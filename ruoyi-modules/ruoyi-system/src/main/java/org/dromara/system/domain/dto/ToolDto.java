@@ -19,8 +19,8 @@ public class ToolDto {
     public static class Parameter {
         private String name;
         private String desc;
+        private String defaultValue;
         private String type;
         private Boolean required;
-        private List<Parameter> properties;
     }
 }
