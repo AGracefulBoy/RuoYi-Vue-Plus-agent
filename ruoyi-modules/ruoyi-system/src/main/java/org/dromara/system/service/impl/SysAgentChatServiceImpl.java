@@ -24,7 +24,6 @@ import org.springframework.util.CollectionUtils;
 import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
 @Slf4j
@@ -129,7 +128,6 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
     private Flux<StreamMessageResponseDto> handleFreeChatAgent(SysAgent agent, ChatRequestDto chatRequest) {
         // 获取当前用户ID
         Long userId = LoginHelper.getUserId();
-
 
 
         String chatModel = chatRequest.getChatModel();
@@ -282,7 +280,7 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
      */
     private List<ToolDto.Parameter> buildToolParameters(SysTool tool) {
         List<ToolDto.Parameter> parameters = new ArrayList<>();
-        if (JSONUtil.isTypeJSONArray(tool.getParameterSchema())){
+        if (JSONUtil.isTypeJSONArray(tool.getParameterSchema())) {
             parameters = JSONUtil.toList(tool.getParameterSchema(), ToolDto.Parameter.class);
         }
         return parameters;
@@ -294,47 +292,18 @@ public class SysAgentChatServiceImpl implements SysAgentChatService {
     private List<ToolDto.Parameter> buildKnowledgeBaseParameters(SysKnowledgeBase kb) {
         List<ToolDto.Parameter> parameters = new ArrayList<>();
 
+        if (kb.getMetadata() != null && !kb.getMetadata().isEmpty()) {
+            if (JSONUtil.isTypeJSONArray(kb.getMetadata())) {
+                List<ToolDto.Parameter> list = JSONUtil.toList(kb.getMetadata(), ToolDto.Parameter.class);
+                parameters.addAll(list);
+            }
+        }
         parameters.add(ToolDto.Parameter.builder()
             .name("question")
             .desc("查询内容")
             .type("string")
             .required(true)
             .build());
-
-        if (kb.getMetadata() != null && !kb.getMetadata().isEmpty()) {
-            // 按逗号分割元数据字符串
-            String[] items = kb.getMetadata().split(",");
-            for (String item : items) {
-                String trimmedItem = item.trim();
-                if (StringUtils.isNotBlank(trimmedItem)) {
-                    String paramName;
-                    String paramDesc;
-
-                    // 如果包含等号，则分割为键值对
-                    if (trimmedItem.contains("=")) {
-                        String[] keyValue = trimmedItem.split("=", 2);
-                        if (keyValue.length == 2) {
-                            paramName = keyValue[0].trim();
-                            paramDesc = keyValue[1].trim();
-                        } else {
-                            paramName = trimmedItem;
-                            paramDesc = trimmedItem;
-                        }
-                    } else {
-                        // 否则将项目作为键和描述
-                        paramName = trimmedItem;
-                        paramDesc = trimmedItem;
-                    }
-
-                    parameters.add(ToolDto.Parameter.builder()
-                        .name(paramName)
-                        .desc(paramDesc)
-                        .type("string")
-                        .required(true)
-                        .build());
-                }
-            }
-        }
 
         return parameters;
     }
