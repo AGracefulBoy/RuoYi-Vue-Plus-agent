@@ -48,6 +48,7 @@ import java.nio.charset.StandardCharsets;
 import cn.hutool.json.JSONUtil;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONArray;
+import org.dromara.system.domain.vo.ToolParameterSchema;
 
 /**
  * 工具管理Service业务层处理
@@ -68,7 +69,19 @@ public class SysToolServiceImpl implements ISysToolService {
      */
     @Override
     public SysToolVo queryById(Long toolId) {
-        return baseMapper.selectVoById(toolId);
+        SysToolVo vo = baseMapper.selectVoById(toolId);
+        if (vo != null && StringUtils.isNotBlank(vo.getParameterSchema())) {
+            try {
+                // 将JSON字符串转换为List<ToolParameterSchema>
+                List<ToolParameterSchema> parameterSchemaList = JSONUtil.toList(vo.getParameterSchema(), ToolParameterSchema.class);
+                vo.setParameterSchemaList(parameterSchemaList);
+            } catch (Exception e) {
+                log.error("解析parameterSchema失败: toolId={}, error={}", toolId, e.getMessage());
+                // 解析失败时返回空列表
+                vo.setParameterSchemaList(new ArrayList<>());
+            }
+        }
+        return vo;
     }
 
     /**
@@ -111,6 +124,12 @@ public class SysToolServiceImpl implements ISysToolService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public SysToolVo insertByBo(SysToolBo bo) {
+        // 处理parameterSchemaList转换为JSON字符串
+        if (bo.getParameterSchemaList() != null && !bo.getParameterSchemaList().isEmpty()) {
+            String parameterSchemaJson = JSONUtil.toJsonStr(bo.getParameterSchemaList());
+            bo.setParameterSchema(parameterSchemaJson);
+        }
+        
         SysTool add = MapstructUtils.convert(bo, SysTool.class);
         validEntityBeforeSave(add);
         boolean flag = baseMapper.insert(add) > 0;
@@ -141,6 +160,12 @@ public class SysToolServiceImpl implements ISysToolService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Boolean updateByBo(SysToolBo bo) {
+        // 处理parameterSchemaList转换为JSON字符串
+        if (bo.getParameterSchemaList() != null && !bo.getParameterSchemaList().isEmpty()) {
+            String parameterSchemaJson = JSONUtil.toJsonStr(bo.getParameterSchemaList());
+            bo.setParameterSchema(parameterSchemaJson);
+        }
+        
         SysTool update = MapstructUtils.convert(bo, SysTool.class);
         validEntityBeforeSave(update);
         return baseMapper.updateById(update) > 0;

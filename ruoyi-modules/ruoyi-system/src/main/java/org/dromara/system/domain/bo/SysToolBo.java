@@ -10,6 +10,7 @@ import org.dromara.common.core.validate.AddGroup;
 import org.dromara.common.core.validate.EditGroup;
 import org.dromara.common.mybatis.core.domain.BaseEntity;
 import org.dromara.system.domain.SysTool;
+import org.dromara.system.domain.vo.ToolParameterSchema;
 
 import java.util.List;
 
@@ -86,6 +87,11 @@ public class SysToolBo extends BaseEntity {
      * 参数模式定义（JSON Schema格式）
      */
     private String parameterSchema;
+
+    /**
+     * 参数模式定义列表（用于前端传入）
+     */
+    private List<ToolParameterSchema> parameterSchemaList;
 
     /**
      * 结果模式定义（JSON Schema格式）

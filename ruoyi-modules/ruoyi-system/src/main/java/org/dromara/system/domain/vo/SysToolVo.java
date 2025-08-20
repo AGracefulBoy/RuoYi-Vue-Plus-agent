@@ -135,6 +135,11 @@ public class SysToolVo implements Serializable {
     private String parameterSchema;
 
     /**
+     * 参数模式定义列表（用于前端展示）
+     */
+    private List<ToolParameterSchema> parameterSchemaList;
+
+    /**
      * 结果模式定义（JSON Schema格式）
      */
     private String resultSchema;
