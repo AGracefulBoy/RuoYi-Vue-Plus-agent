@@ -55,12 +55,6 @@ public class SysModelConfigVo implements Serializable {
     private List<String> modelType;
 
     /**
-     * 模型适配的范围
-     */
-    @ExcelProperty(value = "模型适配范围")
-    private List<String> moduleType;
-
-    /**
      * 模型API地址
      */
     @ExcelProperty(value = "模型API地址")

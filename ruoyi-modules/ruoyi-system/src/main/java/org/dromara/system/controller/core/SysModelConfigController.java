@@ -87,17 +87,6 @@ public class SysModelConfigController extends BaseController {
     }
 
     /**
-     * 根据模型适配范围查询模型配置列表
-     *
-     * @param moduleType 模型适配范围
-     */
-    @SaCheckPermission("system:modelConfig:query")
-    @GetMapping("/module/{moduleType}")
-    public R<List<SysModelConfigVo>> getByModuleType(@PathVariable String moduleType) {
-        return R.ok(modelConfigService.queryByModuleType(moduleType));
-    }
-
-    /**
      * 新增模型配置
      */
     @SaCheckPermission("system:modelConfig:add")

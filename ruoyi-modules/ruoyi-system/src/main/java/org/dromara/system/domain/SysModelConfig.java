@@ -51,12 +51,6 @@ public class SysModelConfig extends TenantEntity {
     private List<String> modelType;
 
     /**
-     * 模型适配的范围
-     */
-    @TableField(typeHandler = FastjsonTypeHandler.class)
-    private List<String> moduleType;
-
-    /**
      * 模型API地址
      */
     private String baseUrl;

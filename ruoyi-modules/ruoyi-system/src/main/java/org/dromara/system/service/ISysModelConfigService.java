@@ -60,9 +60,4 @@ public interface ISysModelConfigService {
      */
     List<SysModelConfigVo> queryByModelType(String modelType);
 
-    /**
-     * 根据模型适配范围查询模型配置列表
-     */
-    List<SysModelConfigVo> queryByModuleType(String moduleType);
-
 } 

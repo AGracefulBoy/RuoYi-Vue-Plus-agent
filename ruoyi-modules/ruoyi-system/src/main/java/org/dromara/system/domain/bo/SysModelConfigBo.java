@@ -51,12 +51,6 @@ public class SysModelConfigBo extends BaseEntity {
     private List<String> modelType;
 
     /**
-     * 模型适配的范围
-     */
-    @NotNull(message = "模型适配范围不能为空", groups = {AddGroup.class, EditGroup.class})
-    private List<String> moduleType;
-
-    /**
      * 模型API地址
      */
     @NotBlank(message = "模型API地址不能为空", groups = {AddGroup.class, EditGroup.class})

@@ -160,15 +160,4 @@ public class SysModelConfigServiceImpl implements ISysModelConfigService {
             .eq(SysModelConfig::getDelFlag, SystemConstants.NORMAL));
     }
 
-    /**
-     * 根据模型适配范围查询模型配置列表
-     */
-    @Override
-    public List<SysModelConfigVo> queryByModuleType(String moduleType) {
-        return baseMapper.selectVoList(new LambdaQueryWrapper<SysModelConfig>()
-            .apply("JSON_CONTAINS(module_type, {0})", "\"" + moduleType + "\"")
-            // 过滤已删除的数据
-            .eq(SysModelConfig::getDelFlag, SystemConstants.NORMAL));
-    }
-
 }
