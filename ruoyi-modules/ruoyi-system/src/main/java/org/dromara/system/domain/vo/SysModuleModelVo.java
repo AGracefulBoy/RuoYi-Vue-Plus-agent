@@ -36,6 +36,11 @@ public class SysModuleModelVo implements Serializable {
     private Long modelId;
 
     /**
+     * 是否默认模型（0否 1是）
+     */
+    private Integer isDefault;
+
+    /**
      * 租户编号
      */
     private String tenantId;

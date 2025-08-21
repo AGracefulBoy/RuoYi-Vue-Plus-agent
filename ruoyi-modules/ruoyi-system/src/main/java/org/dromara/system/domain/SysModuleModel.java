@@ -40,6 +40,11 @@ public class SysModuleModel extends TenantEntity {
     private Long modelId;
 
     /**
+     * 是否默认模型（0否 1是）
+     */
+    private Integer isDefault;
+
+    /**
      * 删除标志（0代表存在 1代表删除）
      */
     @TableLogic

@@ -163,4 +163,42 @@ public class SysModuleModelServiceImpl implements ISysModuleModelService {
         lqw.in(SysModuleModel::getModelId, modelIds);
         return baseMapper.delete(lqw) > 0;
     }
+
+    /**
+     * 设置模块的默认模型
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Boolean setDefaultModel(Long moduleId, Long modelId) {
+        // 1. 先检查该模型是否已绑定到模块
+        LambdaQueryWrapper<SysModuleModel> checkLqw = Wrappers.lambdaQuery();
+        checkLqw.eq(SysModuleModel::getModuleId, moduleId);
+        checkLqw.eq(SysModuleModel::getModelId, modelId);
+        SysModuleModel moduleModel = baseMapper.selectOne(checkLqw);
+        
+        if (moduleModel == null) {
+            // 如果模型未绑定到模块，先进行绑定
+            moduleModel = new SysModuleModel();
+            moduleModel.setModuleId(moduleId);
+            moduleModel.setModelId(modelId);
+            moduleModel.setIsDefault(1);
+            return baseMapper.insert(moduleModel) > 0;
+        }
+        
+        // 2. 将该模块下所有模型的 isDefault 设置为 0
+        SysModuleModel resetDefault = new SysModuleModel();
+        resetDefault.setIsDefault(0);
+        LambdaQueryWrapper<SysModuleModel> resetLqw = Wrappers.lambdaQuery();
+        resetLqw.eq(SysModuleModel::getModuleId, moduleId);
+        baseMapper.update(resetDefault, resetLqw);
+        
+        // 3. 将指定模型的 isDefault 设置为 1
+        SysModuleModel setDefault = new SysModuleModel();
+        setDefault.setIsDefault(1);
+        LambdaQueryWrapper<SysModuleModel> setLqw = Wrappers.lambdaQuery();
+        setLqw.eq(SysModuleModel::getModuleId, moduleId);
+        setLqw.eq(SysModuleModel::getModelId, modelId);
+        
+        return baseMapper.update(setDefault, setLqw) > 0;
+    }
 }

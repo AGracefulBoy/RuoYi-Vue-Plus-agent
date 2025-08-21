@@ -102,4 +102,10 @@ public class SysModelConfigVo implements Serializable {
     @ExcelProperty(value = "备注")
     private String remark;
 
+    /**
+     * 是否默认模型（0否 1是）
+     * 非数据库字段，用于返回时标识
+     */
+    private Integer isDefault;
+
 }

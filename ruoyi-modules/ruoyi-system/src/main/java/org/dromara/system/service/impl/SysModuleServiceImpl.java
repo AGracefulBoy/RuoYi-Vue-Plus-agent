@@ -147,9 +147,22 @@ public class SysModuleServiceImpl implements ISysModuleService {
             return List.of();
         }
         
+        // 创建模型ID到isDefault的映射
+        Map<Long, Integer> modelDefaultMap = moduleModels.stream()
+            .collect(Collectors.toMap(
+                SysModuleModelVo::getModelId,
+                SysModuleModelVo::getIsDefault,
+                (v1, v2) -> v1
+            ));
+        
         // 批量查询模型配置信息
         List<SysModelConfig> modelConfigs = modelConfigMapper.selectBatchIds(modelIds);
-        return MapstructUtils.convert(modelConfigs, SysModelConfigVo.class);
+        List<SysModelConfigVo> result = MapstructUtils.convert(modelConfigs, SysModelConfigVo.class);
+        
+        // 设置isDefault标识
+        result.forEach(vo -> vo.setIsDefault(modelDefaultMap.getOrDefault(vo.getModelId(), 0)));
+        
+        return result;
     }
 
     /**

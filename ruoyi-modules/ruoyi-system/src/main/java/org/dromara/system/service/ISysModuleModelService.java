@@ -82,4 +82,13 @@ public interface ISysModuleModelService {
      */
     Boolean unbindModuleModels(Long moduleId, List<Long> modelIds);
 
+    /**
+     * 设置模块的默认模型
+     *
+     * @param moduleId 模块ID
+     * @param modelId 模型ID
+     * @return 是否设置成功
+     */
+    Boolean setDefaultModel(Long moduleId, Long modelId);
+
 }

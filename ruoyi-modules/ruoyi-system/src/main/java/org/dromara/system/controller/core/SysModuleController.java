@@ -98,4 +98,17 @@ public class SysModuleController extends BaseController {
     public R<Void> unbindModels(@PathVariable Long moduleId, @RequestBody List<Long> modelIds) {
         return toAjax(moduleModelService.unbindModuleModels(moduleId, modelIds));
     }
+
+    /**
+     * 设置模块的默认模型
+     *
+     * @param moduleId 模块ID
+     * @param modelId 模型ID
+     */
+    @SaCheckPermission("system:module:edit")
+    @Log(title = "模块管理", businessType = BusinessType.UPDATE)
+    @PostMapping("/{moduleId}/default/{modelId}")
+    public R<Void> setDefaultModel(@PathVariable Long moduleId, @PathVariable Long modelId) {
+        return toAjax(moduleModelService.setDefaultModel(moduleId, modelId));
+    }
 }

@@ -36,6 +36,11 @@ public class SysModuleModelBo extends BaseEntity {
     private Long modelId;
 
     /**
+     * 是否默认模型（0否 1是）
+     */
+    private Integer isDefault;
+
+    /**
      * 备注
      */
     private String remark;
