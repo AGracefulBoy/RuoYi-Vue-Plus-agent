@@ -20,6 +20,9 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 import org.dromara.common.core.exception.ServiceException;
+import org.dromara.common.llm.model.factory.AiService;
+import org.dromara.common.llm.model.platform.IEmbeddingModelService;
+import org.dromara.common.llm.model.protocol.req.IEmbeddingRequest;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.system.domain.SysKnowledgeBaseDocument;
@@ -28,12 +31,13 @@ import org.dromara.system.domain.dto.HitDocumentDTO;
 import org.dromara.system.domain.dto.HitSourceDTO;
 import org.dromara.system.domain.vo.SysKnowledgeBaseEsDocumentVo;
 import org.dromara.system.domain.vo.SysKnowledgeBaseVo;
+import org.dromara.system.domain.vo.SysModelConfigVo;
 import org.dromara.system.mapper.SysKnowledgeBaseDocumentChunkMapper;
 import org.dromara.system.mapper.SysKnowledgeBaseDocumentMapper;
-import org.dromara.system.service.IElasticsearchDocumentService;
-import org.dromara.system.service.IElasticsearchIndexService;
-import org.dromara.system.service.IReRankService;
-import org.dromara.system.service.ISysKnowledgeBaseService;
+import org.dromara.system.service.*;
+import org.springframework.ai.embedding.Embedding;
+import org.springframework.ai.embedding.EmbeddingResponse;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -51,6 +55,9 @@ import java.util.stream.Collectors;
 @Service
 public class ElasticsearchDocumentServiceImpl implements IElasticsearchDocumentService {
 
+    @Autowired
+    private ISysModelConfigService modelConfigService;
+
     private final ElasticsearchClient elasticsearchClient;
     private final IElasticsearchIndexService elasticsearchIndexService;
     private final SysKnowledgeBaseDocumentMapper knowledgeBaseDocumentMapper;
@@ -58,8 +65,6 @@ public class ElasticsearchDocumentServiceImpl implements IElasticsearchDocumentS
     private final ISysKnowledgeBaseService knowledgeBaseService;
     private final IReRankService reRankService;
 
-    @Value("${embedding.api.url:http://localhost:8001/embeddings}")
-    private String embeddingApiUrl;
 
     @Value("${embedding.api.connect-timeout:30000}")
     private Integer connectTimeout;
@@ -342,42 +347,27 @@ public class ElasticsearchDocumentServiceImpl implements IElasticsearchDocumentS
         return esDocument;
     }
 
+    @Autowired
+    private IEmbeddingService iEmbeddingService;
+
     /**
      * {@inheritDoc}
      */
     @Override
     public SearchResponse<Map> embeddingSearch(String indexName, Integer size, String question,
-                                               Map<String, Object> metadata) {
+                                               Map<String, Object> metadata, SysModelConfigVo modelConfig) {
         if (metadata != null) {
             log.info("Embedding search with metadata: {}", JSONUtil.toJsonStr(metadata));
         }
 
         try {
-            // 获取问题的向量表示
-            String requestBody = prepareRequestBody(Collections.singletonList(question));
-            Response response = sendEmbeddingRequest(requestBody);
-            String responseBody = response.body().string();
-
-            if (!response.isSuccessful()) {
-                log.error("向量化请求失败: {}", responseBody);
-                return null;
-            }
-
-            Map<String, Object> jsonResponse = JSONUtil.toBean(responseBody, Map.class);
-            if (!jsonResponse.containsKey("data") || !JSONUtil.isTypeJSONArray(jsonResponse.get("data").toString())) {
-                log.error("向量化返回数据格式不正确");
-                return null;
-            }
-
-            cn.hutool.json.JSONArray message = JSONUtil.parseArray(jsonResponse.get("data").toString());
-            List<Float> queryVector = JSONUtil.toList(message.getJSONArray(0), Float.class);
-
+            List<List<Float>> lists = iEmbeddingService.textsToEmbeddings(List.of(question), modelConfig.getModelId());
             // 构建查询条件
             KnnSearch.Builder knnBuilder = new KnnSearch.Builder()
                 .field("embedding")
                 .k(size)
                 .numCandidates(100)
-                .queryVector(queryVector);
+                .queryVector(lists.get(0));
 
             // 添加元数据过滤
             if (metadata != null && !metadata.isEmpty()) {
@@ -472,8 +462,9 @@ public class ElasticsearchDocumentServiceImpl implements IElasticsearchDocumentS
             paramObject = JSONUtil.toBean(metadata, Map.class);
         }
 
+        SysModelConfigVo modelConfig = modelConfigService.queryById(knowledgeBase.getEmbeddingModel());
         // 执行向量搜索和关键词搜索
-        SearchResponse<Map> vectorResponse = embeddingSearch(indexName, size * 2, question, paramObject);
+        SearchResponse<Map> vectorResponse = embeddingSearch(indexName, size * 2, question, paramObject, modelConfig);
         SearchResponse<Map> keywordResponse = keywordSearch(indexName, size * 2, question, paramObject);
 
         if (vectorResponse == null || keywordResponse == null) {
@@ -524,10 +515,10 @@ public class ElasticsearchDocumentServiceImpl implements IElasticsearchDocumentS
         }
 
         List<HitSourceDTO> sortedResults = mergedResults.values().stream()
-                // 根据 normalizedScore 降序排序
-                .sorted(Comparator.comparingDouble(HitSourceDTO::getNormalizedScore).reversed())
-                // 收集为 List
-                .collect(Collectors.toList());
+            // 根据 normalizedScore 降序排序
+            .sorted(Comparator.comparingDouble(HitSourceDTO::getNormalizedScore).reversed())
+            // 收集为 List
+            .collect(Collectors.toList());
 
         // 调用reRank 方法进行重排序
         List<List<String>> reRankList = new ArrayList<>();
@@ -603,17 +594,6 @@ public class ElasticsearchDocumentServiceImpl implements IElasticsearchDocumentS
         return JSONUtil.toJsonStr(requestMap);
     }
 
-    /**
-     * 发送向量化请求
-     */
-    private Response sendEmbeddingRequest(String requestBody) throws Exception {
-        Request request = new Request.Builder()
-            .url(embeddingApiUrl)
-            .post(RequestBody.create(requestBody, MediaType.parse("application/json")))
-            .build();
-
-        return httpClient.newCall(request).execute();
-    }
 
 
     /**

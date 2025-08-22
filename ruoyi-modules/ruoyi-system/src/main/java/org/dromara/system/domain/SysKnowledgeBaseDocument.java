@@ -84,6 +84,11 @@ public class SysKnowledgeBaseDocument extends TenantEntity {
     private Long imageModel;
 
     /**
+     * 向量模型
+     */
+    private Long embeddingModel;
+
+    /**
      * 块大小
      */
     private Integer blockSize;
@@ -134,4 +139,4 @@ public class SysKnowledgeBaseDocument extends TenantEntity {
      */
     private Integer mode;
 
-} 
+}

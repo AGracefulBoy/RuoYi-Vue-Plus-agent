@@ -7,6 +7,7 @@ import org.dromara.system.domain.SysKnowledgeBase;
 import org.dromara.system.domain.dto.HitSourceDTO;
 import org.dromara.system.domain.vo.SysKnowledgeBaseEsDocumentVo;
 import org.dromara.system.domain.vo.SysKnowledgeBaseVo;
+import org.dromara.system.domain.vo.SysModelConfigVo;
 
 import java.util.List;
 import java.util.Map;
@@ -67,7 +68,7 @@ public interface IElasticsearchDocumentService {
      * @return 搜索结果
      */
     SearchResponse<Map> embeddingSearch(String indexName, Integer size, String question,
-                                       Map<String, Object> metadata);
+                                        Map<String, Object> metadata, SysModelConfigVo modelConfig);
 
     /**
      * 关键词搜索

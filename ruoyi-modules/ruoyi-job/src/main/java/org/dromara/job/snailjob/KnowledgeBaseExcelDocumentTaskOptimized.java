@@ -293,7 +293,7 @@ public class KnowledgeBaseExcelDocumentTaskOptimized {
             List<CompletableFuture<List<Map<String, Object>>>> embeddingFutures =
                 chunkBatches.stream()
                     .map(batch -> CompletableFuture.supplyAsync(() ->
-                        processExcelChunkBatch(batch, doc, indexName),
+                            processExcelChunkBatch(batch, doc, indexName),
                         documentProcessingExecutor))
                     .collect(Collectors.toList());
 
@@ -339,9 +339,9 @@ public class KnowledgeBaseExcelDocumentTaskOptimized {
      * 批量处理Excel chunks的向量化
      */
     private List<Map<String, Object>> processExcelChunkBatch(
-            List<SysKnowledgeBaseDocumentChunk> chunks,
-            SysKnowledgeBaseDocument doc,
-            String indexName) {
+        List<SysKnowledgeBaseDocumentChunk> chunks,
+        SysKnowledgeBaseDocument doc,
+        String indexName) {
 
         List<Map<String, Object>> esDocuments = new ArrayList<>();
 
@@ -367,15 +367,7 @@ public class KnowledgeBaseExcelDocumentTaskOptimized {
 
         try {
             // 批量调用embedding服务
-            List<float[]> embeddings = new ArrayList<>();
-            for (String content : contents) {
-                float[] embedding = embeddingService.textToEmbeddingArray(content);
-                if (embedding != null && embedding.length > 0) {
-                    embeddings.add(embedding);
-                } else {
-                    embeddings.add(new float[0]); // 添加空数组保持索引对齐
-                }
-            }
+            List<List<Float>> embeddings = embeddingService.textsToEmbeddings(contents, doc.getEmbeddingModel());
 
             // 构建ES文档
             String createTime = LocalDateTime.now().format(
@@ -383,42 +375,13 @@ public class KnowledgeBaseExcelDocumentTaskOptimized {
 
             for (int i = 0; i < chunks.size() && i < embeddings.size(); i++) {
                 SysKnowledgeBaseDocumentChunk chunk = chunks.get(i);
-                float[] embedding = embeddings.get(i);
-
-                if (embedding.length == 0) {
-                    SnailJobLog.REMOTE.warn("切块 {} 向量化失败，跳过", chunk.getChunkId());
-                    continue;
-                }
-
+                List<Float> embedding = embeddings.get(i);
                 Map<String, Object> esDoc = buildEsDocument(chunk, doc, embedding, createTime);
                 esDocuments.add(esDoc);
             }
 
         } catch (Exception e) {
             SnailJobLog.REMOTE.error("批量处理Excel chunks向量化失败", e);
-            // 降级为单个处理
-            for (SysKnowledgeBaseDocumentChunk chunk : chunks) {
-                try {
-                    String content = chunk.getContent();
-                    if (StrUtil.isBlank(content)) {
-                        continue;
-                    }
-
-                    if (content.length() > MAX_CONTENT_LENGTH) {
-                        content = content.substring(0, MAX_CONTENT_LENGTH);
-                    }
-
-                    float[] embedding = embeddingService.textToEmbeddingArray(content);
-                    if (embedding != null && embedding.length > 0) {
-                        String createTime = LocalDateTime.now().format(
-                            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-                        Map<String, Object> esDoc = buildEsDocument(chunk, doc, embedding, createTime);
-                        esDocuments.add(esDoc);
-                    }
-                } catch (Exception ex) {
-                    SnailJobLog.REMOTE.error("处理单个chunk {} 向量化失败", chunk.getChunkId(), ex);
-                }
-            }
         }
 
         return esDocuments;
@@ -471,7 +434,7 @@ public class KnowledgeBaseExcelDocumentTaskOptimized {
      * 构建chunk实体
      */
     private SysKnowledgeBaseDocumentChunk buildChunkEntity(DocumentChunk chunk,
-                                                          SysKnowledgeBaseDocument doc) {
+                                                           SysKnowledgeBaseDocument doc) {
         SysKnowledgeBaseDocumentChunk entity = new SysKnowledgeBaseDocumentChunk();
         entity.setDocumentId(doc.getDocumentId());
         entity.setKnowledgeBaseId(doc.getKnowledgeBaseId());
@@ -487,9 +450,9 @@ public class KnowledgeBaseExcelDocumentTaskOptimized {
      * 构建ES文档
      */
     private Map<String, Object> buildEsDocument(SysKnowledgeBaseDocumentChunk chunk,
-                                               SysKnowledgeBaseDocument doc,
-                                               float[] embedding,
-                                               String createTime) {
+                                                SysKnowledgeBaseDocument doc,
+                                                List<Float> embedding,
+                                                String createTime) {
         Map<String, Object> esDoc = new HashMap<>();
         esDoc.put("documentId", chunk.getDocumentId().toString());
         esDoc.put("chunkId", chunk.getChunkId().toString() + "_" + IdUtil.fastSimpleUUID());

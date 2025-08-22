@@ -212,7 +212,7 @@ public class KnowledgeBaseFileTaskOptimized {
                             SysKnowledgeBaseDocumentConstants.STATUS_DOCUMENT_FAIL);
                     }
                 }, documentProcessingExecutor))
-                .collect(Collectors.toList());
+                .toList();
 
             // 等待所有任务完成
             CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
@@ -310,7 +310,7 @@ public class KnowledgeBaseFileTaskOptimized {
                     .map(batch -> CompletableFuture.supplyAsync(() ->
                         processChunkBatch(batch, doc, chatService, modelConfig),
                         documentProcessingExecutor))
-                    .collect(Collectors.toList());
+                    .toList();
 
             // 等待所有批次完成
             CompletableFuture.allOf(embeddingFutures.toArray(new CompletableFuture[0])).join();
@@ -383,7 +383,7 @@ public class KnowledgeBaseFileTaskOptimized {
                 // 生成向量
                 List<String> textList = new ArrayList<>(parsedData.keySet());
                 if (!textList.isEmpty()) {
-                    List<List<Double>> embeddings = embeddingService.textsToEmbeddings(textList);
+                    List<List<Float>> embeddings = embeddingService.textsToEmbeddings(textList,doc.getEmbeddingModel());
 
                     // 构建ES文档
                     String createTime = LocalDateTime.now().format(
@@ -575,7 +575,7 @@ public class KnowledgeBaseFileTaskOptimized {
     private Map<String, Object> buildEsDocument(SysKnowledgeBaseDocumentChunk chunk,
                                                SysKnowledgeBaseDocument doc,
                                                String title, String content,
-                                               List<Double> embedding, String createTime) {
+                                               List<Float> embedding, String createTime) {
         Map<String, Object> esDoc = new HashMap<>();
         esDoc.put("documentId", chunk.getDocumentId().toString());
         esDoc.put("chunkId", chunk.getChunkId().toString() + "_" + IdUtil.fastSimpleUUID());

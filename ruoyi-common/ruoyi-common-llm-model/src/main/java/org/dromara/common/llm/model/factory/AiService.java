@@ -3,12 +3,15 @@ package org.dromara.common.llm.model.factory;
 
 import org.dromara.common.llm.model.enums.PlatformType;
 import org.dromara.common.llm.model.platform.IChatService;
+import org.dromara.common.llm.model.platform.IEmbeddingModelService;
 import org.dromara.common.llm.model.platform.alibaba.chat.AlibabaChatService;
+import org.dromara.common.llm.model.platform.alibaba.embedding.AlibabaEmbeddingService;
 import org.dromara.common.llm.model.platform.claude.chat.ClaudeChatService;
 import org.dromara.common.llm.model.platform.deepseek.chat.DeepSeekChatService;
 import org.dromara.common.llm.model.platform.doubao.chat.DouBaoChatService;
 import org.dromara.common.llm.model.platform.moonshot.chat.MoonshotChatService;
 import org.dromara.common.llm.model.platform.openai.chat.OpenAiChatService;
+import org.dromara.common.llm.model.platform.openai.embedding.OpenAiEmbeddingService;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -27,6 +30,11 @@ public class AiService implements InitializingBean {
      * 服务实例缓存Map，使用EnumMap提高性能
      */
     private static final Map<PlatformType, IChatService> SERVICE_CACHE = new EnumMap<>(PlatformType.class);
+
+    /**
+     * Embedding服务实例缓存Map，使用EnumMap提高性能
+     */
+    private static final Map<PlatformType, IEmbeddingModelService> EMBEDDING_SERVICE_CACHE = new EnumMap<>(PlatformType.class);
 
     /**
      * 注入OpenAI聊天服务
@@ -51,6 +59,18 @@ public class AiService implements InitializingBean {
 
     @Autowired(required = false)
     private ClaudeChatService claudeChatService;
+
+    /**
+     * 注入OpenAI Embedding服务
+     */
+    @Autowired(required = false)
+    private OpenAiEmbeddingService openAiEmbeddingService;
+
+    /**
+     * 注入Alibaba Embedding服务
+     */
+    @Autowired(required = false)
+    private AlibabaEmbeddingService alibabaEmbeddingService;
 
 
     /**
@@ -80,6 +100,14 @@ public class AiService implements InitializingBean {
 
         if (claudeChatService != null) {
             SERVICE_CACHE.put(PlatformType.CLAUDE, claudeChatService);
+        }
+
+        // 建立平台类型与Embedding服务bean的映射
+        if (openAiEmbeddingService != null) {
+            EMBEDDING_SERVICE_CACHE.put(PlatformType.OPENAI, openAiEmbeddingService);
+        }
+        if (alibabaEmbeddingService != null) {
+            EMBEDDING_SERVICE_CACHE.put(PlatformType.ALIBABA, alibabaEmbeddingService);
         }
     }
 
@@ -140,5 +168,64 @@ public class AiService implements InitializingBean {
     public static boolean isSupported(String platformName) {
         PlatformType platformType = PlatformType.getPlatform(platformName);
         return isSupported(platformType);
+    }
+
+    /**
+     * 根据平台类型获取对应的Embedding服务（从Spring容器获取bean）
+     *
+     * @param platformType 平台类型
+     * @return 对应的Embedding服务实现
+     * @throws UnsupportedOperationException 当平台类型不支持时抛出异常
+     */
+    public static IEmbeddingModelService getEmbeddingService(PlatformType platformType) {
+        // 先从缓存中获取
+        IEmbeddingModelService service = EMBEDDING_SERVICE_CACHE.get(platformType);
+        if (service != null) {
+            return service;
+        }
+        // 默认使用OpenAI embedding服务
+        return EMBEDDING_SERVICE_CACHE.get(PlatformType.OPENAI);
+    }
+
+    /**
+     * 根据平台名称获取对应的Embedding服务（从Spring容器获取bean）
+     *
+     * @param platformName 平台名称
+     * @return 对应的Embedding服务实现
+     * @throws UnsupportedOperationException 当平台类型不支持时抛出异常
+     */
+    public static IEmbeddingModelService getEmbeddingService(String platformName) {
+        PlatformType platformType = PlatformType.getPlatform(platformName);
+        return getEmbeddingService(platformType);
+    }
+
+    /**
+     * 获取所有已支持的Embedding平台类型
+     *
+     * @return 支持的Embedding平台类型数组
+     */
+    public static PlatformType[] getSupportedEmbeddingPlatforms() {
+        return EMBEDDING_SERVICE_CACHE.keySet().toArray(new PlatformType[0]);
+    }
+
+    /**
+     * 检查指定平台是否支持Embedding
+     *
+     * @param platformType 平台类型
+     * @return 是否支持
+     */
+    public static boolean isEmbeddingSupported(PlatformType platformType) {
+        return EMBEDDING_SERVICE_CACHE.containsKey(platformType);
+    }
+
+    /**
+     * 检查指定平台名称是否支持Embedding
+     *
+     * @param platformName 平台名称
+     * @return 是否支持
+     */
+    public static boolean isEmbeddingSupported(String platformName) {
+        PlatformType platformType = PlatformType.getPlatform(platformName);
+        return isEmbeddingSupported(platformType);
     }
 }
