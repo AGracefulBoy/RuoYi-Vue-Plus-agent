@@ -1,5 +1,7 @@
 package org.dromara.system.service;
 
+import org.dromara.system.domain.vo.SysKnowledgeBaseVo;
+
 import java.util.List;
 
 /**
@@ -13,5 +15,5 @@ public interface IReRankService {
      * @param sentencePairs 句子对列表
      * @return 相似度分数列表
      */
-    List<Double> reRank(List<List<String>> sentencePairs);
+    List<Double> reRank(List<String> sentencePairs, SysKnowledgeBaseVo knowledgeBase);
 }

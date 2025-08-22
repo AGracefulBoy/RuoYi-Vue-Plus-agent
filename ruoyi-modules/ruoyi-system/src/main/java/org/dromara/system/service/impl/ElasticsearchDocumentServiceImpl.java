@@ -521,15 +521,12 @@ public class ElasticsearchDocumentServiceImpl implements IElasticsearchDocumentS
             .collect(Collectors.toList());
 
         // 调用reRank 方法进行重排序
-        List<List<String>> reRankList = new ArrayList<>();
+        List<String> reRankList = new ArrayList<>();
         for (HitSourceDTO hitSourceDTO : sortedResults) {
-            List<String> list = new ArrayList<>();
-            list.add(question);
-            list.add(hitSourceDTO.getHitDocument().getContent());
-            reRankList.add(list);
+            reRankList.add(hitSourceDTO.getHitDocument().getContent());
         }
 
-        List<Double> reRankScoreList = reRankService.reRank(reRankList);
+        List<Double> reRankScoreList = reRankService.reRank(reRankList, knowledgeBase);
 
         for (int i = 0; i < sortedResults.size(); i++) {
             sortedResults.get(i).setReRandScore(reRankScoreList.get(i));

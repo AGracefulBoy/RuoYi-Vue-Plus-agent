@@ -4,8 +4,10 @@ package org.dromara.common.llm.model.factory;
 import org.dromara.common.llm.model.enums.PlatformType;
 import org.dromara.common.llm.model.platform.IChatService;
 import org.dromara.common.llm.model.platform.IEmbeddingModelService;
+import org.dromara.common.llm.model.platform.IRerankModeService;
 import org.dromara.common.llm.model.platform.alibaba.chat.AlibabaChatService;
 import org.dromara.common.llm.model.platform.alibaba.embedding.AlibabaEmbeddingService;
+import org.dromara.common.llm.model.platform.alibaba.rerank.AlibabaRerankService;
 import org.dromara.common.llm.model.platform.claude.chat.ClaudeChatService;
 import org.dromara.common.llm.model.platform.deepseek.chat.DeepSeekChatService;
 import org.dromara.common.llm.model.platform.doubao.chat.DouBaoChatService;
@@ -35,6 +37,11 @@ public class AiService implements InitializingBean {
      * Embedding服务实例缓存Map，使用EnumMap提高性能
      */
     private static final Map<PlatformType, IEmbeddingModelService> EMBEDDING_SERVICE_CACHE = new EnumMap<>(PlatformType.class);
+
+    /**
+     * Rerank服务实例缓存Map，使用EnumMap提高性能
+     */
+    private static final Map<PlatformType, IRerankModeService> RERANK_SERVICE_CACHE = new EnumMap<>(PlatformType.class);
 
     /**
      * 注入OpenAI聊天服务
@@ -72,6 +79,12 @@ public class AiService implements InitializingBean {
     @Autowired(required = false)
     private AlibabaEmbeddingService alibabaEmbeddingService;
 
+    /**
+     * 注入Alibaba Rerank服务
+     */
+    @Autowired(required = false)
+    private AlibabaRerankService alibabaRerankService;
+
 
     /**
      * Spring容器初始化后，建立平台类型与服务bean的映射关系
@@ -108,6 +121,11 @@ public class AiService implements InitializingBean {
         }
         if (alibabaEmbeddingService != null) {
             EMBEDDING_SERVICE_CACHE.put(PlatformType.ALIBABA, alibabaEmbeddingService);
+        }
+
+        // 建立平台类型与Rerank服务bean的映射
+        if (alibabaRerankService != null) {
+            RERANK_SERVICE_CACHE.put(PlatformType.ALIBABA, alibabaRerankService);
         }
     }
 
@@ -227,5 +245,64 @@ public class AiService implements InitializingBean {
     public static boolean isEmbeddingSupported(String platformName) {
         PlatformType platformType = PlatformType.getPlatform(platformName);
         return isEmbeddingSupported(platformType);
+    }
+
+    /**
+     * 根据平台类型获取对应的Rerank服务（从Spring容器获取bean）
+     *
+     * @param platformType 平台类型
+     * @return 对应的Rerank服务实现
+     * @throws UnsupportedOperationException 当平台类型不支持时抛出异常
+     */
+    public static IRerankModeService getRerankService(PlatformType platformType) {
+        // 先从缓存中获取
+        IRerankModeService service = RERANK_SERVICE_CACHE.get(platformType);
+        if (service != null) {
+            return service;
+        }
+        // 如果指定平台不支持，抛出异常
+        throw new UnsupportedOperationException("不支持的Rerank平台: " + platformType);
+    }
+
+    /**
+     * 根据平台名称获取对应的Rerank服务（从Spring容器获取bean）
+     *
+     * @param platformName 平台名称
+     * @return 对应的Rerank服务实现
+     * @throws UnsupportedOperationException 当平台类型不支持时抛出异常
+     */
+    public static IRerankModeService getRerankService(String platformName) {
+        PlatformType platformType = PlatformType.getPlatform(platformName);
+        return getRerankService(platformType);
+    }
+
+    /**
+     * 获取所有已支持的Rerank平台类型
+     *
+     * @return 支持的Rerank平台类型数组
+     */
+    public static PlatformType[] getSupportedRerankPlatforms() {
+        return RERANK_SERVICE_CACHE.keySet().toArray(new PlatformType[0]);
+    }
+
+    /**
+     * 检查指定平台是否支持Rerank
+     *
+     * @param platformType 平台类型
+     * @return 是否支持
+     */
+    public static boolean isRerankSupported(PlatformType platformType) {
+        return RERANK_SERVICE_CACHE.containsKey(platformType);
+    }
+
+    /**
+     * 检查指定平台名称是否支持Rerank
+     *
+     * @param platformName 平台名称
+     * @return 是否支持
+     */
+    public static boolean isRerankSupported(String platformName) {
+        PlatformType platformType = PlatformType.getPlatform(platformName);
+        return isRerankSupported(platformType);
     }
 }
