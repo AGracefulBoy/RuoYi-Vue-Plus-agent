@@ -183,27 +183,24 @@ public class SysKnowledgeBaseServiceImpl implements ISysKnowledgeBaseService {
         }
 
         // Collect knowledge base names before deletion for ES index cleanup
-        List<String> knowledgeBaseNames = ids.stream()
+        List<Long> knowledgeBaseNames = ids.stream()
             .map(this::queryById)
             .filter(ObjectUtil::isNotNull)
-            .map(SysKnowledgeBaseVo::getName)
-            .filter(StringUtils::isNotBlank)
+            .map(SysKnowledgeBaseVo::getKnowledgeBaseId)
             .toList();
 
         boolean flag = baseMapper.deleteBatchIds(ids) > 0;
 
         if (flag) {
-            // Delete corresponding Elasticsearch indices
-            knowledgeBaseNames.forEach(name -> {
-                try {
-                    Boolean indexDeleted = elasticsearchIndexService.deleteKnowledgeBaseIndex(name);
-                    if (!indexDeleted) {
-                        log.warn("Failed to delete Elasticsearch index for knowledge base: {}", name);
-                    }
-                } catch (Exception exception) {
-                    log.error("Error deleting Elasticsearch index for knowledge base: {}", name, exception);
+            // Delete corresponding Elasticsearch indices using batch operation
+            try {
+                Boolean indicesDeleted = elasticsearchIndexService.batchDeleteKnowledgeBaseIndices(knowledgeBaseNames);
+                if (!indicesDeleted) {
+                    log.warn("Some Elasticsearch indices failed to delete for knowledge bases");
                 }
-            });
+            } catch (Exception exception) {
+                log.error("Error batch deleting Elasticsearch indices for knowledge bases", exception);
+            }
         }
 
         return flag;

@@ -45,13 +45,21 @@ public interface IElasticsearchIndexService {
      * @return the formatted index name with environment information
      */
     String generateIndexName(String knowledgeBaseName);
-    
+
     /**
      * Batch store documents to Elasticsearch.
-     * 
+     *
      * @param indexName the index name to store documents
      * @param documents a list of documents, each containing id and document data
      * @return the number of successfully stored documents
      */
     int batchStoreDocuments(String indexName, List<Map<String, Object>> documents);
+
+    /**
+     * Batch deletes indices for multiple knowledge bases.
+     *
+     * @param knowledgeBaseNames list of knowledge base names whose indices should be deleted
+     * @return true if all deletions succeeded, false if any deletion failed
+     */
+    Boolean batchDeleteKnowledgeBaseIndices(List<Long> knowledgeBaseNames);
 }

@@ -80,16 +80,44 @@ public class EmbeddingServiceImpl implements IEmbeddingService {
     private List<float[]> callEmbeddingApi(EmbeddingRequestDto request, SysModelConfigVo modelConfig) {
         try {
             IEmbeddingModelService embeddingService = AiService.getEmbeddingService(modelConfig.getModelProvider());
-
-            IEmbeddingRequest text = IEmbeddingRequest.builder()
-                .baseUrl(modelConfig.getBaseUrl())
-                .apiKey(modelConfig.getApiKey())
-                .model(modelConfig.getModelCode())
-                .text(request.getText())
-                .build();
-            EmbeddingResponse call = embeddingService.call(text);
-
-            return call.getResults().stream().map(Embedding::getOutput).toList();
+            
+            List<String> allTexts = request.getText();
+            List<float[]> allResults = new ArrayList<>();
+            int batchSize = 10;
+            
+            // Process texts in batches of 10
+            for (int i = 0; i < allTexts.size(); i += batchSize) {
+                int endIndex = Math.min(i + batchSize, allTexts.size());
+                List<String> batchTexts = allTexts.subList(i, endIndex);
+                
+                log.debug("Processing batch {}/{} with {} texts", 
+                    (i / batchSize) + 1, 
+                    (allTexts.size() + batchSize - 1) / batchSize,
+                    batchTexts.size());
+                
+                IEmbeddingRequest batchRequest = IEmbeddingRequest.builder()
+                    .baseUrl(modelConfig.getBaseUrl())
+                    .apiKey(modelConfig.getApiKey())
+                    .model(modelConfig.getModelCode())
+                    .text(batchTexts)
+                    .build();
+                    
+                EmbeddingResponse batchResponse = embeddingService.call(batchRequest);
+                
+                // Collect results from this batch
+                List<float[]> batchResults = batchResponse.getResults().stream()
+                    .map(Embedding::getOutput)
+                    .toList();
+                allResults.addAll(batchResults);
+                
+                log.debug("Batch processed successfully, got {} embeddings", batchResults.size());
+            }
+            
+            log.info("Successfully processed {} texts in {} batches", 
+                allTexts.size(), 
+                (allTexts.size() + batchSize - 1) / batchSize);
+            
+            return allResults;
 
         } catch (Exception exception) {
             log.error("Failed to call embedding ", exception);

@@ -68,7 +68,7 @@ public class ElasticsearchIndexServiceImpl implements IElasticsearchIndexService
                             .dynamic(DynamicMapping.True))))
                     .properties("embedding", Property.of(p -> p
                         .denseVector(v -> v
-                            .dims(768))))
+                            .dims(1024))))
                 )
             );
 
@@ -142,6 +142,51 @@ public class ElasticsearchIndexServiceImpl implements IElasticsearchIndexService
 
         // Format: knowledge_base_{environment}_{name}
         return "knowledge_base_" + environment + "_" + sanitizedName;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Boolean batchDeleteKnowledgeBaseIndices(List<Long> knowledgeBaseNames) {
+        if (knowledgeBaseNames == null || knowledgeBaseNames.isEmpty()) {
+            log.warn("No knowledge base names provided for batch deletion");
+            return true;
+        }
+
+        boolean allSucceeded = true;
+        int successCount = 0;
+        int failureCount = 0;
+
+        for (Long knowledgeBaseName : knowledgeBaseNames) {
+            try {
+                String indexName = generateIndexName(knowledgeBaseName.toString());
+
+                // Check if index exists before attempting deletion
+                if (!indexExists(knowledgeBaseName.toString())) {
+                    log.debug("Index does not exist for knowledge base: {}, skipping", knowledgeBaseName);
+                    successCount++;
+                    continue;
+                }
+
+                DeleteIndexRequest request = DeleteIndexRequest.of(builder -> builder
+                    .index(indexName));
+
+                elasticsearchClient.indices().delete(request);
+                log.info("Successfully deleted index for knowledge base: {}", knowledgeBaseName);
+                successCount++;
+
+            } catch (Exception exception) {
+                log.error("Failed to delete index for knowledge base: {}", knowledgeBaseName, exception);
+                allSucceeded = false;
+                failureCount++;
+            }
+        }
+
+        log.info("Batch delete completed: {} succeeded, {} failed out of {} total",
+            successCount, failureCount, knowledgeBaseNames.size());
+
+        return allSucceeded;
     }
 
     /**
