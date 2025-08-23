@@ -20,6 +20,11 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * 模型对话接口
+ *
+ * @author zhoudashuai
+ */
 @Slf4j
 @Validated
 @RequiredArgsConstructor
@@ -31,6 +36,9 @@ public class LlmModelChatController {
     private ISysModelConfigService modelConfigService;
 
     // todo 优化
+    /**
+     * 模型对话，支持流失与非流失
+     */
     @PostMapping(path = "/v1", produces = {MediaType.APPLICATION_JSON_VALUE, MediaType.TEXT_EVENT_STREAM_VALUE})
     public Object chat(@RequestBody ModelChatRequestDto modelChatRequestDto) {
         SysModelConfigVo sysModelConfigVo = TenantHelper
