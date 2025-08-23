@@ -17,18 +17,5 @@ import org.dromara.system.domain.vo.SysUserVo;
  */
 public interface SysModelConfigMapper extends BaseMapperPlus<SysModelConfig, SysModelConfigVo> {
 
-    /**
-     * 分页查询用户列表，并进行数据权限控制
-     *
-     * @param page         分页参数
-     * @param queryWrapper 查询条件
-     * @return 分页的用户信息
-     */
-    @DataPermission({
-        @DataColumn(key = "deptName", value = "dept_id"),
-        @DataColumn(key = "userName", value = "user_id")
-    })
-    default Page<SysModelConfigVo> selectPageUserList(Page<SysModelConfig> page, Wrapper<SysModelConfig> queryWrapper) {
-        return this.selectVoPage(page, queryWrapper);
-    }
+
 }
