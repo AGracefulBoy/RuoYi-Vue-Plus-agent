@@ -1,6 +1,7 @@
 package org.dromara.system.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -175,5 +176,19 @@ public class SysModuleServiceImpl implements ISysModuleService {
             return List.of();
         }
         return queryModelsByModuleId(module.getModuleId());
+    }
+    
+    /**
+     * 批量根据模块编码查询模块信息
+     */
+    @Override
+    public List<SysModuleVo> queryByModuleCodes(List<String> moduleCodes) {
+        if (CollUtil.isEmpty(moduleCodes)) {
+            return List.of();
+        }
+        
+        LambdaQueryWrapper<SysModule> lqw = Wrappers.lambdaQuery();
+        lqw.in(SysModule::getModuleCode, moduleCodes);
+        return baseMapper.selectVoList(lqw);
     }
 }

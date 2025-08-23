@@ -88,4 +88,12 @@ public interface ISysModuleService {
      * @return 模型列表
      */
     List<SysModelConfigVo> queryModelsByModuleCode(String moduleCode);
+    
+    /**
+     * 批量根据模块编码查询模块信息
+     * 
+     * @param moduleCodes 模块编码列表
+     * @return 模块信息列表
+     */
+    List<SysModuleVo> queryByModuleCodes(List<String> moduleCodes);
 }

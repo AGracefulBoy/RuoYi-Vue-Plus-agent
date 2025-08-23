@@ -201,4 +201,45 @@ public class SysModuleModelServiceImpl implements ISysModuleModelService {
         
         return baseMapper.update(setDefault, setLqw) > 0;
     }
+
+    /**
+     * 根据模块ID查询默认模型
+     */
+    @Override
+    public Long queryDefaultModelByModuleId(Long moduleId) {
+        if (moduleId == null) {
+            return null;
+        }
+        
+        LambdaQueryWrapper<SysModuleModel> lqw = Wrappers.lambdaQuery();
+        lqw.eq(SysModuleModel::getModuleId, moduleId);
+        lqw.eq(SysModuleModel::getIsDefault, 1);
+        SysModuleModel moduleModel = baseMapper.selectOne(lqw);
+        
+        return moduleModel != null ? moduleModel.getModelId() : null;
+    }
+    
+    /**
+     * 批量根据模块ID查询默认模型
+     */
+    @Override
+    public Map<Long, Long> queryDefaultModelsByModuleIds(List<Long> moduleIds) {
+        if (CollUtil.isEmpty(moduleIds)) {
+            return Map.of();
+        }
+        
+        // 一次查询所有模块的默认模型
+        LambdaQueryWrapper<SysModuleModel> lqw = Wrappers.lambdaQuery();
+        lqw.in(SysModuleModel::getModuleId, moduleIds);
+        lqw.eq(SysModuleModel::getIsDefault, 1);
+        List<SysModuleModel> moduleModels = baseMapper.selectList(lqw);
+        
+        // 转换为Map，key为模块ID，value为默认模型ID
+        return moduleModels.stream()
+            .collect(Collectors.toMap(
+                SysModuleModel::getModuleId,
+                SysModuleModel::getModelId,
+                (v1, v2) -> v1 // 如果有重复的key，保留第一个
+            ));
+    }
 }

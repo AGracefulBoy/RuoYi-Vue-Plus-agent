@@ -91,4 +91,20 @@ public interface ISysModuleModelService {
      */
     Boolean setDefaultModel(Long moduleId, Long modelId);
 
+    /**
+     * 根据模块ID查询默认模型
+     *
+     * @param moduleId 模块ID
+     * @return 默认模型ID，如果没有找到则返回null
+     */
+    Long queryDefaultModelByModuleId(Long moduleId);
+    
+    /**
+     * 批量根据模块ID查询默认模型
+     *
+     * @param moduleIds 模块ID列表
+     * @return 模块ID与默认模型ID的映射，key为模块ID，value为默认模型ID
+     */
+    java.util.Map<Long, Long> queryDefaultModelsByModuleIds(List<Long> moduleIds);
+
 }

@@ -2,13 +2,10 @@ package org.dromara.system.domain.vo;
 
 import cn.idev.excel.annotation.ExcelIgnoreUnannotated;
 import cn.idev.excel.annotation.ExcelProperty;
-import io.github.linpeilie.annotations.AutoMapper;
 import lombok.Data;
-import org.dromara.system.domain.SysKnowledgeBaseConfig;
 
 import java.io.Serial;
 import java.io.Serializable;
-import java.util.Date;
 
 /**
  * 知识库默认配置视图对象 sys_knowledge_base_config
@@ -17,17 +14,10 @@ import java.util.Date;
  */
 @Data
 @ExcelIgnoreUnannotated
-@AutoMapper(target = SysKnowledgeBaseConfig.class)
 public class SysKnowledgeBaseConfigVo implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 1L;
-
-    /**
-     * 主键ID
-     */
-    @ExcelProperty(value = "主键ID")
-    private Long knowledgeBaseConfigId;
 
     /**
      * 向量检索返回条数
@@ -50,8 +40,22 @@ public class SysKnowledgeBaseConfigVo implements Serializable {
     /**
      * 模型
      */
-    @ExcelProperty(value = "模型")
-    private String model;
+    private Long model;
+
+    /**
+     * 视觉模型
+     */
+    private Long imageModel;
+
+    /**
+     * 向量模型
+     */
+    private Long embeddingModel;
+
+    /**
+     * 重排序模型
+     */
+    private Long rerankModel;
 
     /**
      * 块大小
@@ -76,41 +80,4 @@ public class SysKnowledgeBaseConfigVo implements Serializable {
      */
     @ExcelProperty(value = "图片识别提示词")
     private String imagePrompt;
-
-    /**
-     * 创建部门
-     */
-    @ExcelProperty(value = "创建部门")
-    private Long createDept;
-
-    /**
-     * 创建者
-     */
-    @ExcelProperty(value = "创建者")
-    private Long createBy;
-
-    /**
-     * 创建时间
-     */
-    @ExcelProperty(value = "创建时间")
-    private Date createTime;
-
-    /**
-     * 更新者
-     */
-    @ExcelProperty(value = "更新者")
-    private Long updateBy;
-
-    /**
-     * 更新时间
-     */
-    @ExcelProperty(value = "更新时间")
-    private Date updateTime;
-
-    /**
-     * 备注
-     */
-    @ExcelProperty(value = "备注")
-    private String remark;
-
 }
