@@ -1,7 +1,5 @@
 package org.dromara.common.llm.model.protocol.req;
 
-//import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
-
 import com.alibaba.cloud.ai.dashscope.api.DashScopeResponseFormat;
 import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
 import lombok.Getter;
@@ -84,6 +82,17 @@ public class IChatRequest {
 
     private ResponseFormatRequest responseFormat;
 
+    /**
+     * 媒体内容列表（用于视觉模型）
+     */
+    private List<MediaContent> mediaContents;
+
+    @Setter
+    @Getter
+    public static class MediaContent {
+        private String mimeType;    // "image/png", "image/jpeg" 等，可选，不传则自动检测
+        private String content;      // 图片URL地址
+    }
 
     public static ResponseFormat toDeepSeekResponseFormat(ResponseFormatRequest responseFormatRequest) {
         if (responseFormatRequest == null) {
@@ -216,13 +225,13 @@ public class IChatRequest {
             .withTemperature(this.temperature)
             .withTopP(this.topP)
             .withResponseFormat(toDashScopeResponseFormat(this.responseFormat));
-        
+
         // Convert List<String> to List<Object> for withStop method
         if (this.stop != null && !this.stop.isEmpty()) {
             List<Object> stopObjects = new ArrayList<>(this.stop);
             builder.withStop(stopObjects);
         }
-        
+
         return builder.build();
     }
 
