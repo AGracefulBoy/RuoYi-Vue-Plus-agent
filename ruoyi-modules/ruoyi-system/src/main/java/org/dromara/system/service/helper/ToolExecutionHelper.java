@@ -127,7 +127,13 @@ public class ToolExecutionHelper {
             if (parameters != null && parameters.trim().startsWith("{")) {
                 Map<String, Object> params = JSONUtil.toBean(parameters, Map.class);
                 question = (String) params.getOrDefault("question", parameters);
-                metadata = params.containsKey("metadata") ? JSONUtil.toJsonStr(params.get("metadata")) : null;
+
+                // 提取除question之外的其他参数作为metadata
+                Map<String, Object> metadataMap = new HashMap<>(params);
+                metadataMap.remove("question");
+                if (!metadataMap.isEmpty()) {
+                    metadata = JSONUtil.toJsonStr(metadataMap);
+                }
             }
 
             // 调用ElasticsearchDocumentService进行混合搜索

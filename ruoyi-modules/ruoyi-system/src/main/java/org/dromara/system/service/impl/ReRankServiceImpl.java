@@ -31,16 +31,11 @@ public class ReRankServiceImpl implements IReRankService {
 
 
     @Override
-    public List<Double> reRank(List<String> sentencePairs, SysKnowledgeBaseVo knowledgeBase) {
+    public List<Double> reRank(String question,List<String> sentencePairs, SysKnowledgeBaseVo knowledgeBase) {
         try {
             // 参数验证
             if (CollectionUtils.isEmpty(sentencePairs)) {
                 log.warn("sentencePairs为空，返回空结果");
-                return Collections.emptyList();
-            }
-
-            if (sentencePairs.size() < 2) {
-                log.warn("sentencePairs至少需要包含查询和文档，当前大小: {}", sentencePairs.size());
                 return Collections.emptyList();
             }
 
@@ -56,18 +51,14 @@ public class ReRankServiceImpl implements IReRankService {
             // 获取rerank服务
             IRerankModeService rerankService = AiService.getRerankService(modelConfig.getModelProvider());
 
-            // 解析sentencePairs参数：第一个元素是查询，其余元素是文档
-            String query = sentencePairs.get(0);
-            List<String> documents = sentencePairs.subList(1, sentencePairs.size());
-
             // 构建rerank请求
             IReRankRequest rerankRequest = IReRankRequest.builder()
                 .apiKey(modelConfig.getApiKey())
                 .baseUrl(modelConfig.getBaseUrl())
                 .model(modelConfig.getModelCode())
-                .topN(knowledgeBase.getTopK() != null ? knowledgeBase.getTopK() : documents.size())
-                .query(query)
-                .documents(documents)
+                .topN(knowledgeBase.getTopK() != null ? knowledgeBase.getTopK() * 2 : sentencePairs.size())
+                .query(question)
+                .documents(sentencePairs)
                 .build();
 
             // 执行rerank调用
@@ -86,7 +77,7 @@ public class ReRankServiceImpl implements IReRankService {
             } else {
                 log.warn("rerank调用返回空结果");
                 // 返回默认分数（全部为0）
-                for (int i = 0; i < documents.size(); i++) {
+                for (int i = 0; i < sentencePairs.size(); i++) {
                     scores.add(0.0);
                 }
             }

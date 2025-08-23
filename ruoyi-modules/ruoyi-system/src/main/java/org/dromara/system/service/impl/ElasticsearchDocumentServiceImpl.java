@@ -526,7 +526,7 @@ public class ElasticsearchDocumentServiceImpl implements IElasticsearchDocumentS
             reRankList.add(hitSourceDTO.getHitDocument().getContent());
         }
 
-        List<Double> reRankScoreList = reRankService.reRank(reRankList, knowledgeBase);
+        List<Double> reRankScoreList = reRankService.reRank(question, reRankList, knowledgeBase);
 
         for (int i = 0; i < sortedResults.size(); i++) {
             sortedResults.get(i).setReRandScore(reRankScoreList.get(i));
@@ -590,7 +590,6 @@ public class ElasticsearchDocumentServiceImpl implements IElasticsearchDocumentS
         requestMap.put("text", texts);
         return JSONUtil.toJsonStr(requestMap);
     }
-
 
 
     /**

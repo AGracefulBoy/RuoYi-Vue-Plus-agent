@@ -15,5 +15,5 @@ public interface IReRankService {
      * @param sentencePairs 句子对列表
      * @return 相似度分数列表
      */
-    List<Double> reRank(List<String> sentencePairs, SysKnowledgeBaseVo knowledgeBase);
+    List<Double> reRank(String question, List<String> sentencePairs, SysKnowledgeBaseVo knowledgeBase);
 }
