@@ -289,6 +289,16 @@ public class SysKnowledgeBaseDocumentServiceImpl implements ISysKnowledgeBaseDoc
             document.setModel(knowledgeBaseVo.getModel());
         }
 
+        // 如果文档没有配置 model，则从知识库获取
+        if (document.getEmbeddingModel() == null && knowledgeBaseVo.getEmbeddingModel() != null) {
+            document.setEmbeddingModel(knowledgeBaseVo.getEmbeddingModel());
+        }
+
+        // 如果文档没有配置 model，则从知识库获取
+        if (document.getImageModel() == null && knowledgeBaseVo.getImageModel() != null) {
+            document.setImageModel(knowledgeBaseVo.getImageModel());
+        }
+
         // 如果文档没有配置 blockSize，则从知识库获取
         if (ObjectUtil.isNull(document.getBlockSize()) && ObjectUtil.isNotNull(knowledgeBaseVo.getBlockSize())) {
             document.setBlockSize(knowledgeBaseVo.getBlockSize());
@@ -323,7 +333,7 @@ public class SysKnowledgeBaseDocumentServiceImpl implements ISysKnowledgeBaseDoc
         try {
             // 解析JSON为List<KnowledgeBaseMetadata>
             List<KnowledgeBaseMetadata> metadataList = JSONUtil.toList(metadata, KnowledgeBaseMetadata.class);
-            
+
             // 将List转换为Map
             for (KnowledgeBaseMetadata item : metadataList) {
                 if (item != null && StringUtils.isNotBlank(item.getName())) {

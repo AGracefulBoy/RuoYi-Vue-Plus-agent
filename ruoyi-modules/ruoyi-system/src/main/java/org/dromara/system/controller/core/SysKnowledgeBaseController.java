@@ -137,6 +137,7 @@ public class SysKnowledgeBaseController extends BaseController {
     /**
      * 获取知识库默认配置
      */
+    // todo 性能优化
     @SaCheckPermission("system:knowledgeBase:query")
     @GetMapping("/defaultConfig")
     public R<SysKnowledgeBaseConfigVo> getDefaultConfig() {
