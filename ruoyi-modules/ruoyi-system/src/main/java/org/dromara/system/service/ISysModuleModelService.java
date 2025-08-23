@@ -107,4 +107,13 @@ public interface ISysModuleModelService {
      */
     java.util.Map<Long, Long> queryDefaultModelsByModuleIds(List<Long> moduleIds);
 
+    /**
+     * 配置模块的模型关联关系
+     * 一次性完成模型的绑定、解绑和默认模型设置
+     *
+     * @param configBo 模块模型配置参数
+     * @return 是否配置成功
+     */
+    Boolean configModuleModels(org.dromara.system.domain.bo.SysModuleModelConfigBo configBo);
+
 }

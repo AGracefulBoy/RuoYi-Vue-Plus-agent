@@ -10,6 +10,7 @@ import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.system.domain.SysModuleModel;
 import org.dromara.system.domain.bo.SysModuleModelBo;
+import org.dromara.system.domain.bo.SysModuleModelConfigBo;
 import org.dromara.system.domain.vo.SysModuleModelVo;
 import org.dromara.system.mapper.SysModuleModelMapper;
 import org.dromara.system.service.ISysModuleModelService;
@@ -241,5 +242,88 @@ public class SysModuleModelServiceImpl implements ISysModuleModelService {
                 SysModuleModel::getModelId,
                 (v1, v2) -> v1 // 如果有重复的key，保留第一个
             ));
+    }
+
+    /**
+     * 配置模块的模型关联关系
+     * 一次性完成模型的绑定、解绑和默认模型设置
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Boolean configModuleModels(SysModuleModelConfigBo configBo) {
+        Long moduleId = configBo.getModuleId();
+        List<Long> newModelIds = configBo.getModelIds();
+        Long defaultModelId = configBo.getDefaultModelId();
+
+        // 1. 查询该模块现有的所有模型关联
+        LambdaQueryWrapper<SysModuleModel> queryWrapper = Wrappers.lambdaQuery();
+        queryWrapper.eq(SysModuleModel::getModuleId, moduleId);
+        List<SysModuleModel> existingModels = baseMapper.selectList(queryWrapper);
+
+        // 2. 获取现有的模型ID列表
+        List<Long> existingModelIds = existingModels.stream()
+            .map(SysModuleModel::getModelId)
+            .collect(Collectors.toList());
+
+        // 3. 如果没有新的模型列表，则删除所有现有关联
+        if (CollUtil.isEmpty(newModelIds)) {
+            if (CollUtil.isNotEmpty(existingModelIds)) {
+                LambdaQueryWrapper<SysModuleModel> deleteWrapper = Wrappers.lambdaQuery();
+                deleteWrapper.eq(SysModuleModel::getModuleId, moduleId);
+                baseMapper.delete(deleteWrapper);
+            }
+            return true;
+        }
+
+        // 4. 找出需要删除的模型（在旧列表中但不在新列表中）
+        List<Long> toDeleteModelIds = existingModelIds.stream()
+            .filter(modelId -> !newModelIds.contains(modelId))
+            .collect(Collectors.toList());
+
+        // 5. 找出需要新增的模型（在新列表中但不在旧列表中）
+        List<Long> toAddModelIds = newModelIds.stream()
+            .filter(modelId -> !existingModelIds.contains(modelId))
+            .collect(Collectors.toList());
+
+        // 6. 删除不再需要的关联
+        if (CollUtil.isNotEmpty(toDeleteModelIds)) {
+            LambdaQueryWrapper<SysModuleModel> deleteWrapper = Wrappers.lambdaQuery();
+            deleteWrapper.eq(SysModuleModel::getModuleId, moduleId);
+            deleteWrapper.in(SysModuleModel::getModelId, toDeleteModelIds);
+            baseMapper.delete(deleteWrapper);
+        }
+
+        // 7. 批量新增新的关联
+        if (CollUtil.isNotEmpty(toAddModelIds)) {
+            List<SysModuleModel> addList = new ArrayList<>();
+            for (Long modelId : toAddModelIds) {
+                SysModuleModel model = new SysModuleModel();
+                model.setModuleId(moduleId);
+                model.setModelId(modelId);
+                model.setIsDefault(0); // 默认非默认模型
+                addList.add(model);
+            }
+            baseMapper.insertBatch(addList);
+        }
+
+        // 8. 设置默认模型（如果指定了）
+        if (defaultModelId != null && newModelIds.contains(defaultModelId)) {
+            // 先将该模块下所有模型的 isDefault 设置为 0
+            SysModuleModel resetDefault = new SysModuleModel();
+            resetDefault.setIsDefault(0);
+            LambdaQueryWrapper<SysModuleModel> resetWrapper = Wrappers.lambdaQuery();
+            resetWrapper.eq(SysModuleModel::getModuleId, moduleId);
+            baseMapper.update(resetDefault, resetWrapper);
+
+            // 再将指定模型的 isDefault 设置为 1
+            SysModuleModel setDefault = new SysModuleModel();
+            setDefault.setIsDefault(1);
+            LambdaQueryWrapper<SysModuleModel> setWrapper = Wrappers.lambdaQuery();
+            setWrapper.eq(SysModuleModel::getModuleId, moduleId);
+            setWrapper.eq(SysModuleModel::getModelId, defaultModelId);
+            baseMapper.update(setDefault, setWrapper);
+        }
+
+        return true;
     }
 }

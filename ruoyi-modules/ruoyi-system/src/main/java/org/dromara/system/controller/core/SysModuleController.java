@@ -16,6 +16,7 @@ import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.common.web.core.BaseController;
 import org.dromara.system.domain.bo.SysModuleBo;
+import org.dromara.system.domain.bo.SysModuleModelConfigBo;
 import org.dromara.system.domain.vo.SysModelConfigVo;
 import org.dromara.system.domain.vo.SysModuleVo;
 import org.dromara.system.service.ISysModuleModelService;
@@ -80,8 +81,25 @@ public class SysModuleController extends BaseController {
     }
 
     /**
-     * 绑定模块与模型关系
+     * 配置模块的模型关联关系
+     * 一次性完成模型的绑定、解绑和默认模型设置
+     *
+     * @param configBo 配置参数
      */
+    @SaCheckPermission("system:module:edit")
+    @Log(title = "模块管理", businessType = BusinessType.UPDATE)
+    @PostMapping("/models/config")
+    public R<Void> configModuleModels(@Validated @RequestBody SysModuleModelConfigBo configBo) {
+        // 设置模块ID到配置对象中
+        return toAjax(moduleModelService.configModuleModels(configBo));
+    }
+
+    /**
+     * 绑定模块与模型关系（保留以兼容旧版本）
+     *
+     * @deprecated 请使用 configModuleModels 接口
+     */
+    @Deprecated
     @SaCheckPermission("system:module:edit")
     @Log(title = "模块管理", businessType = BusinessType.UPDATE)
     @PostMapping("/{moduleId}/bind")
@@ -90,8 +108,11 @@ public class SysModuleController extends BaseController {
     }
 
     /**
-     * 解绑模块与模型关系
+     * 解绑模块与模型关系（保留以兼容旧版本）
+     *
+     * @deprecated 请使用 configModuleModels 接口
      */
+    @Deprecated
     @SaCheckPermission("system:module:edit")
     @Log(title = "模块管理", businessType = BusinessType.UPDATE)
     @PostMapping("/{moduleId}/unbind")
@@ -100,11 +121,13 @@ public class SysModuleController extends BaseController {
     }
 
     /**
-     * 设置模块的默认模型
+     * 设置模块的默认模型（保留以兼容旧版本）
      *
      * @param moduleId 模块ID
      * @param modelId 模型ID
+     * @deprecated 请使用 configModuleModels 接口
      */
+    @Deprecated
     @SaCheckPermission("system:module:edit")
     @Log(title = "模块管理", businessType = BusinessType.UPDATE)
     @PostMapping("/{moduleId}/default/{modelId}")

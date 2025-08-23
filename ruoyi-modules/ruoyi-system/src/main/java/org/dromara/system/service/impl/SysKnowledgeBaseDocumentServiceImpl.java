@@ -289,12 +289,12 @@ public class SysKnowledgeBaseDocumentServiceImpl implements ISysKnowledgeBaseDoc
             document.setModel(knowledgeBaseVo.getModel());
         }
 
-        // 如果文档没有配置 model，则从知识库获取
+        // 如果文档没有配置 embeddingModel，则从知识库获取
         if (document.getEmbeddingModel() == null && knowledgeBaseVo.getEmbeddingModel() != null) {
             document.setEmbeddingModel(knowledgeBaseVo.getEmbeddingModel());
         }
 
-        // 如果文档没有配置 model，则从知识库获取
+        // 如果文档没有配置 imageModel，则从知识库获取
         if (document.getImageModel() == null && knowledgeBaseVo.getImageModel() != null) {
             document.setImageModel(knowledgeBaseVo.getImageModel());
         }

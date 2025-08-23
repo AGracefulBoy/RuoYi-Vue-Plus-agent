@@ -47,7 +47,11 @@ public class SysModuleServiceImpl implements ISysModuleService {
      */
     @Override
     public SysModuleVo queryById(Long moduleId) {
-        return baseMapper.selectVoById(moduleId);
+        SysModuleVo module = baseMapper.selectVoById(moduleId);
+        if (module != null) {
+            fillModelsForModules(List.of(module));
+        }
+        return module;
     }
 
     /**
@@ -57,6 +61,10 @@ public class SysModuleServiceImpl implements ISysModuleService {
     public TableDataInfo<SysModuleVo> queryPageList(SysModuleBo bo, PageQuery pageQuery) {
         LambdaQueryWrapper<SysModule> lqw = buildQueryWrapper(bo);
         Page<SysModuleVo> result = baseMapper.selectVoPage(pageQuery.build(), lqw);
+        // 填充模型数据
+        if (CollUtil.isNotEmpty(result.getRecords())) {
+            fillModelsForModules(result.getRecords());
+        }
         return TableDataInfo.build(result);
     }
 
@@ -66,7 +74,12 @@ public class SysModuleServiceImpl implements ISysModuleService {
     @Override
     public List<SysModuleVo> queryList(SysModuleBo bo) {
         LambdaQueryWrapper<SysModule> lqw = buildQueryWrapper(bo);
-        return baseMapper.selectVoList(lqw);
+        List<SysModuleVo> modules = baseMapper.selectVoList(lqw);
+        // 填充模型数据
+        if (CollUtil.isNotEmpty(modules)) {
+            fillModelsForModules(modules);
+        }
+        return modules;
     }
 
     private LambdaQueryWrapper<SysModule> buildQueryWrapper(SysModuleBo bo) {
@@ -190,5 +203,73 @@ public class SysModuleServiceImpl implements ISysModuleService {
         LambdaQueryWrapper<SysModule> lqw = Wrappers.lambdaQuery();
         lqw.in(SysModule::getModuleCode, moduleCodes);
         return baseMapper.selectVoList(lqw);
+    }
+    
+    /**
+     * 批量填充模块的模型列表
+     *
+     * @param modules 模块列表
+     */
+    private void fillModelsForModules(List<SysModuleVo> modules) {
+        if (CollUtil.isEmpty(modules)) {
+            return;
+        }
+        
+        // 收集所有模块ID
+        List<Long> moduleIds = modules.stream()
+            .map(SysModuleVo::getModuleId)
+            .distinct()
+            .collect(Collectors.toList());
+        
+        // 批量查询所有模块的模型关联关系
+        LambdaQueryWrapper<SysModuleModel> lqw = Wrappers.lambdaQuery();
+        lqw.in(SysModuleModel::getModuleId, moduleIds);
+        List<SysModuleModelVo> moduleModels = moduleModelMapper.selectVoList(lqw);
+        
+        if (CollUtil.isEmpty(moduleModels)) {
+            // 如果没有关联关系，给所有模块设置空列表
+            modules.forEach(module -> module.setModels(List.of()));
+            return;
+        }
+        
+        // 获取所有模型ID
+        List<Long> modelIds = moduleModels.stream()
+            .map(SysModuleModelVo::getModelId)
+            .distinct()
+            .collect(Collectors.toList());
+        
+        // 批量查询所有模型配置信息
+        List<SysModelConfig> modelConfigs = modelConfigMapper.selectBatchIds(modelIds);
+        Map<Long, SysModelConfigVo> modelConfigMap = MapstructUtils.convert(modelConfigs, SysModelConfigVo.class)
+            .stream()
+            .collect(Collectors.toMap(SysModelConfigVo::getModelId, vo -> vo));
+        
+        // 按模块ID分组模型关联关系
+        Map<Long, List<SysModuleModelVo>> moduleModelMap = moduleModels.stream()
+            .collect(Collectors.groupingBy(SysModuleModelVo::getModuleId));
+        
+        // 为每个模块设置模型列表
+        modules.forEach(module -> {
+            List<SysModuleModelVo> moduleModelList = moduleModelMap.get(module.getModuleId());
+            if (CollUtil.isEmpty(moduleModelList)) {
+                module.setModels(List.of());
+            } else {
+                // 构建该模块的模型列表
+                List<SysModelConfigVo> modelList = moduleModelList.stream()
+                    .map(mm -> {
+                        SysModelConfigVo model = modelConfigMap.get(mm.getModelId());
+                        if (model != null) {
+                            // 克隆对象避免修改原对象
+                            SysModelConfigVo clonedModel = BeanUtil.copyProperties(model, SysModelConfigVo.class);
+                            clonedModel.setIsDefault(mm.getIsDefault());
+                            return clonedModel;
+                        }
+                        return null;
+                    })
+                    .filter(model -> model != null)
+                    .collect(Collectors.toList());
+                module.setModels(modelList);
+            }
+        });
     }
 }
