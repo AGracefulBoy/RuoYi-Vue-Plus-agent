@@ -23,8 +23,10 @@ import org.dromara.system.domain.vo.KnowledgeBaseMetadata;
 import org.dromara.system.domain.vo.SysKnowledgeBaseDocumentVo;
 import org.dromara.system.mapper.SysKnowledgeBaseDocumentMapper;
 import org.dromara.system.mapper.SysKnowledgeBaseMapper;
+import org.dromara.system.service.IElasticsearchDocumentService;
 import org.dromara.system.service.ISysKnowledgeBaseDocumentService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -32,6 +34,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 知识库文档管理Service业务层处理
@@ -45,6 +48,7 @@ public class SysKnowledgeBaseDocumentServiceImpl implements ISysKnowledgeBaseDoc
 
     private final SysKnowledgeBaseDocumentMapper baseMapper;
     private final SysKnowledgeBaseMapper knowledgeBaseMapper;
+    private final IElasticsearchDocumentService elasticsearchDocumentService;
 
     /**
      * 查询知识库文档管理
@@ -227,14 +231,28 @@ public class SysKnowledgeBaseDocumentServiceImpl implements ISysKnowledgeBaseDoc
         }
     }
 
+    // todo 双向删除必须要保证删除成功
     /**
      * 批量删除知识库文档管理
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Boolean deleteWithValidByIds(Collection<Long> ids, Boolean isValid) {
-        if (isValid) {
-            // TODO 做一些业务上的校验,判断是否需要校验
+        // 先批量删除ES中的文档数据
+        try {
+            List<Long> documentIds = new ArrayList<>(ids);
+            Map<Long, Boolean> esDeleteResults = elasticsearchDocumentService.batchDeleteDocumentsByDocumentIds(documentIds);
+
+            // 记录删除失败的文档
+            long failedCount = esDeleteResults.values().stream().filter(v -> !v).count();
+            if (failedCount > 0) {
+                log.warn("Failed to delete {} ES documents out of {}", failedCount, ids.size());
+            }
+        } catch (Exception e) {
+            log.error("Error batch deleting ES documents", e);
         }
+
+        // 再删除数据库中的记录
         return baseMapper.deleteBatchIds(ids) > 0;
     }
 
@@ -243,6 +261,32 @@ public class SysKnowledgeBaseDocumentServiceImpl implements ISysKnowledgeBaseDoc
      */
     @Override
     public Boolean deleteByKnowledgeBaseId(Long knowledgeBaseId) {
+        // 先查询该知识库下的所有文档
+        LambdaQueryWrapper<SysKnowledgeBaseDocument> queryWrapper = Wrappers.lambdaQuery();
+        queryWrapper.eq(SysKnowledgeBaseDocument::getKnowledgeBaseId, knowledgeBaseId)
+            .select(SysKnowledgeBaseDocument::getDocumentId);
+        List<SysKnowledgeBaseDocument> documents = baseMapper.selectList(queryWrapper);
+
+        // 批量删除ES中的文档数据
+        if (!documents.isEmpty()) {
+            try {
+                List<Long> documentIds = documents.stream()
+                    .map(SysKnowledgeBaseDocument::getDocumentId)
+                    .collect(Collectors.toList());
+
+                Map<Long, Boolean> esDeleteResults = elasticsearchDocumentService.batchDeleteDocumentsByDocumentIds(documentIds);
+
+                // 记录删除失败的文档
+                long failedCount = esDeleteResults.values().stream().filter(v -> !v).count();
+                if (failedCount > 0) {
+                    log.warn("Failed to delete {} ES documents for knowledgeBaseId: {}", failedCount, knowledgeBaseId);
+                }
+            } catch (Exception e) {
+                log.error("Error batch deleting ES documents for knowledgeBaseId: {}", knowledgeBaseId, e);
+            }
+        }
+
+        // 删除数据库中的记录
         LambdaQueryWrapper<SysKnowledgeBaseDocument> lqw = Wrappers.lambdaQuery();
         lqw.eq(SysKnowledgeBaseDocument::getKnowledgeBaseId, knowledgeBaseId);
         return baseMapper.delete(lqw) >= 0;

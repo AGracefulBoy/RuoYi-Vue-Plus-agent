@@ -58,6 +58,15 @@ public interface IElasticsearchDocumentService {
     Boolean deleteChunkByChunkId(String chunkId);
 
     /**
+     * Batch deletes documents from Elasticsearch by document IDs.
+     * This will remove all chunks associated with the given document IDs.
+     *
+     * @param documentIds the collection of document IDs to delete
+     * @return map of documentId to deletion result (true if succeeded, false otherwise)
+     */
+    Map<Long, Boolean> batchDeleteDocumentsByDocumentIds(List<Long> documentIds);
+
+    /**
      * 向量搜索
      * 使用KNN查询进行向量相似度搜索
      *

@@ -42,6 +42,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -316,6 +317,92 @@ public class ElasticsearchDocumentServiceImpl implements IElasticsearchDocumentS
             log.error("Failed to delete ES chunk: chunkId={}", chunkId, exception);
             return false;
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Map<Long, Boolean> batchDeleteDocumentsByDocumentIds(List<Long> documentIds) {
+        Map<Long, Boolean> resultMap = new ConcurrentHashMap<>();
+
+        if (documentIds == null || documentIds.isEmpty()) {
+            return resultMap;
+        }
+
+        try {
+            log.info("Batch deleting ES documents for {} documentIds", documentIds.size());
+
+            // 按知识库分组文档ID，以便批量删除
+            Map<String, List<Long>> indexToDocumentIds = new HashMap<>();
+
+            for (Long documentId : documentIds) {
+                String indexName = getIndexNameByDocumentId(documentId);
+                if (indexName != null) {
+                    indexToDocumentIds.computeIfAbsent(indexName, k -> new ArrayList<>()).add(documentId);
+                } else {
+                    log.warn("Cannot find index for documentId: {}", documentId);
+                    resultMap.put(documentId, false);
+                }
+            }
+
+            // 对每个索引执行批量删除
+            for (Map.Entry<String, List<Long>> entry : indexToDocumentIds.entrySet()) {
+                String indexName = entry.getKey();
+                List<Long> docIds = entry.getValue();
+
+                try {
+                    // 使用 deleteByQuery 批量删除
+                    DeleteByQueryRequest deleteRequest = DeleteByQueryRequest.of(builder -> builder
+                        .index(indexName)
+                        .query(query -> query
+                            .terms(terms -> terms
+                                .field("documentId")
+                                .terms(t -> {
+                                    List<FieldValue> values = docIds.stream()
+                                        .map(id -> FieldValue.of(id.toString()))
+                                        .collect(Collectors.toList());
+                                    return t.value(values);
+                                })
+                            )
+                        )
+                        .refresh(Boolean.TRUE)
+                    );
+
+                    var deleteResponse = elasticsearchClient.deleteByQuery(deleteRequest);
+                    long deletedCount = deleteResponse.deleted() != null ? deleteResponse.deleted() : 0;
+
+                    log.info("Deleted {} documents from index {} for documentIds: {}",
+                        deletedCount, indexName, docIds);
+
+                    // 将结果记录到map中
+                    boolean success = deletedCount > 0;
+                    for (Long docId : docIds) {
+                        resultMap.put(docId, success);
+                    }
+
+                } catch (Exception e) {
+                    log.error("Failed to batch delete documents from index {}: {}", indexName, e.getMessage());
+                    for (Long docId : docIds) {
+                        resultMap.put(docId, false);
+                    }
+                }
+            }
+
+            log.info("Batch delete completed: {} succeeded, {} failed out of {} total",
+                resultMap.values().stream().filter(v -> v).count(),
+                resultMap.values().stream().filter(v -> !v).count(),
+                documentIds.size());
+
+        } catch (Exception e) {
+            log.error("Batch delete documents failed", e);
+            // 标记所有文档删除失败
+            for (Long documentId : documentIds) {
+                resultMap.putIfAbsent(documentId, false);
+            }
+        }
+
+        return resultMap;
     }
 
     /**
