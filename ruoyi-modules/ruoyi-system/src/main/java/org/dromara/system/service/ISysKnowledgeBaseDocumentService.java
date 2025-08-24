@@ -3,6 +3,7 @@ package org.dromara.system.service;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.system.domain.bo.SysKnowledgeBaseDocumentBo;
+import org.dromara.system.domain.bo.SysKnowledgeBaseDocumentResliceBo;
 import org.dromara.system.domain.bo.SysKnowledgeBaseDocumentSliceUpdateBo;
 import org.dromara.system.domain.vo.SysKnowledgeBaseDocumentVo;
 
@@ -111,9 +112,9 @@ public interface ISysKnowledgeBaseDocumentService {
      * 重新切片文档
      * 删除ES中的历史文档并重置文档状态为待执行
      *
-     * @param documentId 文档ID
+     * @param bo 重新切片业务对象
      * @return 操作结果
      */
-    Boolean resliceDocument(Long documentId);
+    Boolean resliceDocument(SysKnowledgeBaseDocumentResliceBo bo);
 
 } 

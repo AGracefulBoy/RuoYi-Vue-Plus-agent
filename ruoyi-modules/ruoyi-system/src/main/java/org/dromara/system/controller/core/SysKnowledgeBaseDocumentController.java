@@ -14,6 +14,7 @@ import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.common.web.core.BaseController;
 import org.dromara.system.domain.bo.SysKnowledgeBaseDocumentBo;
+import org.dromara.system.domain.bo.SysKnowledgeBaseDocumentResliceBo;
 import org.dromara.system.domain.bo.SysKnowledgeBaseDocumentSliceUpdateBo;
 import org.dromara.system.domain.vo.SysKnowledgeBaseDocumentVo;
 import org.dromara.system.domain.vo.SysKnowledgeBaseEsDocumentVo;
@@ -176,14 +177,14 @@ public class SysKnowledgeBaseDocumentController extends BaseController {
      * 重新切片文档
      * 删除ES中的历史文档并重置文档状态为待执行
      *
-     * @param documentId 文档ID
+     * @param bo 重新切片业务对象
      * @return 操作结果
      */
     @SaCheckPermission("system:knowledgeBaseDocument:edit")
     @Log(title = "知识库文档重新切片", businessType = BusinessType.UPDATE)
-    @PostMapping("/reslice/{documentId}")
-    public R<Void> resliceDocument(@NotNull(message = "文档ID不能为空")
-                                   @PathVariable Long documentId) {
-        return toAjax(knowledgeBaseDocumentService.resliceDocument(documentId));
+    @RepeatSubmit()
+    @PostMapping("/reslice")
+    public R<Void> resliceDocument(@Validated @RequestBody SysKnowledgeBaseDocumentResliceBo bo) {
+        return toAjax(knowledgeBaseDocumentService.resliceDocument(bo));
     }
 }

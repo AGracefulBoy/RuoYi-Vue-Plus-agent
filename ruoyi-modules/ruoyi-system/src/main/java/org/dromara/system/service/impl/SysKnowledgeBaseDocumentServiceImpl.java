@@ -18,6 +18,7 @@ import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.system.constant.SysKnowledgeBaseDocumentConstants;
 import org.dromara.system.domain.SysKnowledgeBaseDocument;
 import org.dromara.system.domain.bo.SysKnowledgeBaseDocumentBo;
+import org.dromara.system.domain.bo.SysKnowledgeBaseDocumentResliceBo;
 import org.dromara.system.domain.bo.SysKnowledgeBaseDocumentSliceUpdateBo;
 import org.dromara.system.domain.vo.KnowledgeBaseMetadata;
 import org.dromara.system.domain.vo.SysKnowledgeBaseDocumentVo;
@@ -232,6 +233,7 @@ public class SysKnowledgeBaseDocumentServiceImpl implements ISysKnowledgeBaseDoc
     }
 
     // todo 双向删除必须要保证删除成功
+
     /**
      * 批量删除知识库文档管理
      */
@@ -442,17 +444,59 @@ public class SysKnowledgeBaseDocumentServiceImpl implements ISysKnowledgeBaseDoc
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Boolean resliceDocument(Long documentId) {
-        if (ObjectUtil.isNull(documentId)) {
+    public Boolean resliceDocument(SysKnowledgeBaseDocumentResliceBo bo) {
+        if (ObjectUtil.isNull(bo) || ObjectUtil.isNull(bo.getDocumentId())) {
             throw new ServiceException("文档ID不能为空");
         }
-        
+
+        Long documentId = bo.getDocumentId();
+
         // 先查询文档是否存在
         SysKnowledgeBaseDocument document = baseMapper.selectById(documentId);
         if (ObjectUtil.isNull(document)) {
             throw new ServiceException("文档不存在");
         }
-        
+
+        // 更新文档的切片参数
+        if (ObjectUtil.isNotNull(bo.getMetadata())) {
+            document.setMetadata(bo.getMetadata());
+        }
+        if (bo.getModel() != null) {
+            document.setModel(bo.getModel());
+        }
+        if (bo.getImageModel() != null) {
+            document.setImageModel(bo.getImageModel());
+        }
+        if (ObjectUtil.isNotNull(bo.getBlockSize())) {
+            document.setBlockSize(bo.getBlockSize());
+        }
+        if (ObjectUtil.isNotNull(bo.getOverlapSize())) {
+            document.setOverlapSize(bo.getOverlapSize());
+        }
+        if (StringUtils.isNotBlank(bo.getSlicePrompt())) {
+            document.setSlicePrompt(bo.getSlicePrompt());
+        }
+        if (StringUtils.isNotBlank(bo.getImagePrompt())) {
+            document.setImagePrompt(bo.getImagePrompt());
+        }
+        if (ObjectUtil.isNotNull(bo.getEnableImageRecognition())) {
+            document.setEnableImageRecognition(bo.getEnableImageRecognition());
+        }
+        if (ObjectUtil.isNotNull(bo.getMode())) {
+            document.setMode(bo.getMode());
+        }
+
+        // 更新文档状态为默认状态（待执行）
+        document.setStatus(SysKnowledgeBaseDocumentConstants.DEFAULT_STATUS);
+        document.setTaskId(null);
+        document.setParseCompletedUrl(null);
+
+        // 保存更新到数据库
+        boolean updateResult = baseMapper.updateById(document) > 0;
+        if (!updateResult) {
+            throw new ServiceException("更新文档参数失败");
+        }
+
         try {
             // 删除ES中的历史文档
             Boolean esDeleteResult = elasticsearchDocumentService.deleteDocumentsByDocumentId(documentId);
@@ -463,16 +507,10 @@ public class SysKnowledgeBaseDocumentServiceImpl implements ISysKnowledgeBaseDoc
             log.error("Error deleting ES documents for documentId: {} during reslice", documentId, e);
             throw new ServiceException("删除历史文档失败：" + e.getMessage());
         }
-        
-        // 更新文档状态为默认状态（待执行）
-        Boolean statusUpdateResult = updateDocumentStatus(documentId, SysKnowledgeBaseDocumentConstants.DEFAULT_STATUS);
-        if (!statusUpdateResult) {
-            throw new ServiceException("更新文档状态失败");
-        }
-        
-        log.info("Successfully resliced document: {}, status reset to: {}", 
+
+        log.info("Successfully resliced document: {}, status reset to: {}",
             documentId, SysKnowledgeBaseDocumentConstants.DEFAULT_STATUS);
-        
+
         return true;
     }
 
