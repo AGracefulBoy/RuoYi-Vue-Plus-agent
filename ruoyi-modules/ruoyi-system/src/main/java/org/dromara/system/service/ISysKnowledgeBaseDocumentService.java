@@ -107,5 +107,13 @@ public interface ISysKnowledgeBaseDocumentService {
      */
     Boolean updateSliceParams(SysKnowledgeBaseDocumentSliceUpdateBo bo);
 
+    /**
+     * 重新切片文档
+     * 删除ES中的历史文档并重置文档状态为待执行
+     *
+     * @param documentId 文档ID
+     * @return 操作结果
+     */
+    Boolean resliceDocument(Long documentId);
 
 } 

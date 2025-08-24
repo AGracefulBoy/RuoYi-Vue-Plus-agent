@@ -171,4 +171,19 @@ public class SysKnowledgeBaseDocumentController extends BaseController {
                                          @PathVariable String chunkId) {
         return toAjax(elasticsearchDocumentService.deleteChunkByChunkId(chunkId));
     }
+
+    /**
+     * 重新切片文档
+     * 删除ES中的历史文档并重置文档状态为待执行
+     *
+     * @param documentId 文档ID
+     * @return 操作结果
+     */
+    @SaCheckPermission("system:knowledgeBaseDocument:edit")
+    @Log(title = "知识库文档重新切片", businessType = BusinessType.UPDATE)
+    @PostMapping("/reslice/{documentId}")
+    public R<Void> resliceDocument(@NotNull(message = "文档ID不能为空")
+                                   @PathVariable Long documentId) {
+        return toAjax(knowledgeBaseDocumentService.resliceDocument(documentId));
+    }
 }

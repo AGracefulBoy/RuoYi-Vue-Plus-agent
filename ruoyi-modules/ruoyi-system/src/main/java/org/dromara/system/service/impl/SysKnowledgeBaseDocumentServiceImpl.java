@@ -436,4 +436,44 @@ public class SysKnowledgeBaseDocumentServiceImpl implements ISysKnowledgeBaseDoc
         return baseMapper.updateById(entity) > 0;
     }
 
+    /**
+     * 重新切片文档
+     * 删除ES中的历史文档并重置文档状态为待执行
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Boolean resliceDocument(Long documentId) {
+        if (ObjectUtil.isNull(documentId)) {
+            throw new ServiceException("文档ID不能为空");
+        }
+        
+        // 先查询文档是否存在
+        SysKnowledgeBaseDocument document = baseMapper.selectById(documentId);
+        if (ObjectUtil.isNull(document)) {
+            throw new ServiceException("文档不存在");
+        }
+        
+        try {
+            // 删除ES中的历史文档
+            Boolean esDeleteResult = elasticsearchDocumentService.deleteDocumentsByDocumentId(documentId);
+            if (!esDeleteResult) {
+                log.warn("Failed to delete ES documents for documentId: {} during reslice", documentId);
+            }
+        } catch (Exception e) {
+            log.error("Error deleting ES documents for documentId: {} during reslice", documentId, e);
+            throw new ServiceException("删除历史文档失败：" + e.getMessage());
+        }
+        
+        // 更新文档状态为默认状态（待执行）
+        Boolean statusUpdateResult = updateDocumentStatus(documentId, SysKnowledgeBaseDocumentConstants.DEFAULT_STATUS);
+        if (!statusUpdateResult) {
+            throw new ServiceException("更新文档状态失败");
+        }
+        
+        log.info("Successfully resliced document: {}, status reset to: {}", 
+            documentId, SysKnowledgeBaseDocumentConstants.DEFAULT_STATUS);
+        
+        return true;
+    }
+
 }
