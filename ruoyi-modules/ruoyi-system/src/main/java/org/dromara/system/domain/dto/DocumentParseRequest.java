@@ -44,4 +44,6 @@ public class DocumentParseRequest {
      * Image recognition prompt
      */
     private String prompt;
+
+    private String modelId;
 }

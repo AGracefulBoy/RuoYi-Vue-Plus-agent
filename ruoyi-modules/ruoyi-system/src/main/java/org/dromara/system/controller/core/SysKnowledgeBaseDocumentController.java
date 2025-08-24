@@ -175,7 +175,6 @@ public class SysKnowledgeBaseDocumentController extends BaseController {
 
     /**
      * 重新切片文档
-     * 删除ES中的历史文档并重置文档状态为待执行
      *
      * @param bo 重新切片业务对象
      * @return 操作结果

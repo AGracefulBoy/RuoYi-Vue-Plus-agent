@@ -308,7 +308,7 @@ public class KnowledgeBaseFileTaskOptimized {
             List<CompletableFuture<List<Map<String, Object>>>> embeddingFutures =
                 chunkBatches.stream()
                     .map(batch -> CompletableFuture.supplyAsync(() ->
-                        processChunkBatch(batch, doc, chatService, modelConfig),
+                            processChunkBatch(batch, doc, chatService, modelConfig),
                         documentProcessingExecutor))
                     .toList();
 
@@ -352,10 +352,10 @@ public class KnowledgeBaseFileTaskOptimized {
      * 处理chunk批次的向量化
      */
     private List<Map<String, Object>> processChunkBatch(
-            List<SysKnowledgeBaseDocumentChunk> chunks,
-            SysKnowledgeBaseDocument doc,
-            IChatService chatService,
-            SysModelConfigVo modelConfig) {
+        List<SysKnowledgeBaseDocumentChunk> chunks,
+        SysKnowledgeBaseDocument doc,
+        IChatService chatService,
+        SysModelConfigVo modelConfig) {
 
         List<Map<String, Object>> esDocuments = new ArrayList<>();
 
@@ -383,7 +383,7 @@ public class KnowledgeBaseFileTaskOptimized {
                 // 生成向量
                 List<String> textList = new ArrayList<>(parsedData.keySet());
                 if (!textList.isEmpty()) {
-                    List<List<Float>> embeddings = embeddingService.textsToEmbeddings(textList,doc.getEmbeddingModel());
+                    List<List<Float>> embeddings = embeddingService.textsToEmbeddings(textList, doc.getEmbeddingModel());
 
                     // 构建ES文档
                     String createTime = LocalDateTime.now().format(
@@ -470,6 +470,7 @@ public class KnowledgeBaseFileTaskOptimized {
             .fileType(doc.getType())
             .mode(doc.getMode() != null ? doc.getMode() : 1)
             .fileUrl(doc.getUrl())
+            .modelId(Optional.ofNullable(doc.getImageModel()).map(Object::toString).orElse(null))
             .enableImageRecognition(doc.getEnableImageRecognition() != null &&
                 doc.getEnableImageRecognition() == 1)
             .prompt(doc.getImagePrompt())
@@ -555,7 +556,7 @@ public class KnowledgeBaseFileTaskOptimized {
     }
 
     private IChatRequest buildChatRequest(SysModelConfigVo modelConfig, String promptTemplate,
-                                         String content) {
+                                          String content) {
         IChatRequest request = new IChatRequest();
         request.setCode(modelConfig.getModelCode());
         request.setModel(modelConfig.getModelCode());
@@ -573,9 +574,9 @@ public class KnowledgeBaseFileTaskOptimized {
     }
 
     private Map<String, Object> buildEsDocument(SysKnowledgeBaseDocumentChunk chunk,
-                                               SysKnowledgeBaseDocument doc,
-                                               String title, String content,
-                                               List<Float> embedding, String createTime) {
+                                                SysKnowledgeBaseDocument doc,
+                                                String title, String content,
+                                                List<Float> embedding, String createTime) {
         Map<String, Object> esDoc = new HashMap<>();
         esDoc.put("documentId", chunk.getDocumentId().toString());
         esDoc.put("chunkId", chunk.getChunkId().toString() + "_" + IdUtil.fastSimpleUUID());
@@ -595,7 +596,7 @@ public class KnowledgeBaseFileTaskOptimized {
     }
 
     private int processParseResponseAndUpdate(List<SysKnowledgeBaseDocument> documents,
-                                             DocumentParseResponse response) {
+                                              DocumentParseResponse response) {
         if (response == null || response.getSuccessTaskIds() == null) {
             SnailJobLog.REMOTE.error("文档解析API调用失败或返回空响应");
             return 0;
@@ -655,7 +656,7 @@ public class KnowledgeBaseFileTaskOptimized {
     }
 
     private void parseJsonRecursive(Object obj, String currentPath,
-                                   LinkedHashMap<String, String> result) {
+                                    LinkedHashMap<String, String> result) {
         if (obj instanceof JSONObject) {
             JSONObject jsonObj = (JSONObject) obj;
             for (Map.Entry<String, Object> entry : jsonObj.entrySet()) {
