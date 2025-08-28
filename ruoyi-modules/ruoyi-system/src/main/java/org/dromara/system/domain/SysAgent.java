@@ -116,4 +116,9 @@ public class SysAgent extends TenantEntity {
      * 备注
      */
     private String remark;
+
+    /**
+     * 自由对话模型ID，关联sys_model_config.model_id
+     */
+    private Long freeModel;
 }

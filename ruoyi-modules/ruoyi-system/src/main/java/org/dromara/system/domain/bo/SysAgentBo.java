@@ -110,4 +110,9 @@ public class SysAgentBo extends BaseEntity {
      */
     @Size(min = 0, max = 500, message = "备注长度不能超过{max}个字符")
     private String remark;
+
+    /**
+     * 自由对话模型ID，关联sys_model_config.model_id
+     */
+    private Long freeModel;
 }

@@ -201,4 +201,10 @@ public class SysAgentVo implements Serializable {
      */
     @ExcelProperty(value = "备注")
     private String remark;
+
+    /**
+     * 自由对话模型ID，关联sys_model_config.model_id
+     */
+    @ExcelProperty(value = "自由对话模型ID")
+    private Long freeModel;
 }
